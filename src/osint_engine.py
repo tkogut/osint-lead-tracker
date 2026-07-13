@@ -70,6 +70,9 @@ def _parse_leads(raw_text: str) -> list[dict]:
     Parsuje surową odpowiedź LLM do listy leadów.
     Przy błędzie parsowania zwraca [].
     """
+    if not raw_text or not raw_text.strip():
+        logger.warning("Pusta odpowiedź z modelu AI.")
+        return []
     clean = _strip_markdown_fences(raw_text)
     try:
         payload: Any = json.loads(clean)
