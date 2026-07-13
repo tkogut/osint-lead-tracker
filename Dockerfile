@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # --- application source ---
 COPY src/ ./src/
+ENV PYTHONPATH=/app/src
 
 # --- runtime directory for SQLite data ---
 RUN mkdir -p /app/data && chmod 777 /app/data
