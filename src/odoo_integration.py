@@ -107,7 +107,7 @@ class OdooClient:
         vals: dict = {
             "name": name,
             "description": description,
-            "type": "opportunity",
+            "type": "lead",
         }
 
         if s.odoo_team_id:
