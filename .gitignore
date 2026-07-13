@@ -1,0 +1,7 @@
+# AGENTS-OS v5.0
+tmp/
+*.log
+__pycache__/
+.DS_Store
+node_modules/
+.env

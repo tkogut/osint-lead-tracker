@@ -1,0 +1,115 @@
+#!/bin/bash
+# ==============================================================================
+# AGENTS-OS v5.0 — PRE-COMMIT SECURITY HOOK
+# Prevents API token and configuration file leaks from being committed to the repository.
+# Instalacja: cp hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# ==============================================================================
+
+set -e
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+ERRORS=0
+
+echo "🔐 [pre-commit] Running AGENTS-OS security scanner..."
+
+# --------------------------------------------------------------------------- #
+# 1. Block .env files from the Git index
+# --------------------------------------------------------------------------- #
+ENV_FILES=$(git diff --cached --name-only | grep -E '(^|/)\.env(\.|$)' || true)
+if [ -n "$ENV_FILES" ]; then
+    echo -e "${RED}❌ BLOCKED: Attempt to commit a .env file!${NC}"
+    echo "   File(s): $ENV_FILES"
+    echo "   Add '.env' to .gitignore and remove the file from the index:"
+    echo "   git rm --cached <file.env>"
+    ERRORS=$((ERRORS + 1))
+fi
+
+# --------------------------------------------------------------------------- #
+# 2. Scan for API token leaks
+# --------------------------------------------------------------------------- #
+
+# Token patterns to block
+declare -a PATTERNS=(
+    "gho_[A-Za-z0-9_]{36,}"                          # GitHub OAuth token
+    "github_pat_[A-Za-z0-9_]{22,}"                   # GitHub PAT (fine-grained)
+    "ghp_[A-Za-z0-9_]{36,}"                          # GitHub PAT (classic)
+    "ghs_[A-Za-z0-9_]{36,}"                          # GitHub Server token
+    "AIza[0-9A-Za-z\\-_]{35}"                        # Google/Gemini API key
+    "sk-ant-api[0-9A-Za-z\\-_]{40,}"                 # Anthropic API key
+    "sk-[a-zA-Z0-9]{20}T3BlbkFJ[a-zA-Z0-9]{20}"     # OpenAI API key (classic)
+    "AKIA[0-9A-Z]{16}"                               # AWS Access Key ID
+)
+
+declare -a PATTERN_NAMES=(
+    "GitHub OAuth Token (gho_)"
+    "GitHub Fine-grained PAT (github_pat_)"
+    "GitHub Classic PAT (ghp_)"
+    "GitHub Server Token (ghs_)"
+    "Google/Gemini API Key (AIza)"
+    "Anthropic API Key (sk-ant-api)"
+    "OpenAI API Key (sk-...T3BlbkFJ)"
+    "AWS Access Key ID (AKIA)"
+)
+
+# Files staged for commit
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
+
+if [ -n "$STAGED_FILES" ]; then
+    for i in "${!PATTERNS[@]}"; do
+        PATTERN="${PATTERNS[$i]}"
+        NAME="${PATTERN_NAMES[$i]}"
+
+        # Check staged diff for the pattern (added lines only +)
+        MATCHES=$(git diff --cached -U0 2>/dev/null | grep '^+' | grep -v '^+++' | grep -oE "$PATTERN" | head -5 || true)
+
+        if [ -n "$MATCHES" ]; then
+            echo -e "${RED}❌ TOKEN LEAK: Pattern '$NAME' detected in staged changes!${NC}"
+            # Show masked token (first 8 characters + ***)
+            echo "$MATCHES" | while IFS= read -r match; do
+                MASKED="${match:0:8}***REDACTED***"
+                echo "   Detected: $MASKED"
+            done
+            ERRORS=$((ERRORS + 1))
+        fi
+    done
+fi
+
+# --------------------------------------------------------------------------- #
+# 3. Block configuration files with potential secrets
+# --------------------------------------------------------------------------- #
+SENSITIVE_PATTERNS=(
+    "\.env\."
+    "credentials\.json$"
+    "secrets\.ya?ml$"
+    "\.pem$"
+    "\.key$"
+    "id_rsa$"
+    "id_ed25519$"
+)
+
+for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+    MATCHES=$(git diff --cached --name-only | grep -E "$pattern" || true)
+    if [ -n "$MATCHES" ]; then
+        echo -e "${YELLOW}⚠️  WARNING: Potentially sensitive file in commit: $MATCHES${NC}"
+        echo "   Ensure the file does not contain secrets."
+        # Warning only, not a block — leaves the decision to the developer
+    fi
+done
+
+# --------------------------------------------------------------------------- #
+# Result
+# --------------------------------------------------------------------------- #
+if [ "$ERRORS" -gt 0 ]; then
+    echo ""
+    echo -e "${RED}🚫 COMMIT BLOCKED: $ERRORS security issue(s) detected.${NC}"
+    echo "   Fix the above errors and try again."
+    echo "   To bypass (DANGEROUS!): git commit --no-verify"
+    exit 1
+fi
+
+echo -e "${GREEN}✅ [pre-commit] Scan complete — no leaks detected. Commit allowed.${NC}"
+exit 0
