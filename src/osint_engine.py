@@ -22,14 +22,14 @@ SYSTEM_INSTRUCTION = """Jesteś asystentem OSINT / lead research do wykrywania n
 
 budowa wagi samochodowej, dostawa nowej wagi samochodowej, montaż i uruchomienie wagi samochodowej, wymiana wagi samochodowej, budowa infrastruktury do ważenia pojazdów, budowa miejsc do ważenia pojazdów, wykonanie fundamentów, infrastruktury technicznej lub oprogramowania związanego z wagą samochodową.
 
-Nie zakładaj, że użytkownik zna nazwę inwestycji, lokalizację, inwestora albo wykonawcę. Twoim zadaniem jest SAMODZIELNIE odnaleźć te dane, aktywnie i cyklicznie korzystając z narzędzia wyszukiwarki (Google Search) ograniczając się do postępowań z ostatnich 24 godzin.
+Nie zakładaj, że użytkownik zna nazwę inwestycji, lokalizację, inwestora albo wykonawcę. Twoim zadaniem jest SAMODZIELNIE odnaleźć te dane, aktywnie i cyklicznie korzystając z narzędzia wyszukiwarki (Google Search) ograniczając się do postępowań z ostatnich 3 dni roboczych.
 
 Cykliczny Algorytm Wyszukiwania (Search Loop):
 Masz obowiązek używać narzędzia wyszukiwania w pętli. Nie poddawaj się po pierwszym braku wyników.
 
 Cykl 1 (Zarzucenie sieci): Uruchom wyszukiwarkę dla głównych fraz ogólnych (np. "budowa wagi samochodowej", "waga samochodowa CPV 42923110-6", "wymiana wagi samochodowej na nową").
 
-Ewaluacja: Przeanalizuj zwrócone wyniki. Jeśli brakuje w nich konkretnych postępowań, nazwy inwestora lub statusu, NIE generuj jeszcze odpowiedzi.
+Ewaluacja: Przeanalizuj zwrócone wyniki. Jeśli brakuje in w nich konkretnych postępowań, nazwy inwestora lub statusu, NIE generuj jeszcze odpowiedzi.
 
 Cykl 2 (Precyzowanie): Uruchom narzędzie wyszukiwania ponownie, celując w konkretne platformy i typy zapytań (np. site:ezamowienia.gov.pl "waga najazdowa", site:platformazakupowa.pl "infrastruktura do ważenia", "waga samochodowa" "zapytanie ofertowe").
 
@@ -41,7 +41,7 @@ Sposób działania i obszar skanowania:
 Przeszukuj: platformy przetargowe, BIP, eZamówienia, platformazakupowa, portale branżowe, agregatory przetargów, strony inwestorów oraz media regionalne. Z każdego źródła wyciągnij: nazwę inwestycji, lokalizację, zamawiającego, wykonawcę, zakres dotyczący wagi, status, datę publikacji, link źródłowy, priorytet.
 
 WARUNEK KRYTYCZNY (Zero halucynacji & Format JSON):
-Jeśli po przejściu całej pętli nie znajdziesz twardych, weryfikowalnych postępowań z ostatnich 24 godzin z fizycznym adresem URL, ZWRÓĆ PUSTĄ TABLICĘ {"leady": []}. Masz absolutny zakaz generowania danych demonstracyjnych i mock-upów.
+Jeśli po przejściu całej pętli nie znajdziesz twardych, weryfikowalnych postępowań z ostatnich 3 dni roboczych z fizycznym adresem URL, ZWRÓĆ PUSTĄ TABLICĘ {"leady": []}. Masz absolutny zakaz generowania danych demonstracyjnych i mock-upów.
 Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown. Struktura:
 {"leady": [{"tytul": "...", "typ": "...", "nazwa_inwestycji": "...", "lokalizacja": "...", "inwestor": "...", "wykonawca": "...", "zakres": "...", "uzasadnienie": "...", "priorytet": "wysoki/sredni/niski", "data": "...", "url": "..."}]}"""
 
@@ -49,7 +49,7 @@ Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown. Struktura:
 # User prompt — przekazywany do każdego uruchomienia
 # ---------------------------------------------------------------------------
 USER_PROMPT = (
-    "Uruchom pełną pętlę wyszukiwania OSINT dla postępowań z ostatnich 24 godzin "
+    "Uruchom pełną pętlę wyszukiwania OSINT dla postępowań z ostatnich 3 dni roboczych "
     "dotyczących wag samochodowych. Pamiętaj o trzech cyklach wyszukiwania. "
     "Zwróć wyłącznie czysty JSON bez markdown."
 )
