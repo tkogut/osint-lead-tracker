@@ -39,7 +39,7 @@ services:
     labels:
       # --- Traefik v2/v3 labels ---
       - "traefik.enable=true"
-      - "traefik.http.routers.osint.rule=Host(`osint.twoja-domena.pl`)"
+      - "traefik.http.routers.osint.rule=Host(`osint.srv1490214.hstgr.cloud`)"
       - "traefik.http.routers.osint.entrypoints=websecure"
       - "traefik.http.routers.osint.tls.certresolver=letsencrypt"
       - "traefik.http.services.osint.loadbalancer.server.port=8080"
@@ -50,5 +50,5 @@ services:
 
 networks:
   default:
-    name: traefik-net
+    name: traefik-proxy
     external: true
