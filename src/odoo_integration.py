@@ -71,30 +71,66 @@ class OdooClient:
         """
         s = self._settings
 
-        # --- buduj opis ---
-        url_part = f"Źródło: {lead.get('url', 'brak')}"
+        # --- buduj opis HTML ---
+        typ = lead.get("typ") or "brak danych"
+        data_pub = lead.get("data") or lead.get("data_pub") or "brak danych"
+        lokalizacja = lead.get("lokalizacja") or "brak danych"
+        inwestor = lead.get("inwestor") or "brak danych"
+        wykonawca = lead.get("wykonawca") or "brak danych"
+        zakres = lead.get("zakres") or "brak danych"
+        uzasadnienie = lead.get("uzasadnienie") or "brak danych"
+        priorytet = lead.get("priorytet") or "brak danych"
+        url = lead.get("url") or "#"
         opis_szczeg = lead.get("opis_szczegolowy") or ""
-        lokalizacja = lead.get("lokalizacja") or ""
-        inwestor = lead.get("inwestor") or ""
-        wykonawca = lead.get("wykonawca") or ""
-        zakres = lead.get("zakres") or ""
-        uzasadnienie = lead.get("uzasadnienie") or ""
-        priorytet = lead.get("priorytet") or ""
 
-        description_parts = [
-            url_part,
-            f"\n--- Szczegóły ---",
-            f"Lokalizacja: {lokalizacja}",
-            f"Inwestor/Zamawiający: {inwestor}",
-            f"Wykonawca: {wykonawca}",
-            f"Zakres (waga): {zakres}",
-            f"Uzasadnienie: {uzasadnienie}",
-            f"Priorytet: {priorytet}",
-        ]
+        table_style = "width: 100%; border-collapse: collapse; margin-bottom: 15px;"
+        td_label_style = "padding: 6px 10px; font-weight: bold; border-bottom: 1px solid #eeeeee; width: 30%; text-align: left;"
+        td_val_style = "padding: 6px 10px; border-bottom: 1px solid #eeeeee; text-align: left;"
+
+        description = f"""<h3>📋 SZCZEGÓŁY ZAPYTANIA OSINT</h3>
+<table style="{table_style}">
+  <tr>
+    <td style="{td_label_style}">Kategoria zamówienia:</td>
+    <td style="{td_val_style}">{typ}</td>
+  </tr>
+  <tr>
+    <td style="{td_label_style}">Lokalizacja:</td>
+    <td style="{td_val_style}">{lokalizacja}</td>
+  </tr>
+  <tr>
+    <td style="{td_label_style}">Inwestor / Zamawiający:</td>
+    <td style="{td_val_style}">{inwestor}</td>
+  </tr>
+  <tr>
+    <td style="{td_label_style}">Wykonawca:</td>
+    <td style="{td_val_style}">{wykonawca}</td>
+  </tr>
+  <tr>
+    <td style="{td_label_style}">Termin publikacji:</td>
+    <td style="{td_val_style}">{data_pub}</td>
+  </tr>
+  <tr>
+    <td style="{td_label_style}">Priorytet:</td>
+    <td style="{td_val_style}"><strong>{priorytet.upper()}</strong></td>
+  </tr>
+</table>
+
+<h4>🏗️ Zakres związany z wagą samochodową:</h4>
+<p>{zakres}</p>
+
+<h4>💡 Uzasadnienie potencjału handlowego:</h4>
+<p><em>{uzasadnienie}</em></p>
+"""
         if opis_szczeg:
-            description_parts.append(f"\n{opis_szczeg}")
+            description += f"""
+<h4>📝 Dodatkowe szczegóły:</h4>
+<p>{opis_szczeg}</p>
+"""
 
-        description = "\n".join(description_parts)
+        description += f"""
+<hr/>
+<p>🔗 <strong>Źródło zamówienia:</strong> <a href="{url}" target="_blank">Otwórz oficjalne ogłoszenie w nowej karcie</a></p>
+"""
 
         # --- nazwa leada ---
         name = (
