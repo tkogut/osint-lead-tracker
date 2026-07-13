@@ -5,6 +5,13 @@ Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w t
 
 ---
 
+## [1.2.0] - 2026-07-13
+
+### Added
+- **Skaner pozwoleń budowlanych GUNB (RWDZ)**: Integracja z rejestrem wniosków, decyzji i zgłoszeń budowlanych GUNB w celu wykrywania prywatnych i komercyjnych budów wag samochodowych w 16 województwach.
+- **Pamięć podręczna (Content-Length)**: System cache'owania sprawdzający wielkość plików ZIP przy użyciu zapytań `HEAD` – eliminuje to zbędne pobieranie setek megabajtów danych przy codziennych skanach.
+- **Automatyczny parser CSV**: Autonomiczny, pamięciowo-wydajny parser CSV czytający dane strumieniowo prosto ze skompresowanych archiwów ZIP bez obciążania pamięci RAM serwera.
+
 ## [1.1.0] - 2026-07-13
 
 ### Added

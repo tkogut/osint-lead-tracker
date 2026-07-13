@@ -1,7 +1,7 @@
 # OSINT Lead Tracker 🚀
 > **AGENTS-OS v5.0 Swarm Edition**
 
-Mikroserwis w Pythonie (FastAPI) automatyzujący wyszukiwanie i kwalifikację szans sprzedażowych (leadów) w branży wag samochodowych. Narzędzie łączy bezpośrednie odpytywanie rządowego API platformy **e-Zamówienia** ze skanowaniem szerokiego internetu za pomocą **Google Gemini 2.5 Flash (Search Grounding)**, po czym przesyła wyselekcjonowane i sformatowane rekordy do systemu **Odoo CRM**.
+Mikroserwis w Pythonie (FastAPI) automatyzujący wyszukiwanie i kwalifikację szans sprzedażowych (leadów) w branży wag samochodowych. Narzędzie łączy bezpośrednie odpytywanie rządowego API platformy **e-Zamówienia**, skanowanie rejestru pozwoleń na budowę **GUNB (RWDZ)** oraz przeszukiwanie szerokiego internetu za pomocą **Google Gemini 2.5 Flash (Search Grounding)**, po czym przesyła wyselekcjonowane i sformatowane rekordy do systemu **Odoo CRM**.
 
 ---
 
@@ -14,21 +14,28 @@ graph TD
     A[Skaner / Chron / Ręczne wywołanie] --> B{Skanowanie hybrydowe}
     
     B -->|1. BZP REST API| C[Zapytanie o kody CPV 42923110-6...]
-    B -->|2. Google Search Grounding| D[AI Web Search dla przetargów i inwestycji]
+    B -->|2. Rejestr GUNB RWDZ| D{Czy rozmiar pliku ZIP uległ zmianie?}
+    B -->|3. Google Search Grounding| E[AI Web Search dla przetargów i inwestycji]
     
-    C --> E[Pobrane ogłoszenia BZP]
-    E --> F[Lokalny pre-filter słów kluczowych]
-    F -->|Przepuszczone| G[Gemini: weryfikacja i ekstrakcja szczegółów]
+    D -->|Nie| F[Pomiń pobieranie / Użyj cache]
+    D -->|Tak| G[Pobierz ZIP, rozpakuj CSV i filtruj linie]
     
-    D --> H[Sparsowane leady internetowe]
+    C --> H[Pobrane ogłoszenia BZP]
+    H --> I[Lokalny pre-filter słów kluczowych]
+    I -->|Przepuszczone| J[Gemini: weryfikacja i ekstrakcja szczegółów]
     
-    G --> I[Konsolidacja i deduplikacja po URL]
-    H --> I
+    E --> K[Sparsowane leady internetowe]
     
-    I --> J{Czy URL istnieje w SQLite?}
-    J -->|Tak| K[Ignoruj duplikat]
-    J -->|Nie| L[Utwórz Lead w Odoo crm.lead]
-    L --> M[Zapisz URL + Odoo ID w bazie leads.db]
+    G --> L[Wygenerowane leady z pozwoleń budowlanych]
+    
+    J --> M[Konsolidacja i deduplikacja po URL]
+    K --> M
+    L --> M
+    
+    M --> N{Czy URL istnieje w SQLite?}
+    N -->|Tak| O[Ignoruj duplikat]
+    N -->|Nie| P[Utwórz Lead w Odoo crm.lead]
+    P --> Q[Zapisz URL + Odoo ID w bazie leads.db]
 ```
 
 ---
@@ -37,15 +44,19 @@ graph TD
 
 1. **Hybrydowe Źródło Danych**:
    * **e-Zamówienia (Biuletyn Zamówień Publicznych)**: Bezpośrednie odpytywanie REST API dla kodów CPV związanych z wagami (np. `42923110-6` - wagi samochodowe, `42923000-2`, `42923200-0`). Zapewnia 100% wykrywalności i natychmiastowy dostęp do dokumentacji przetargowej.
+   * **Główny Urząd Nadzoru Budowlanego (GUNB RWDZ)**: Pobieranie i parsing rejestrów wniosków i decyzji budowlanych z 16 województw w poszukiwaniu budowy stacjonarnych wag samochodowych/najazdowych.
    * **Google Search Grounding (Gemini)**: Przeszukiwanie szerszego internetu w poszukiwaniu komercyjnych zapytań ofertowych, przetargów niepublicznych i wiadomości inwestycyjnych.
-2. **Kwalifikacja przez Gemini 2.5 Flash**:
+2. **Optymalizacja Wydajności (GUNB Caching)**:
+   * System wysyła lekkie zapytania `HEAD` w celu sprawdzenia `Content-Length` plików ZIP.
+   * Pobieranie danych następuje tylko wtedy, gdy baza urzędu uległa aktualizacji, co oszczędza ponad 350 MB transferu przy rutynowych skanach.
+3. **Kwalifikacja przez Gemini 2.5 Flash**:
    * Zabezpieczenie przed przeterminowanymi lub rozstrzygniętymi zamówieniami.
    * Odczyt dokładnych parametrów (zakres, nośność wagi) z treści ogłoszeń.
    * Automatyczna ocena priorytetu biznesowego (wysoki/średni/niski).
-3. **Formatowanie HTML w Odoo**:
+4. **Formatowanie HTML w Odoo**:
    * Tworzenie przejrzystych tabel szczegółowych na karcie leada w Odoo.
-   * Generowanie bezpośrednich, poprawnie zakodowanych linków publicznych do ogłoszeń e-Zamówień.
-4. **Deduplikacja i Bezpieczeństwo**:
+   * Generowanie bezpośrednich, poprawnie zakodowanych linków publicznych do ogłoszeń e-Zamówień i wniosków GUNB.
+5. **Deduplikacja i Bezpieczeństwo**:
    * Unikalny indeks URL w bazie SQLite uniemożliwia wielokrotne tworzenie tej samej szansy w CRM.
    * Autoryzacja żądań tokenem nagłówkowym `X-API-Token`.
 
