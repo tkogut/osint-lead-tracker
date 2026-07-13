@@ -1,12 +1,16 @@
 """
-osint_engine.py — Silnik AI OSINT z integracją e-Zamówień (BZP REST API) + Google Search Grounding.
-Wyszukuje postępowania przetargowe dotyczące wag samochodowych z ostatnich 3 dni roboczych.
+osint_engine.py — Silnik AI OSINT z integracją e-Zamówień (BZP API), Google Search Grounding oraz pozwoleń na budowę (GUNB RWDZ).
+Wyszukuje postępowania przetargowe i decyzje budowlane dotyczące wag samochodowych z ostatnich 3 dni roboczych.
 """
 
+import csv
 import json
 import logging
+import os
 import re
 import urllib.parse
+import zipfile
+import io
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -159,7 +163,6 @@ class OSINTEngine:
         html_body = notice.get("htmlBody", "")
         text_content = clean_html(html_body)
 
-        # Lokalny pre-filter słów kluczowych, aby oszczędzić tokeny
         title_lower = notice.get("orderObject", "").lower()
         body_lower = text_content.lower()
         has_keywords = any(k in title_lower or k in body_lower for k in ["waga", "wagi", "wag", "ważeń", "ważen", "scale"])
@@ -169,7 +172,6 @@ class OSINTEngine:
             logger.debug("Odrzucono lokalnie ogłoszenie BZP bez słów kluczowych: %s", notice.get("orderObject"))
             return None
 
-        # Ograniczamy treść do 15k znaków
         text_content = text_content[:15000]
 
         prompt = f"""Przeanalizuj poniższe ogłoszenie o zamówieniu publicznym i określ, czy dotyczy ono wagi samochodowej (wag samochodowych / najazdowych / stanowisk do ważenia pojazdów).
@@ -296,11 +298,175 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
             logger.error("Google Search Grounding FAILED: %s", exc, exc_info=True)
             return []
 
+    def _search_gunb(self, start_date: str, today_date: str) -> list[dict]:
+        """
+        Pobiera i analizuje rejestr pozwoleń na budowę RWDZ (GUNB).
+        Wykorzystuje pamięć podręczną (Content-Length) w celu uniknięcia pobierania
+        dużych plików ZIP na każdym uruchomieniu.
+        """
+        logger.info("GUNB RWDZ: start skanowania (%s do %s)…", start_date, today_date)
+        
+        cache_path = "./data/gunb_cache.json"
+        cache = {}
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, "r") as f:
+                    cache = json.load(f)
+            except Exception as e:
+                logger.error("Błąd ładowania pamięci podręcznej GUNB: %s", e)
+
+        # Pobieramy stronę pobierania i wyszukujemy pliki ZIP
+        pobranie_url = "https://wyszukiwarka.gunb.gov.pl/pobranie.html"
+        try:
+            r = requests.get(pobranie_url, timeout=15)
+            if r.status_code != 200:
+                logger.error("Błąd pobierania strony GUNB: %s", r.status_code)
+                return []
+            
+            links = re.findall(r'href="([^"]+\.zip)"', r.text)
+        except Exception as e:
+            logger.error("Wyjątek podczas pobierania strony GUNB: %s", e)
+            return []
+
+        leads = []
+        updated_cache = {}
+
+        for link in links:
+            # Nie skanujemy starych zgłoszeń historycznych z lat 2016-2021
+            if "wynik_zgloszenia_2016_2021" in link:
+                continue
+                
+            full_url = link if link.startswith("http") else "https://wyszukiwarka.gunb.gov.pl/" + link
+            filename = os.path.basename(link)
+
+            # Sprawdzamy nagłówki (Content-Length)
+            try:
+                head = requests.head(full_url, timeout=5)
+                content_length = head.headers.get("Content-Length", "")
+            except Exception as e:
+                logger.warning("Błąd odpytywania nagłówków dla %s: %s", filename, e)
+                content_length = ""
+
+            # Sprawdzamy czy plik się zmienił
+            cached_len = cache.get(filename)
+            updated_cache[filename] = content_length
+
+            if cached_len and cached_len == content_length:
+                logger.debug("Plik %s jest aktualny (pomijam pobieranie)", filename)
+                continue
+
+            logger.info("Pobieranie i analiza aktualizacji rejestru GUNB: %s (rozmiar: %s bajtów)...", filename, content_length)
+            
+            try:
+                res = requests.get(full_url, timeout=30)
+                if res.status_code != 200:
+                    logger.warning("Nie udało się pobrać %s: %s", filename, res.status_code)
+                    continue
+
+                with zipfile.ZipFile(io.BytesIO(res.content)) as z:
+                    csv_name = [f for f in z.namelist() if f.endswith(".csv")]
+                    if not csv_name:
+                        continue
+                    
+                    with z.open(csv_name[0]) as csv_file:
+                        wrapper = io.TextIOWrapper(csv_file, encoding="utf-8-sig")
+                        reader = csv.reader(wrapper, delimiter=";")
+                        
+                        header = next(reader, None)
+                        if not header:
+                            continue
+                            
+                        # Szukamy kolumn
+                        obj_idx = -1
+                        date_decyzja_idx = -1
+                        date_wplyw_idx = -1
+                        city_idx = -1
+                        org_idx = -1
+                        gunb_idx = -1
+                        organ_idx = -1
+                        woj_idx = -1
+                        
+                        for idx, col in enumerate(header):
+                            col_lower = col.lower()
+                            if "numer_gunb" in col_lower: gunb_idx = idx
+                            elif "nazwa_organu" in col_lower: organ_idx = idx
+                            elif "data_wplywu_wniosku" in col_lower: date_wplyw_idx = idx
+                            elif "data_wydania_decyzji" in col_lower: date_decyzja_idx = idx
+                            elif "nazwa_inwestor" in col_lower: org_idx = idx
+                            elif "miasto" in col_lower: city_idx = idx
+                            elif "wojewodztwo" in col_lower: woj_idx = idx
+                            elif "nazwa_zam_budowlanego" in col_lower or "nazwa_zamierzenia_bud" in col_lower:
+                                if obj_idx == -1: obj_idx = idx
+
+                        # Czytamy wiersze
+                        for row in reader:
+                            if len(row) < max(gunb_idx, organ_idx, date_wplyw_idx, date_decyzja_idx, org_idx, city_idx, woj_idx, obj_idx) + 1:
+                                continue
+                            
+                            # Pobieramy datę
+                            data_decyzji = row[date_decyzja_idx].strip() if date_decyzja_idx != -1 else ""
+                            data_wplywu = row[date_wplyw_idx].strip() if date_wplyw_idx != -1 else ""
+                            
+                            date_str = None
+                            if data_decyzji:
+                                date_str = data_decyzji[:10]
+                            elif data_wplywu:
+                                date_str = data_wplywu[:10]
+                                
+                            if not date_str:
+                                continue
+                                
+                            # Sprawdzamy czy mieści się w zakresie dat (3 dni robocze)
+                            if not (start_date <= date_str <= today_date):
+                                continue
+
+                            # Filtrujemy lokalnie po słowach kluczowych
+                            nazwa_zamierzenia = row[obj_idx].strip() if obj_idx != -1 else ""
+                            inwestor = row[org_idx].strip() if org_idx != -1 else ""
+                            
+                            text_search = (nazwa_zamierzenia + " " + inwestor).lower()
+                            if "waga" in text_search or "wagi" in text_search or "wag" in text_search:
+                                if "samochod" in text_search or "najazd" in text_search or "ciężar" in text_search:
+                                    # Znaleziono wniosek/decyzję budowlaną dla wagi samochodowej!
+                                    numer_gunb = row[gunb_idx].strip() if gunb_idx != -1 else "brak_nr"
+                                    nazwa_organu = row[organ_idx].strip() if organ_idx != -1 else ""
+                                    city = row[city_idx].strip() if city_idx != -1 else ""
+                                    woj = row[woj_idx].strip() if woj_idx != -1 else ""
+                                    
+                                    lead_data = {
+                                        "url": f"https://wyszukiwarka.gunb.gov.pl/wniosek/{urllib.parse.quote(numer_gunb, safe='')}",
+                                        "tytul": f"Budowa wagi samochodowej - {inwestor or 'Inwestor prywatny'}",
+                                        "typ": "lead",
+                                        "lokalizacja": f"{city}, woj. {woj}".strip(", "),
+                                        "inwestor": inwestor or "Inwestor prywatny (dane w rejestrze RWDZ)",
+                                        "wykonawca": "",
+                                        "zakres": nazwa_zamierzenia,
+                                        "uzasadnienie": f"Wpis w rejestrze pozwoleń na budowę GUNB RWDZ (numer GUNB: {numer_gunb}). Wydający organ: {nazwa_organu}.",
+                                        "priorytet": "wysoki",
+                                        "data": date_str
+                                    }
+                                    leads.append(lead_data)
+                                    logger.info("Wykryto pozwolenie na budowę wagi samochodowej z rejestru GUNB: %s", lead_data["tytul"])
+            
+            except Exception as e:
+                logger.error("Błąd podczas przetwarzania pliku GUNB %s: %s", filename, e)
+
+        # Zapisujemy zaktualizowaną pamięć podręczną na dysk
+        try:
+            with open(cache_path, "w") as f:
+                json.dump(updated_cache, f)
+        except Exception as e:
+            logger.error("Błąd zapisu pamięci podręcznej GUNB: %s", e)
+
+        logger.info("GUNB RWDZ: ukończono. Wykryto %d nowych lead(ów) z pozwoleń budowlanych", len(leads))
+        return leads
+
     def run_search(self) -> list[dict]:
         """
         Uruchamia wyszukiwanie hybrydowe:
         1. Skanowanie bezpośrednie API e-Zamówień (BZP).
         2. Skanowanie szerokie za pomocą Google Search Grounding.
+        3. Skanowanie i analizę rejestru pozwoleń na budowę GUNB RWDZ.
         Merguje i deduplikuje wyniki po URL.
         """
         today_str, start_str = get_date_limits()
@@ -312,11 +478,14 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
         # 2. Google Search Grounding
         google_leads = self._search_google(start_str, today_str)
 
+        # 3. GUNB RWDZ (Pozwolenia na budowę)
+        gunb_leads = self._search_gunb(start_str, today_str)
+
         # Łączenie i deduplikacja
         all_leads = []
         seen_urls = set()
 
-        for lead in bzp_leads + google_leads:
+        for lead in bzp_leads + google_leads + gunb_leads:
             url = lead.get("url", "").strip()
             if not url:
                 continue
