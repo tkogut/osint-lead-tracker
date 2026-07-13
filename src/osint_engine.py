@@ -203,7 +203,7 @@ Wymagania:
   "url": "Bezpośredni link do ogłoszenia"
 }}
 W polu 'url' użyj dokładnie tego wzorca, wstawiając numer ogłoszenia {notice.get('noticeNumber')}:
-https://ezamowienia.gov.pl/mo-client-board/bzp/notice-details/{urllib.parse.quote(notice.get('noticeNumber', ''))}
+https://ezamowienia.gov.pl/mo-client-board/bzp/notice-details/{urllib.parse.quote(notice.get('noticeNumber', ''), safe='')}
 
 Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników markdown."""
 
