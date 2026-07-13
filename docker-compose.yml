@@ -1,0 +1,54 @@
+# ============================================================
+# docker-compose.yml — osint-lead-tracker
+# Traefik labels included for VPS reverse proxy
+# ============================================================
+
+services:
+  osint-lead-tracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: osint-lead-tracker:latest
+    container_name: osint-lead-tracker
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    volumes:
+      # Persistentny wolumin SQLite na hoście
+      - ./data:/app/data
+
+    ports:
+      # Ekspozycja tylko lokalnie (Traefik proxy od zewnątrz)
+      - "127.0.0.1:8080:8080"
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    labels:
+      # --- Traefik v2/v3 labels ---
+      - "traefik.enable=true"
+      - "traefik.http.routers.osint.rule=Host(`osint.twoja-domena.pl`)"
+      - "traefik.http.routers.osint.entrypoints=websecure"
+      - "traefik.http.routers.osint.tls.certresolver=letsencrypt"
+      - "traefik.http.services.osint.loadbalancer.server.port=8080"
+      # Middleware: rate limiting
+      - "traefik.http.routers.osint.middlewares=osint-ratelimit"
+      - "traefik.http.middlewares.osint-ratelimit.ratelimit.average=10"
+      - "traefik.http.middlewares.osint-ratelimit.ratelimit.burst=20"
+
+networks:
+  default:
+    name: traefik-net
+    external: true

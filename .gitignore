@@ -2,6 +2,14 @@
 tmp/
 *.log
 __pycache__/
+**/__pycache__/
+*.pyc
 .DS_Store
 node_modules/
-.env
+.env*
+data/
+*.db
+*.sqlite
+*.sqlite3
+.venv/
+venv/
