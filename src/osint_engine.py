@@ -28,7 +28,6 @@ def get_date_limits() -> tuple[str, str]:
     while business_days_subtracted < 3:
         days_to_subtract += 1
         day = today - timedelta(days=days_to_subtract)
-        # weekday(): 0 = poniedziałek, ..., 4 = piątek, 5 = sobota, 6 = niedziela
         if day.weekday() < 5:
             business_days_subtracted += 1
 
@@ -46,20 +45,24 @@ Nie zakładaj, że użytkownik zna nazwę inwestycji, lokalizację, inwestora al
 BARDZO WAŻNE (Zakres czasowy i status):
 1. Dzisiejsza data (rok 2026) to: {today_str}.
 2. Szukamy wyłącznie postępowań opublikowanych w zakresie dat od {start_str} do {today_str}.
-3. MASZ ABSOLUTNY ZAKAZ dodawania postępowań, których termin składania ofert już minął, lub które zostały już rozstrzygnięte/unieważnione. Interesują nas wyłącznie AKTYWNE, trwające postępowania. Zawsze sprawdź status i termin składania ofert w treści strony.
+3. MASZ ABSOLUTNY ZAKAZ dodawania postępowań, których termin składania ofert już minął, lub które zostały już rozstrzygnięte/unieważnione. Interesują nas wyłącznie AKTYWNE, trwające postępowania. Zawsze sprawdź status i termin składania ofert w treści strony. Kategorycznie odrzuć wyniki, w których przetarg jest oznaczony jako "rozstrzygnięty", "wybrano wykonawcę", "unieważniony", "po terminie".
+
+Zasada formułowania zapytań do wyszukiwarki:
+Gdy wywołujesz wyszukiwarkę Google, używaj prostych słów kluczowych (np. "budowa wagi samochodowej przetarg", "waga samochodowa zapytanie ofertowe"). 
+BEZWZGLĘDNY ZAKAZ wpisywania w zapytaniach do wyszukiwarki fraz takich jak "data publikacji", "ostatnie 3 dni", czy przedziałów dat typu "2026-07-08..2026-07-13". Wyszukiwarka Google nie rozumie takich filtrów tekstowych i zwraca 0 wyników. Filtrację dat wykonasz samodzielnie na podstawie odczytanej treści stron.
 
 Krytyczna zasada dotycząca linków URL:
 W polu "url" musisz podać bezpośredni, oryginalny link publiczny do ogłoszenia na danej platformie (np. https://ezamowienia.gov.pl/..., https://platformazakupowa.pl/..., bip.xxx.pl).
-ABSOLUTNY ZAKAZ używania linków przekierowujących z Google Search Grounding (np. zaczynających się od vertexaisearch.cloud.google.com/grounding-api-redirect/...). Wyciągaj bezpośrednie domeny i adresy URL stron źródłowych.
+ABSOLUTNY ZAKAZ używania linków przekierowujących z Google Search Grounding (np. zaczynających się od vertexaisearch.cloud.google.com/grounding-api-redirect/...). Wyciągaj bezpośrednie domeny i adresy URL stron źródłowych z tekstu lub z linków w wynikach wyszukiwania.
 
 Cykliczny Algorytm Wyszukiwania (Search Loop):
 Masz obowiązek używać narzędzia wyszukiwania w pętli. Nie poddawaj się po pierwszym braku wyników.
 
-Cykl 1 (Zarzucenie sieci): Uruchom wyszukiwarkę dla głównych fraz ogólnych (np. "budowa wagi samochodowej", "waga samochodowa CPV 42923110-6", "wymiana wagi samochodowej na nową" po {start_str}).
+Cykl 1 (Zarzucenie sieci): Uruchom wyszukiwarkę dla głównych fraz ogólnych (np. "budowa wagi samochodowej", "waga samochodowa CPV 42923110-6", "wymiana wagi samochodowej na nową").
 
 Ewaluacja: Przeanalizuj zwrócone wyniki. Jeśli brakuje in w nich konkretnych postępowań, nazwy inwestora lub statusu, NIE generuj jeszcze odpowiedzi.
 
-Cykl 2 (Precyzowanie): Uruchom narzędzie wyszukiwania ponownie, celując w konkretne platformy i typy zapytań (np. site:ezamowienia.gov.pl "waga najazdowa" po {start_str}, site:platformazakupowa.pl "infrastruktura do ważenia" po {start_str}, "waga samochodowa" "zapytanie ofertowe" po {start_str}).
+Cykl 2 (Precyzowanie): Uruchom narzędzie wyszukiwania ponownie, celując w konkretne platformy i typy zapytań (np. site:ezamowienia.gov.pl "waga najazdowa", site:platformazakupowa.pl "infrastruktura do ważenia", "waga samochodowa" "zapytanie ofertowe").
 
 Cykl 3 (Deep Dive): Jeśli znalazłeś inwestycję, ale brakuje danych o wykonawcy lub lokalizacji, uruchom wyszukiwanie celowane pod nazwę tej konkretnej inwestycji, aby uzupełnić luki.
 
@@ -78,8 +81,9 @@ def get_user_prompt(today_str: str, start_str: str) -> str:
     return (
         f"Uruchom pełną pętlę wyszukiwania OSINT dla aktywnych postępowań opublikowanych "
         f"w zakresie od {start_str} do {today_str} dotyczących wag samochodowych. "
-        f"Upewnij się, że terminy składania ofert nie minęły. Zwróć wyłącznie oryginalne, "
-        f"bezpośrednie adresy URL źródeł (nie linki vertexaisearch). Zwróć czysty JSON bez markdown."
+        f"Upewnij się, że terminy składania ofert nie minęły, a przetargi nie są rozstrzygnięte. "
+        f"Zwróć wyłącznie oryginalne, bezpośrednie adresy URL źródeł (np. https://ezamowienia.gov.pl/...). "
+        f"Nie podawaj linków vertexaisearch. Zwróć czysty JSON bez markdown."
     )
 
 
@@ -115,8 +119,9 @@ def _parse_leads(raw_text: str) -> list[dict]:
             if not isinstance(item, dict):
                 continue
             url = item.get("url", "").strip()
-            if not url or url in ("...", "N/A", "") or "grounding-api-redirect" in url:
-                logger.debug("Pominięto lead bez bezpośredniego URL lub z redirectem: %s", item.get("tytul"))
+            # Upewnijmy się, że url to bezpośredni adres a nie redirect Google
+            if not url or url in ("...", "N/A", "") or "grounding-api-redirect" in url or "vertexaisearch" in url:
+                logger.debug("Pominięto lead bez bezpośredniego URL lub z redirectem Google: %s", item.get("tytul"))
                 continue
             valid.append(item)
 
