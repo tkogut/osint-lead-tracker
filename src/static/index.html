@@ -367,76 +367,81 @@
             </div>
             <form id="account-form">
                 <input type="hidden" id="account-id">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="acc-name">Nazwa Kampanii</label>
-                        <input type="text" id="acc-name" required placeholder="np. Wagi Samochodowe">
+                <div class="modal-body-layout">
+                    <div class="modal-left-col">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="acc-name">Nazwa Kampanii</label>
+                                <input type="text" id="acc-name" required placeholder="np. Wagi Samochodowe">
+                            </div>
+                            <div class="form-group">
+                                <label for="acc-model">Model AI</label>
+                                <select id="acc-model">
+                                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                    <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                                    <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="acc-temperature">Temperatura</label>
+                                <input type="number" id="acc-temperature" min="0.0" max="1.5" step="0.1" value="0.1" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="acc-max-tokens">Maks. Tokens</label>
+                                <input type="number" id="acc-max-tokens" value="4096" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="acc-cpvs">Kody CPV (oddzielone przecinkami)</label>
+                            <input type="text" id="acc-cpvs" placeholder="np. 42923110-6, 42923000-2">
+                        </div>
+                        <div class="form-group">
+                            <label for="acc-keywords">Słowa Kluczowe (oddzielone przecinkami)</label>
+                            <input type="text" id="acc-keywords" placeholder="np. waga, wagi, najazdowa">
+                        </div>
+                        
+                        <h4 class="form-subheader"><i class="fa-solid fa-share-nodes"></i> Odoo Multicompany Mapping</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="acc-company-id">Odoo Company ID</label>
+                                <input type="number" id="acc-company-id" placeholder="np. 1">
+                            </div>
+                            <div class="form-group">
+                                <label for="acc-user-id">Odoo User ID (Handlowiec)</label>
+                                <input type="number" id="acc-user-id" placeholder="Pozostaw puste lub podaj ID">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="acc-tag-ids">Odoo Tag IDs (oddzielone przecinkami)</label>
+                                <input type="text" id="acc-tag-ids" placeholder="np. 3, 5, 12">
+                            </div>
+                            <div class="form-group">
+                                <label for="acc-team-id">Odoo Team ID</label>
+                                <input type="number" id="acc-team-id" placeholder="np. 11">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="acc-source-id">Odoo Source ID</label>
+                                <input type="number" id="acc-source-id" placeholder="np. 234">
+                            </div>
+                            <div class="form-group flex-row">
+                                <label for="acc-active">Aktywna</label>
+                                <input type="checkbox" id="acc-active" checked>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="acc-model">Model AI</label>
-                        <select id="acc-model">
-                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
-                            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                        </select>
+                    <div class="modal-right-col">
+                        <div class="form-group prompt-group">
+                            <label for="acc-prompt">Dedykowany Prompt Systemowy (Opcjonalny)</label>
+                            <textarea id="acc-prompt" placeholder="Zostaw puste, aby użyć domyślnego..."></textarea>
+                        </div>
                     </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="acc-temperature">Temperatura</label>
-                        <input type="number" id="acc-temperature" min="0.0" max="1.5" step="0.1" value="0.1" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="acc-max-tokens">Maks. Tokens</label>
-                        <input type="number" id="acc-max-tokens" value="4096" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="acc-cpvs">Kody CPV (oddzielone przecinkami)</label>
-                    <input type="text" id="acc-cpvs" placeholder="np. 42923110-6, 42923000-2">
-                </div>
-                <div class="form-group">
-                    <label for="acc-keywords">Słowa Kluczowe (oddzielone przecinkami)</label>
-                    <input type="text" id="acc-keywords" placeholder="np. waga, wagi, najazdowa">
-                </div>
-                
-                <h4 class="form-subheader"><i class="fa-solid fa-share-nodes"></i> Odoo Multicompany Mapping</h4>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="acc-company-id">Odoo Company ID</label>
-                        <input type="number" id="acc-company-id" placeholder="np. 1">
-                    </div>
-                    <div class="form-group">
-                        <label for="acc-user-id">Odoo User ID (Handlowiec)</label>
-                        <input type="number" id="acc-user-id" placeholder="Pozostaw puste lub podaj ID">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="acc-tag-ids">Odoo Tag IDs (oddzielone przecinkami)</label>
-                        <input type="text" id="acc-tag-ids" placeholder="np. 3, 5, 12">
-                    </div>
-                    <div class="form-group">
-                        <label for="acc-team-id">Odoo Team ID</label>
-                        <input type="number" id="acc-team-id" placeholder="np. 11">
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="acc-source-id">Odoo Source ID</label>
-                        <input type="number" id="acc-source-id" placeholder="np. 234">
-                    </div>
-                    <div class="form-group flex-row">
-                        <label for="acc-active">Aktywna</label>
-                        <input type="checkbox" id="acc-active" checked>
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label for="acc-prompt">Dedykowany Prompt Systemowy (Opcjonalny)</label>
-                    <textarea id="acc-prompt" rows="4" placeholder="Zostaw puste, aby użyć domyślnego..."></textarea>
                 </div>
                 
                 <div class="modal-footer">

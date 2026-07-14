@@ -623,6 +623,64 @@ input:focus, select:focus, textarea:focus {
     padding: 32px;
 }
 
+#account-modal .modal-content {
+    width: 1050px;
+    max-width: 95vw;
+}
+
+.modal-body-layout {
+    display: flex;
+    gap: 32px;
+    margin-bottom: 20px;
+}
+
+.modal-left-col {
+    flex: 1;
+    min-width: 0;
+}
+
+.modal-right-col {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.prompt-group {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin-bottom: 0;
+}
+
+.prompt-group label {
+    margin-bottom: 8px;
+}
+
+.prompt-group textarea {
+    flex: 1;
+    min-height: 400px;
+    resize: none;
+    height: 100%;
+}
+
+.form-group.flex-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 36px;
+}
+
+.form-group.flex-row label {
+    margin-bottom: 0;
+}
+
+.form-group.flex-row input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
 .modal-header {
     display: flex;
     justify-content: space-between;
@@ -809,4 +867,16 @@ input:focus, select:focus, textarea:focus {
     font-weight: 600;
     color: var(--text-muted);
     width: 24px;
+}
+
+@media (max-width: 1024px) {
+    .modal-body-layout {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 576px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
 }
