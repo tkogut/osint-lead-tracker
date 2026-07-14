@@ -46,6 +46,19 @@ async def init_db() -> None:
     os.makedirs(os.path.dirname(settings.sqlite_path), exist_ok=True)
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+        # Funkcja do dodawania brakujących kolumn
+        def add_columns_if_missing(connection):
+            cursor = connection.cursor()
+            cursor.execute("PRAGMA table_info(leads)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if "status" not in columns:
+                connection.execute("ALTER TABLE leads ADD COLUMN status TEXT DEFAULT 'New'")
+            if "prompt_version_id" not in columns:
+                connection.execute("ALTER TABLE leads ADD COLUMN prompt_version_id INTEGER")
+                
+        await conn.run_sync(add_columns_if_missing)
+        
     logger.info("DB init OK (SQLAlchemy Async) -> %s", settings.sqlite_path)
 
 
@@ -57,7 +70,7 @@ async def url_exists(url: str) -> bool:
         return lead is not None
 
 
-async def save_lead(lead_dict: dict, odoo_id: Optional[int] = None) -> int:
+async def save_lead(lead_dict: dict, odoo_id: Optional[int] = None, prompt_version_id: Optional[int] = None) -> int:
     """Zapisuje leada do SQLite."""
     async with AsyncSessionLocal() as session:
         new_lead = Lead(
@@ -72,6 +85,8 @@ async def save_lead(lead_dict: dict, odoo_id: Optional[int] = None) -> int:
             priorytet=lead_dict.get("priorytet"),
             data_pub=lead_dict.get("data"),
             odoo_id=odoo_id,
+            prompt_version_id=prompt_version_id,
+            status="New",
             created_at=datetime.utcnow().isoformat()
         )
         session.add(new_lead)
@@ -101,7 +116,9 @@ async def get_recent_leads(limit: int = 50) -> list[dict]:
                 "priorytet": l.priorytet,
                 "data_pub": l.data_pub,
                 "odoo_id": l.odoo_id,
-                "created_at": l.created_at
+                "created_at": l.created_at,
+                "status": l.status or "New",
+                "prompt_version_id": l.prompt_version_id
             }
             for l in leads
         ]

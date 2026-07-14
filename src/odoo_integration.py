@@ -200,6 +200,31 @@ class OdooClient:
             logger.error("Odoo create_lead FAILED: %s — vals=%s", exc, vals)
             return None
 
+    def get_leads_status(self, odoo_ids: List[int]) -> List[dict]:
+        """
+        Pobiera statusy (active, probability) dla podanych id crm.lead.
+        """
+        if not odoo_ids:
+            return []
+        odoo_db = get_db_setting_sync("ODOO_DB", self._settings.odoo_db)
+        odoo_api_key = get_db_setting_sync("ODOO_API_KEY", self._settings.odoo_api_key)
+        try:
+            uid = self._authenticate()
+            models = self._models_proxy()
+            records = models.execute_kw(
+                odoo_db,
+                uid,
+                odoo_api_key,
+                "crm.lead",
+                "search_read",
+                [[["id", "in", odoo_ids]]],
+                {"fields": ["id", "active", "probability"]}
+            )
+            return records
+        except Exception as exc:
+            logger.error("Odoo get_leads_status FAILED: %s", exc)
+            return []
+
 
 # Singleton — reused across requests/scheduler runs
 _odoo_client: Optional[OdooClient] = None

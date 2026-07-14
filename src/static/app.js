@@ -441,6 +441,12 @@ document.addEventListener("DOMContentLoaded", () => {
         accountForm.reset();
         accountIdInput.value = "";
         
+        // Reset history panel
+        const historyList = document.getElementById("prompt-history-list");
+        const historyCount = document.getElementById("prompt-history-count");
+        if (historyList) historyList.innerHTML = `<div class="prompt-history-empty">Brak historii wersji dla tej kampanii.</div>`;
+        if (historyCount) historyCount.textContent = "0";
+        
         if (accountId) {
             const acc = accountsList.find(a => a.id === accountId);
             if (acc) {
@@ -465,6 +471,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     const defaultPromptData = await apiRequest("/api/settings/default-prompt");
                     document.getElementById("acc-prompt").value = defaultPromptData ? defaultPromptData.default_prompt : "";
                 }
+                
+                // Load prompt version history
+                loadPromptHistory(acc.id);
             }
         } else {
             modalTitle.textContent = "Dodaj Nową Kampanię";
@@ -473,6 +482,63 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         
         accountModal.classList.remove("hidden");
+    }
+
+    async function loadPromptHistory(accountId) {
+        const historyList = document.getElementById("prompt-history-list");
+        const historyCount = document.getElementById("prompt-history-count");
+        
+        try {
+            const versions = await apiRequest(`/api/analytics/prompts?account_id=${accountId}`);
+            if (!versions || versions.length === 0) {
+                historyList.innerHTML = `<div class="prompt-history-empty">Brak historii wersji.</div>`;
+                historyCount.textContent = "0";
+                return;
+            }
+            
+            historyCount.textContent = versions.length;
+            historyList.innerHTML = versions.map(pv => {
+                const dateStr = pv.created_at ? new Date(pv.created_at).toLocaleDateString("pl-PL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+                const rate = pv.conversion_rate > 0 ? `<span class="pv-stat rate"><i class="fa-solid fa-arrow-trend-up"></i> ${pv.conversion_rate}%</span>` : "";
+                const preview = pv.prompt_text ? pv.prompt_text.substring(0, 60).replace(/</g, "&lt;") + (pv.prompt_text.length > 60 ? "..." : "") : "";
+                return `
+                    <div class="prompt-version-item">
+                        <span class="pv-badge">v${pv.version}</span>
+                        <div class="pv-info">
+                            <span class="pv-date">${dateStr}</span>
+                            <div class="pv-stats">
+                                <span class="pv-stat total"><i class="fa-solid fa-list"></i> ${pv.leads_count}</span>
+                                <span class="pv-stat won"><i class="fa-solid fa-check"></i> ${pv.won_leads_count}</span>
+                                <span class="pv-stat lost"><i class="fa-solid fa-xmark"></i> ${pv.lost_leads_count}</span>
+                                ${rate}
+                            </div>
+                            <span title="${pv.prompt_text ? pv.prompt_text.replace(/"/g, '&quot;') : ''}" style="font-size: 11px; color: var(--text-muted);">${preview}</span>
+                        </div>
+                        <button class="btn-restore" data-acc-id="${accountId}" data-pv-id="${pv.id}" data-prompt="${(pv.prompt_text || '').replace(/"/g, '&quot;')}">Przywóć</button>
+                    </div>
+                `;
+            }).join("");
+            
+            // Attach restore listeners
+            historyList.querySelectorAll(".btn-restore").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    const pvId = parseInt(btn.dataset.pvId);
+                    const accId = parseInt(btn.dataset.accId);
+                    const promptText = btn.getAttribute("data-prompt").replace(/&quot;/g, '"');
+                    
+                    if (!confirm(`Przywrócić wersję promptu? Zostanie ona ustawiona jako aktywna dla tej kampanii.`)) return;
+                    
+                    try {
+                        await apiRequest(`/api/accounts/${accId}/prompts/${pvId}/restore`, { method: "POST" });
+                        document.getElementById("acc-prompt").value = promptText;
+                        showToast("Wersja promptu została przywrócona. Pamiętaj o zapisaniu kampanii!");
+                        loadPromptHistory(accId);
+                    } catch (e) {}
+                });
+            });
+        } catch (e) {
+            historyList.innerHTML = `<div class="prompt-history-empty">Błąd ładowania historii.</div>`;
+        }
     }
 
     function closeAccountModal() {

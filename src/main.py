@@ -27,7 +27,7 @@ from config import get_settings
 from database import get_recent_leads, init_db, save_lead, url_exists, AsyncSessionLocal, get_db_setting_sync
 from odoo_integration import get_odoo_client
 from osint_engine import get_engine, get_date_limits, get_system_instruction
-from models import User, Session as UserSession, Account, ResearchLog, Setting
+from models import User, Session as UserSession, Account, ResearchLog, Setting, Lead, PromptVersion
 from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest, SettingUpdate, ChangePasswordRequest
 from auth import verify_password, create_user_session, validate_session_token
 
@@ -125,6 +125,16 @@ async def run_osint_pipeline() -> dict[str, Any]:
             logger.info("Skanowanie dla konta: %s (ID: %s)", account.name, account.id)
             stats["accounts_scanned"] += 1
             
+            # Pobieramy najnowszą wersję promptu dla konta (jeśli istnieje)
+            prompt_ver_res = await session.execute(
+                select(PromptVersion)
+                .filter(PromptVersion.account_id == account.id)
+                .order_by(PromptVersion.version.desc())
+                .limit(1)
+            )
+            prompt_ver = prompt_ver_res.scalar_one_or_none()
+            prompt_version_id = prompt_ver.id if prompt_ver else None
+            
             # Pobieramy wyniki wyszukiwania (słownik z podziałem na źródła)
             search_results = engine.run_search_for_account(account)
             
@@ -171,7 +181,7 @@ async def run_osint_pipeline() -> dict[str, Any]:
                         
                     # Zapis do SQLite
                     try:
-                        await save_lead(lead, odoo_id=odoo_id)
+                        await save_lead(lead, odoo_id=odoo_id, prompt_version_id=prompt_version_id)
                         leads_created_count += 1
                         stats["leads_new"] += 1
                     except IntegrityError:
@@ -199,6 +209,71 @@ async def run_osint_pipeline() -> dict[str, Any]:
     return stats
 
 
+async def run_crm_sync() -> dict[str, Any]:
+    """
+    Pobiera zaktualizowane statusy szans z Odoo dla wszystkich leadów posiadających odoo_id
+    i aktualizuje ich status w bazie danych SQLite.
+    """
+    logger.info("=== CRM Status Sync START ===")
+    odoo = get_odoo_client()
+    
+    stats = {
+        "leads_checked": 0,
+        "leads_updated": 0,
+        "errors": 0
+    }
+    
+    try:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(Lead).filter(Lead.odoo_id.isnot(None))
+            )
+            leads = result.scalars().all()
+            
+            if not leads:
+                logger.info("Brak leadów z powiązanym odoo_id do zsynchronizowania.")
+                return stats
+            
+            odoo_ids = [l.odoo_id for l in leads]
+            stats["leads_checked"] = len(odoo_ids)
+            
+            chunk_size = 100
+            odoo_records = []
+            import asyncio
+            for i in range(0, len(odoo_ids), chunk_size):
+                chunk = odoo_ids[i:i + chunk_size]
+                records = await asyncio.to_thread(odoo.get_leads_status, chunk)
+                if records:
+                    odoo_records.extend(records)
+                
+            odoo_map = {r["id"]: r for r in odoo_records if r and "id" in r}
+            
+            for lead in leads:
+                if lead.odoo_id in odoo_map:
+                    rec = odoo_map[lead.odoo_id]
+                    active = rec.get("active", True)
+                    probability = rec.get("probability", 0.0)
+                    
+                    if not active:
+                        new_status = "Lost"
+                    elif probability == 100:
+                        new_status = "Won"
+                    else:
+                        new_status = f"Active ({int(probability)}%)"
+                    
+                    if lead.status != new_status:
+                        lead.status = new_status
+                        stats["leads_updated"] += 1
+                        
+            await session.commit()
+            logger.info("Zakończono synchronizację CRM: %s", stats)
+    except Exception as e:
+        logger.error("Błąd podczas synchronizacji z CRM: %s", e)
+        stats["errors"] += 1
+        
+    return stats
+
+
 # ---------------------------------------------------------------------------
 # Lifespan (startup / shutdown)
 # ---------------------------------------------------------------------------
@@ -212,7 +287,7 @@ async def lifespan(app: FastAPI):
     cron_minute = int(get_db_setting_sync("CRON_MINUTE", str(settings.cron_minute)))
     cron_tz = get_db_setting_sync("CRON_TIMEZONE", settings.cron_timezone)
 
-    # Automatyczny start crona
+    # Automatyczny start crona dla pipeline
     trigger = CronTrigger(
         hour=cron_hour,
         minute=cron_minute,
@@ -226,9 +301,20 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
         misfire_grace_time=3600,
     )
+    
+    # Dodajemy synchronizację CRM co 1 godzinę
+    scheduler.add_job(
+        run_crm_sync,
+        trigger="interval",
+        hours=1,
+        id="crm_sync",
+        name="Sync CRM leads status from Odoo",
+        replace_existing=True,
+    )
+    
     scheduler.start()
     logger.info(
-        "Scheduler started — cron=%02d:%02d %s",
+        "Scheduler started — cron=%02d:%02d %s | CRM Sync scheduled (hourly)",
         cron_hour,
         cron_minute,
         cron_tz,
@@ -417,6 +503,16 @@ async def create_account(
     await db.commit()
     await db.refresh(new_acc)
     
+    if req.custom_prompt:
+        pv = PromptVersion(
+            account_id=new_acc.id,
+            prompt_text=req.custom_prompt,
+            version=1,
+            created_at=datetime.utcnow()
+        )
+        db.add(pv)
+        await db.commit()
+    
     return AccountResponse(
         id=new_acc.id,
         name=new_acc.name,
@@ -447,6 +543,9 @@ async def update_account(
     if not acc:
         raise HTTPException(status_code=404, detail="Konto nie istnieje.")
 
+    old_prompt = acc.custom_prompt
+    new_prompt = req.custom_prompt
+
     acc.name = req.name
     acc.target_cpvs = json.dumps(req.target_cpvs)
     acc.target_keywords = json.dumps(req.target_keywords)
@@ -463,6 +562,25 @@ async def update_account(
     
     await db.commit()
     
+    if new_prompt != old_prompt and new_prompt:
+        pv_res = await db.execute(
+            select(PromptVersion)
+            .filter(PromptVersion.account_id == acc.id)
+            .order_by(PromptVersion.version.desc())
+            .limit(1)
+        )
+        latest_pv = pv_res.scalar_one_or_none()
+        if not latest_pv or latest_pv.prompt_text != new_prompt:
+            next_version = (latest_pv.version + 1) if latest_pv else 1
+            pv = PromptVersion(
+                account_id=acc.id,
+                prompt_text=new_prompt,
+                version=next_version,
+                created_at=datetime.utcnow()
+            )
+            db.add(pv)
+            await db.commit()
+            
     return AccountResponse(
         id=acc.id,
         name=acc.name,
@@ -609,14 +727,61 @@ async def get_analytics_timeline(
 async def get_research_logs(
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
-    limit: int = 100
+    limit: int = 100,
+    q: Optional[str] = None,
+    account_id: Optional[int] = None,
+    status: Optional[str] = None,
+    source: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None
 ):
-    result = await db.execute(
-        select(ResearchLog, Account)
-        .join(Account, Account.id == ResearchLog.account_id)
-        .order_by(ResearchLog.timestamp.desc())
-        .limit(limit)
-    )
+    query = select(ResearchLog, Account).join(Account, Account.id == ResearchLog.account_id)
+    
+    if account_id is not None:
+        query = query.filter(ResearchLog.account_id == account_id)
+        
+    if status is not None and status != "":
+        if status.lower() == "success":
+            query = query.filter(ResearchLog.response_status_code == 200)
+        elif status.lower() == "error":
+            query = query.filter(ResearchLog.response_status_code != 200)
+            
+    if source is not None and source != "":
+        query = query.filter(ResearchLog.source == source)
+        
+    if q is not None and q.strip() != "":
+        search_pattern = f"%{q}%"
+        query = query.filter(
+            (ResearchLog.log_text.like(search_pattern)) | 
+            (ResearchLog.query_params.like(search_pattern)) | 
+            (ResearchLog.source.like(search_pattern))
+        )
+        
+    if date_from is not None and date_from != "":
+        try:
+            dt_from = datetime.fromisoformat(date_from.replace("Z", "+00:00"))
+            query = query.filter(ResearchLog.timestamp >= dt_from)
+        except ValueError:
+            try:
+                dt_from = datetime.strptime(date_from, "%Y-%m-%d")
+                query = query.filter(ResearchLog.timestamp >= dt_from)
+            except ValueError:
+                pass
+                
+    if date_to is not None and date_to != "":
+        try:
+            dt_to = datetime.fromisoformat(date_to.replace("Z", "+00:00"))
+            query = query.filter(ResearchLog.timestamp <= dt_to)
+        except ValueError:
+            try:
+                dt_to = datetime.strptime(date_to, "%Y-%m-%d")
+                dt_to = dt_to.replace(hour=23, minute=59, second=59, microsecond=999999)
+                query = query.filter(ResearchLog.timestamp <= dt_to)
+            except ValueError:
+                pass
+                
+    query = query.order_by(ResearchLog.timestamp.desc()).limit(limit)
+    result = await db.execute(query)
     rows = result.all()
     
     resp = []
@@ -679,6 +844,143 @@ async def run_sandbox_test(
     except Exception as exc:
         logger.error("Sandbox test error: %s", exc)
         return {"success": False, "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# API Endpoints - CRM Sync & Prompt Analytics (Faza 5)
+# ---------------------------------------------------------------------------
+@app.post("/api/leads/sync-crm", tags=["Leads"])
+async def trigger_crm_sync(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db)
+):
+    stats = await run_crm_sync()
+    return stats
+
+
+@app.get("/api/analytics/prompts", tags=["Analytics"])
+async def get_prompt_analytics(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
+    account_id: Optional[int] = None
+):
+    query = select(PromptVersion)
+    if account_id is not None:
+        query = query.filter(PromptVersion.account_id == account_id)
+    query = query.order_by(PromptVersion.version.desc())
+    
+    result = await db.execute(query)
+    versions = result.scalars().all()
+    
+    res_list = []
+    for pv in versions:
+        # total leads
+        total_res = await db.execute(
+            select(func.count(Lead.id)).filter(Lead.prompt_version_id == pv.id)
+        )
+        total_leads = total_res.scalar() or 0
+        
+        # won leads
+        won_res = await db.execute(
+            select(func.count(Lead.id)).filter(Lead.prompt_version_id == pv.id, Lead.status == "Won")
+        )
+        won_leads = won_res.scalar() or 0
+        
+        # lost leads
+        lost_res = await db.execute(
+            select(func.count(Lead.id)).filter(Lead.prompt_version_id == pv.id, Lead.status == "Lost")
+        )
+        lost_leads = lost_res.scalar() or 0
+        
+        # active leads
+        active_res = await db.execute(
+            select(func.count(Lead.id)).filter(Lead.prompt_version_id == pv.id, Lead.status.like("Active%"))
+        )
+        active_leads = active_res.scalar() or 0
+        
+        # conversion rate
+        conversion_rate = 0.0
+        if total_leads > 0:
+            conversion_rate = round((won_leads / total_leads) * 100.0, 2)
+            
+        res_list.append({
+            "id": pv.id,
+            "account_id": pv.account_id,
+            "prompt_text": pv.prompt_text,
+            "version": pv.version,
+            "created_at": pv.created_at.isoformat() if pv.created_at else None,
+            "leads_count": total_leads,
+            "won_leads_count": won_leads,
+            "lost_leads_count": lost_leads,
+            "active_leads_count": active_leads,
+            "conversion_rate": conversion_rate
+        })
+        
+    return res_list
+
+
+@app.post("/api/accounts/{id}/prompts/{version_id}/restore", response_model=AccountResponse, tags=["Accounts"])
+async def restore_prompt(
+    id: int,
+    version_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db)
+):
+    result = await db.execute(select(Account).filter(Account.id == id).limit(1))
+    acc = result.scalar_one_or_none()
+    if not acc:
+        raise HTTPException(status_code=404, detail="Konto nie istnieje.")
+        
+    ver_result = await db.execute(
+        select(PromptVersion)
+        .filter(PromptVersion.id == version_id, PromptVersion.account_id == id)
+        .limit(1)
+    )
+    pv = ver_result.scalar_one_or_none()
+    if not pv:
+        raise HTTPException(status_code=404, detail="Wersja promptu nie istnieje dla tego konta.")
+        
+    old_prompt = acc.custom_prompt
+    new_prompt = pv.prompt_text
+    
+    acc.custom_prompt = new_prompt
+    await db.commit()
+    
+    if old_prompt != new_prompt:
+        pv_res = await db.execute(
+            select(PromptVersion)
+            .filter(PromptVersion.account_id == acc.id)
+            .order_by(PromptVersion.version.desc())
+            .limit(1)
+        )
+        latest_pv = pv_res.scalar_one_or_none()
+        next_version = (latest_pv.version + 1) if latest_pv else 1
+        new_pv = PromptVersion(
+            account_id=acc.id,
+            prompt_text=new_prompt,
+            version=next_version,
+            created_at=datetime.utcnow()
+        )
+        db.add(new_pv)
+        await db.commit()
+        
+    await db.refresh(acc)
+    return AccountResponse(
+        id=acc.id,
+        name=acc.name,
+        target_cpvs=json.loads(acc.target_cpvs),
+        target_keywords=json.loads(acc.target_keywords),
+        custom_prompt=acc.custom_prompt,
+        llm_model=acc.llm_model,
+        llm_temperature=acc.llm_temperature,
+        llm_max_tokens=acc.llm_max_tokens,
+        odoo_company_id=acc.odoo_company_id,
+        odoo_user_id=acc.odoo_user_id,
+        odoo_tag_ids=json.loads(acc.odoo_tag_ids),
+        odoo_team_id=acc.odoo_team_id,
+        odoo_source_id=acc.odoo_source_id,
+        is_active=acc.is_active
+    )
 
 
 # ---------------------------------------------------------------------------

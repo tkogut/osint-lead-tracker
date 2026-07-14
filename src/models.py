@@ -64,6 +64,7 @@ class Account(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     logs = relationship("ResearchLog", back_populates="account", cascade="all, delete-orphan")
+    prompt_versions = relationship("PromptVersion", back_populates="account", cascade="all, delete-orphan")
 
 
 class ResearchLog(Base):
@@ -85,6 +86,19 @@ class ResearchLog(Base):
     log_text = Column(Text, nullable=True)
 
     account = relationship("Account", back_populates="logs")
+
+
+class PromptVersion(Base):
+    """Historia wersji promptów dla kampanii/kont (Faza 5)."""
+    __tablename__ = "prompt_versions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    prompt_text = Column(Text, nullable=False)
+    version = Column(Integer, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    account = relationship("Account", back_populates="prompt_versions")
 
 
 class Setting(Base):
@@ -113,3 +127,5 @@ class Lead(Base):
     data_pub = Column(String(50))
     odoo_id = Column(Integer, nullable=True)
     created_at = Column(String(100), nullable=False, default=lambda: datetime.utcnow().isoformat())
+    status = Column(String(100), nullable=True, default="New")
+    prompt_version_id = Column(Integer, ForeignKey("prompt_versions.id", ondelete="SET NULL"), nullable=True)
