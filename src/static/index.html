@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSINT Lead Dashboard — MIW Group</title>
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Premium Stylesheet -->
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-container" class="glass-card login-box hidden">
+        <div class="login-header">
+            <i class="fa-solid fa-compass-drafting logo-icon animate-pulse"></i>
+            <h2>OSINT Lead Tracker</h2>
+            <p>Zaloguj się do panelu administracyjnego</p>
+        </div>
+        <form id="login-form">
+            <div class="form-group">
+                <label for="username"><i class="fa-solid fa-user"></i> Użytkownik</label>
+                <input type="text" id="username" required placeholder="np. admin">
+            </div>
+            <div class="form-group">
+                <label for="password"><i class="fa-solid fa-lock"></i> Hasło</label>
+                <input type="password" id="password" required placeholder="••••••••">
+            </div>
+            <button type="submit" class="btn-primary btn-block">
+                Zaloguj się <i class="fa-solid fa-arrow-right-to-bracket"></i>
+            </button>
+            <div id="login-error" class="alert alert-error hidden"></div>
+        </form>
+    </div>
+
+    <!-- MAIN DASHBOARD -->
+    <div id="app-container" class="app-layout hidden">
+        
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="fa-solid fa-scale-balanced logo-icon"></i>
+                <div>
+                    <h1>MIW Group</h1>
+                    <span>OSINT v1.3.0</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-tab="dashboard">
+                    <i class="fa-solid fa-chart-line"></i> Dashboard
+                </button>
+                <button class="nav-item" data-tab="accounts">
+                    <i class="fa-solid fa-folder-tree"></i> Kampanie / Konta
+                </button>
+                <button class="nav-item" data-tab="sandbox">
+                    <i class="fa-solid fa-vial"></i> Piaskownica AI
+                </button>
+                <button class="nav-item" data-tab="logs">
+                    <i class="fa-solid fa-list-check"></i> Rejestr i Logi
+                </button>
+                <button class="nav-item" data-tab="settings">
+                    <i class="fa-solid fa-sliders"></i> Ustawienia
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <i class="fa-solid fa-circle-user"></i>
+                    <div>
+                        <span id="user-display-name">admin</span>
+                        <small>Administrator</small>
+                    </div>
+                </div>
+                <button id="logout-btn" class="btn-logout" title="Wyloguj się">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="content-area">
+            
+            <!-- TOP BAR -->
+            <header class="top-bar">
+                <div class="header-title">
+                    <h2 id="current-tab-title">Dashboard</h2>
+                    <p id="current-tab-desc">Przegląd pozyskanych leadów i statystyki</p>
+                </div>
+                <div class="header-actions">
+                    <button id="trigger-scan-btn" class="btn-scan animate-shimmer">
+                        <i class="fa-solid fa-bolt"></i> Uruchom Skanowanie
+                    </button>
+                </div>
+            </header>
+
+            <!-- TABS CONTAINER -->
+            <div class="tabs-container">
+                
+                <!-- TAB: DASHBOARD -->
+                <section id="tab-dashboard" class="tab-pane active">
+                    <!-- KPI Cards -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card glass-card">
+                            <div class="kpi-icon icon-blue"><i class="fa-solid fa-bullseye"></i></div>
+                            <div class="kpi-info">
+                                <h3>Wszystkie Leady</h3>
+                                <span id="stat-total-leads">0</span>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass-card">
+                            <div class="kpi-icon icon-green"><i class="fa-solid fa-scale-balanced"></i></div>
+                            <div class="kpi-info">
+                                <h3>Wagi Samochodowe</h3>
+                                <span id="stat-auto-scales">0</span>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass-card">
+                            <div class="kpi-icon icon-purple"><i class="fa-solid fa-square-check"></i></div>
+                            <div class="kpi-info">
+                                <h3>Wysłane do Odoo</h3>
+                                <span id="stat-odoo-leads">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Leads Table -->
+                    <div class="table-container glass-card">
+                        <div class="table-header">
+                            <h3><i class="fa-solid fa-list"></i> Ostatnio pozyskane szanse</h3>
+                            <div class="table-actions">
+                                <input type="text" id="lead-search" placeholder="Szukaj leadów...">
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Tytuł</th>
+                                        <th>Inwestor</th>
+                                        <th>Lokalizacja</th>
+                                        <th>Źródło</th>
+                                        <th>Data</th>
+                                        <th>Priorytet</th>
+                                        <th>Akcje</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leads-table-body">
+                                    <tr>
+                                        <td colspan="7" class="loading-state">Ładowanie danych...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB: ACCOUNTS (Multi-tenancy CRUD) -->
+                <section id="tab-accounts" class="tab-pane">
+                    <div class="section-header-actions">
+                        <h3><i class="fa-solid fa-folder-tree"></i> Kampanie i Konta (Multi-tenancy)</h3>
+                        <button id="add-account-btn" class="btn-primary"><i class="fa-solid fa-plus"></i> Dodaj Kampanię</button>
+                    </div>
+                    <div class="accounts-grid" id="accounts-container">
+                        <!-- Accounts dynamically loaded here -->
+                    </div>
+                </section>
+
+                <!-- TAB: SANDBOX (Piaskownica promptów) -->
+                <section id="tab-sandbox" class="tab-pane">
+                    <div class="sandbox-layout">
+                        <div class="sandbox-column glass-card">
+                            <h3><i class="fa-solid fa-vial"></i> Konfiguracja Testu</h3>
+                            <form id="sandbox-form">
+                                <div class="form-group">
+                                    <label for="sandbox-model">Model AI</label>
+                                    <select id="sandbox-model">
+                                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="sandbox-temperature">Temperatura (Kreatywność)</label>
+                                    <div class="slider-container">
+                                        <input type="range" id="sandbox-temperature" min="0.0" max="1.5" step="0.1" value="0.1">
+                                        <span id="sandbox-temp-val">0.1</span>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="sandbox-prompt">Prompt Systemowy (Instrukcja)</label>
+                                    <textarea id="sandbox-prompt" rows="8" placeholder="Podaj instrukcję systemową dla modelu..."></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="sandbox-text">Surowa treść ogłoszenia (Input)</label>
+                                    <textarea id="sandbox-text" rows="10" placeholder="Wklej tutaj surowy tekst ogłoszenia (np. z BZP lub strony www)..." required></textarea>
+                                </div>
+                                <button type="submit" id="run-sandbox-btn" class="btn-primary btn-block">
+                                    <i class="fa-solid fa-play"></i> Uruchom Test AI
+                                </button>
+                            </form>
+                        </div>
+                        <div class="sandbox-column glass-card sandbox-output-panel">
+                            <h3><i class="fa-solid fa-laptop-code"></i> Wynik AI</h3>
+                            <div class="sandbox-output-wrapper">
+                                <pre id="sandbox-output" class="output-pre">Wynik analizy ukaże się tutaj po kliknięciu „Uruchom Test AI”...</pre>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB: LOGS (Hard Proof Viewer) -->
+                <section id="tab-logs" class="tab-pane">
+                    <div class="table-container glass-card">
+                        <div class="table-header">
+                            <h3><i class="fa-solid fa-list-check"></i> Rejestr i Logi (Twardy Dowód)</h3>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Czas</th>
+                                        <th>Kampania</th>
+                                        <th>Źródło</th>
+                                        <th>Dowód (SHA-256 Hash)</th>
+                                        <th>Status</th>
+                                        <th>Znalezione</th>
+                                        <th>Dodane</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="logs-table-body">
+                                    <tr>
+                                        <td colspan="7" class="loading-state">Ładowanie logów...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB: SETTINGS -->
+                <section id="tab-settings" class="tab-pane">
+                    <div class="settings-layout glass-card">
+                        <h3><i class="fa-solid fa-sliders"></i> Globalne Ustawienia (.env)</h3>
+                        <p class="settings-hint">Wartości kluczy API oraz parametry globalne są ładowane bezpośrednio z konfiguracji systemowej.</p>
+                        <form id="settings-form">
+                            <div id="settings-fields-container">
+                                <!-- Loaded dynamically -->
+                            </div>
+                            <button type="submit" class="btn-primary"><i class="fa-solid fa-save"></i> Zapisz Zmiany</button>
+                        </form>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL: ADD/EDIT ACCOUNT -->
+    <div id="account-modal" class="modal-overlay hidden">
+        <div class="modal-content glass-card animate-zoom">
+            <div class="modal-header">
+                <h3 id="modal-title">Dodaj Nowe Konto</h3>
+                <button class="modal-close" id="modal-close-btn">&times;</button>
+            </div>
+            <form id="account-form">
+                <input type="hidden" id="account-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="acc-name">Nazwa Kampanii</label>
+                        <input type="text" id="acc-name" required placeholder="np. Wagi Samochodowe">
+                    </div>
+                    <div class="form-group">
+                        <label for="acc-model">Model AI</label>
+                        <select id="acc-model">
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                            <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="acc-temperature">Temperatura</label>
+                        <input type="number" id="acc-temperature" min="0.0" max="1.5" step="0.1" value="0.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="acc-max-tokens">Maks. Tokens</label>
+                        <input type="number" id="acc-max-tokens" value="4096" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="acc-cpvs">Kody CPV (oddzielone przecinkami)</label>
+                    <input type="text" id="acc-cpvs" placeholder="np. 42923110-6, 42923000-2">
+                </div>
+                <div class="form-group">
+                    <label for="acc-keywords">Słowa Kluczowe (oddzielone przecinkami)</label>
+                    <input type="text" id="acc-keywords" placeholder="np. waga, wagi, najazdowa">
+                </div>
+                
+                <h4 class="form-subheader"><i class="fa-solid fa-share-nodes"></i> Odoo Multicompany Mapping</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="acc-company-id">Odoo Company ID</label>
+                        <input type="number" id="acc-company-id" placeholder="np. 1">
+                    </div>
+                    <div class="form-group">
+                        <label for="acc-user-id">Odoo User ID (Handlowiec)</label>
+                        <input type="number" id="acc-user-id" placeholder="Pozostaw puste lub podaj ID">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="acc-tag-ids">Odoo Tag IDs (oddzielone przecinkami)</label>
+                        <input type="text" id="acc-tag-ids" placeholder="np. 3, 5, 12">
+                    </div>
+                    <div class="form-group">
+                        <label for="acc-team-id">Odoo Team ID</label>
+                        <input type="number" id="acc-team-id" placeholder="np. 11">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="acc-source-id">Odoo Source ID</label>
+                        <input type="number" id="acc-source-id" placeholder="np. 234">
+                    </div>
+                    <div class="form-group flex-row">
+                        <label for="acc-active">Aktywna</label>
+                        <input type="checkbox" id="acc-active" checked>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="acc-prompt">Dedykowany Prompt Systemowy (Opcjonalny)</label>
+                    <textarea id="acc-prompt" rows="4" placeholder="Zostaw puste, aby użyć domyślnego..."></textarea>
+                </div>
+                
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="modal-cancel-btn">Anuluj</button>
+                    <button type="submit" class="btn-primary">Zapisz Konto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

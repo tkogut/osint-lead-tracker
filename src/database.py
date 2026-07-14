@@ -1,100 +1,97 @@
 """
-database.py — SQLite via aiosqlite.
-Tabela leads z unikalnym URL-em (deduplikacja).
+database.py — SQLite via SQLAlchemy (wsparcie asynchroniczne i synchroniczne).
+Kompatybilne wstecznie z dotychczasową strukturą bazy danych.
 """
 
 import logging
-import os
 from datetime import datetime
 from typing import Optional
 
-import aiosqlite
+from sqlalchemy import select, create_engine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from config import get_settings
+from models import Base, Lead
 
 logger = logging.getLogger(__name__)
-
 settings = get_settings()
-DB_PATH = settings.sqlite_path
+
+# Ustalenie URL bazodanowych
+async_db_url = settings.database_url.replace("sqlite:///", "sqlite+aiosqlite:///")
+sync_db_url = settings.database_url
+
+# Asynchroniczny silnik i fabryka sesji (dla FastAPI)
+async_engine = create_async_engine(async_db_url, echo=False)
+AsyncSessionLocal = async_sessionmaker(async_engine, expire_on_commit=False, class_=AsyncSession)
+
+# Synchroniczny silnik i fabryka sesji (dla zadań pobocznych)
+sync_engine = create_engine(sync_db_url, echo=False)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
 
 
 async def init_db() -> None:
-    """Tworzy tabelę leads jeśli nie istnieje."""
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            """
-            CREATE TABLE IF NOT EXISTS leads (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                url         TEXT    UNIQUE NOT NULL,
-                tytul       TEXT    NOT NULL,
-                typ         TEXT,
-                lokalizacja TEXT,
-                inwestor    TEXT,
-                wykonawca   TEXT,
-                zakres      TEXT,
-                uzasadnienie TEXT,
-                priorytet   TEXT,
-                data_pub    TEXT,
-                odoo_id     INTEGER,
-                created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-            )
-            """
-        )
-        await db.commit()
-    logger.info("DB init OK → %s", DB_PATH)
+    """Tworzy wszystkie tabele bazy danych, jeśli nie istnieją."""
+    import os
+    os.makedirs(os.path.dirname(settings.sqlite_path), exist_ok=True)
+    async with async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("DB init OK (SQLAlchemy Async) -> %s", settings.sqlite_path)
 
 
 async def url_exists(url: str) -> bool:
     """Sprawdza czy URL jest już w bazie (deduplikacja)."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute(
-            "SELECT 1 FROM leads WHERE url = ? LIMIT 1", (url,)
-        ) as cursor:
-            row = await cursor.fetchone()
-            return row is not None
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Lead).filter(Lead.url == url).limit(1))
+        lead = result.scalar_one_or_none()
+        return lead is not None
 
 
-async def save_lead(lead: dict, odoo_id: Optional[int] = None) -> int:
-    """
-    Zapisuje leada do SQLite.
-    Zwraca rowid nowego rekordu.
-    Raises sqlite3.IntegrityError jeśli URL już istnieje.
-    """
-    async with aiosqlite.connect(DB_PATH) as db:
-        cursor = await db.execute(
-            """
-            INSERT INTO leads
-                (url, tytul, typ, lokalizacja, inwestor, wykonawca,
-                 zakres, uzasadnienie, priorytet, data_pub, odoo_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                lead.get("url", ""),
-                lead.get("tytul", ""),
-                lead.get("typ"),
-                lead.get("lokalizacja"),
-                lead.get("inwestor"),
-                lead.get("wykonawca"),
-                lead.get("zakres"),
-                lead.get("uzasadnienie"),
-                lead.get("priorytet"),
-                lead.get("data"),
-                odoo_id,
-                datetime.utcnow().isoformat(),
-            ),
+async def save_lead(lead_dict: dict, odoo_id: Optional[int] = None) -> int:
+    """Zapisuje leada do SQLite."""
+    async with AsyncSessionLocal() as session:
+        new_lead = Lead(
+            url=lead_dict.get("url", ""),
+            tytul=lead_dict.get("tytul", ""),
+            typ=lead_dict.get("typ"),
+            lokalizacja=lead_dict.get("lokalizacja"),
+            inwestor=lead_dict.get("inwestor"),
+            wykonawca=lead_dict.get("wykonawca"),
+            zakres=lead_dict.get("zakres"),
+            uzasadnienie=lead_dict.get("uzasadnienie"),
+            priorytet=lead_dict.get("priorytet"),
+            data_pub=lead_dict.get("data"),
+            odoo_id=odoo_id,
+            created_at=datetime.utcnow().isoformat()
         )
-        await db.commit()
-        logger.info("Saved lead id=%s url=%s", cursor.lastrowid, lead.get("url"))
-        return cursor.lastrowid
+        session.add(new_lead)
+        await session.commit()
+        logger.info("Saved lead id=%s url=%s", new_lead.id, new_lead.url)
+        return new_lead.id
 
 
 async def get_recent_leads(limit: int = 50) -> list[dict]:
-    """Zwraca ostatnie N leadów (dla endpointu /leads)."""
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM leads ORDER BY created_at DESC LIMIT ?", (limit,)
-        ) as cursor:
-            rows = await cursor.fetchall()
-            return [dict(r) for r in rows]
+    """Zwraca ostatnie N leadów w formacie słowników."""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Lead).order_by(Lead.created_at.desc()).limit(limit)
+        )
+        leads = result.scalars().all()
+        return [
+            {
+                "id": l.id,
+                "url": l.url,
+                "tytul": l.tytul,
+                "typ": l.typ,
+                "lokalizacja": l.lokalizacja,
+                "inwestor": l.inwestor,
+                "wykonawca": l.wykonawca,
+                "zakres": l.zakres,
+                "uzasadnienie": l.uzasadnienie,
+                "priorytet": l.priorytet,
+                "data_pub": l.data_pub,
+                "odoo_id": l.odoo_id,
+                "created_at": l.created_at
+            }
+            for l in leads
+        ]
