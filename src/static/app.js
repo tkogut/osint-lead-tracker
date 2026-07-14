@@ -344,7 +344,7 @@ document.addEventListener("DOMContentLoaded", () => {
     modalCloseBtn.addEventListener("click", closeAccountModal);
     modalCancelBtn.addEventListener("click", closeAccountModal);
 
-    function openAccountModal(accountId = null) {
+    async function openAccountModal(accountId = null) {
         accountForm.reset();
         accountIdInput.value = "";
         
@@ -365,10 +365,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.getElementById("acc-team-id").value = acc.odoo_team_id || "";
                 document.getElementById("acc-source-id").value = acc.odoo_source_id || "";
                 document.getElementById("acc-active").checked = acc.is_active;
-                document.getElementById("acc-prompt").value = acc.custom_prompt || "";
+                
+                if (acc.custom_prompt) {
+                    document.getElementById("acc-prompt").value = acc.custom_prompt;
+                } else {
+                    const defaultPromptData = await apiRequest("/api/settings/default-prompt");
+                    document.getElementById("acc-prompt").value = defaultPromptData ? defaultPromptData.default_prompt : "";
+                }
             }
         } else {
             modalTitle.textContent = "Dodaj Nową Kampanię";
+            const defaultPromptData = await apiRequest("/api/settings/default-prompt");
+            document.getElementById("acc-prompt").value = defaultPromptData ? defaultPromptData.default_prompt : "";
         }
         
         accountModal.classList.remove("hidden");
@@ -602,6 +610,30 @@ document.addEventListener("DOMContentLoaded", () => {
             triggerScanBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> Uruchom Skanowanie`;
         }
     });
+
+    // --- Change Password Form ---
+    const changePasswordForm = document.getElementById("change-password-form");
+    if (changePasswordForm) {
+        changePasswordForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const oldPwd = document.getElementById("old-password").value;
+            const newPwd = document.getElementById("new-password").value;
+            
+            try {
+                const res = await apiRequest("/api/auth/change-password", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ old_password: oldPwd, new_password: newPwd })
+                });
+                if (res && res.success) {
+                    showToast("Hasło zostało pomyślnie zmienione.");
+                    changePasswordForm.reset();
+                }
+            } catch (err) {
+                // error alert handled by apiRequest
+            }
+        });
+    }
 
     // --- Start ---
     checkSession();

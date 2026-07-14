@@ -12,7 +12,17 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import sessionmaker
 
 from config import get_settings
-from models import Base, Lead
+from models import Base, Lead, Setting
+
+def get_db_setting_sync(key: str, default: str = "") -> str:
+    """Odczytuje ustawienie z bazy danych w sposób synchroniczny (dla potoków tła)."""
+    with SessionLocal() as session:
+        result = session.execute(select(Setting).filter(Setting.key == key).limit(1))
+        item = result.scalar_one_or_none()
+        if item and item.value is not None:
+            return item.value
+        return default
+
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

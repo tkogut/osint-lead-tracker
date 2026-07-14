@@ -65,10 +65,11 @@ async def seed_data() -> None:
             await session.commit()
             logger.info("Utworzono domyślne konto: Wagi Samochodowe")
             
-        # 3. Kopiowanie ustawień z pliku .env do bazy danych
         setting_keys = [
             "GEMINI_API_KEY",
             "ODOO_URL",
+            "ODOO_DB",
+            "ODOO_USER",
             "ODOO_API_KEY",
             "API_TOKEN",
             "CRON_HOUR",
@@ -85,11 +86,14 @@ async def seed_data() -> None:
                 val = ""
                 if key == "GEMINI_API_KEY": val = settings.gemini_api_key
                 elif key == "ODOO_URL": val = settings.odoo_url
+                elif key == "ODOO_DB": val = settings.odoo_db
+                elif key == "ODOO_USER": val = settings.odoo_user
                 elif key == "ODOO_API_KEY": val = settings.odoo_api_key
                 elif key == "API_TOKEN": val = settings.api_token
                 elif key == "CRON_HOUR": val = str(settings.cron_hour)
                 elif key == "CRON_MINUTE": val = str(settings.cron_minute)
                 elif key == "CRON_TIMEZONE": val = settings.cron_timezone
+
                 
                 db_setting = Setting(key=key, value=val)
                 session.add(db_setting)

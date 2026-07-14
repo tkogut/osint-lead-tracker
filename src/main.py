@@ -1,12 +1,14 @@
 """
 main.py — Punkt wejścia FastAPI + APScheduler dla osint-lead-tracker.
 Zawiera interfejs API dla modułu Lead Dashboard (Auth, Accounts, Settings, Logs, Sandbox).
+Wspiera Fazu 2 (Engine Parameterization, Option A Scheduler w Dockerze, wielofirmowość Odoo).
 """
 
 import json
 import logging
 import sqlite3
 import os
+import hashlib
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Annotated, Any, List, Optional
@@ -21,11 +23,11 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import get_settings
-from database import get_recent_leads, init_db, save_lead, url_exists, AsyncSessionLocal
+from database import get_recent_leads, init_db, save_lead, url_exists, AsyncSessionLocal, get_db_setting_sync
 from odoo_integration import get_odoo_client
-from osint_engine import get_engine, get_date_limits
+from osint_engine import get_engine, get_date_limits, get_system_instruction
 from models import User, Session as UserSession, Account, ResearchLog, Setting
-from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest, SettingUpdate
+from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest, SettingUpdate, ChangePasswordRequest
 from auth import verify_password, create_user_session, validate_session_token
 
 # ---------------------------------------------------------------------------
@@ -53,7 +55,9 @@ api_key_header = APIKeyHeader(name="X-API-Token", auto_error=True)
 async def verify_token(
     token: Annotated[str, Security(api_key_header)],
 ) -> str:
-    if token != settings.api_token:
+    # Weryfikacja tokena z bazy (lub fallback do config)
+    api_token = get_db_setting_sync("API_TOKEN", settings.api_token)
+    if token != api_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API token.",
@@ -95,49 +99,101 @@ async def get_current_user(
 # ---------------------------------------------------------------------------
 async def run_osint_pipeline() -> dict[str, Any]:
     """
-    Główna logika wyszukiwania leadów ze wszystkich źródeł.
+    Uruchamia wyszukiwanie dla wszystkich aktywnych kont (kampanii).
+    Zapisuje wyniki do bazy danych, logi (ResearchLog) i przekazuje leady do Odoo.
     """
-    logger.info("=== OSINT Pipeline START ===")
+    logger.info("=== OSINT Pipeline START (Multi-tenancy Faza 2) ===")
+    
     engine = get_engine()
     odoo = get_odoo_client()
-
-    leads = engine.run_search()
-
-    stats = {"found": len(leads), "new": 0, "duplicates": 0, "odoo_ok": 0, "odoo_fail": 0}
-
-    for lead in leads:
-        url = lead.get("url", "").strip()
-        if not url:
-            logger.warning("Lead bez URL — pomijam: %s", lead.get("tytul"))
-            continue
-
-        # --- deduplikacja ---
-        if await url_exists(url):
-            logger.info("Duplikat → pomijam: %s", url)
-            stats["duplicates"] += 1
-            continue
-
-        # --- zapis do Odoo ---
-        odoo_id: int | None = None
-        try:
-            odoo_id = odoo.create_lead(lead)
-            if odoo_id:
-                stats["odoo_ok"] += 1
-                logger.info("Odoo OK → lead_id=%s", odoo_id)
-            else:
-                stats["odoo_fail"] += 1
-        except Exception as exc:
-            logger.error("Odoo exception: %s", exc)
-            stats["odoo_fail"] += 1
-
-        # --- zapis do SQLite ---
-        try:
-            await save_lead(lead, odoo_id=odoo_id)
-            stats["new"] += 1
-        except sqlite3.IntegrityError:
-            logger.warning("Integrity error (race) dla URL: %s", url)
-            stats["duplicates"] += 1
-
+    
+    stats = {
+        "accounts_scanned": 0,
+        "leads_found": 0,
+        "leads_new": 0,
+        "odoo_ok": 0,
+        "odoo_fail": 0
+    }
+    
+    async with AsyncSessionLocal() as session:
+        # Pobieramy aktywne konta
+        result = await session.execute(select(Account).filter(Account.is_active == True))
+        accounts = result.scalars().all()
+        
+        for account in accounts:
+            logger.info("Skanowanie dla konta: %s (ID: %s)", account.name, account.id)
+            stats["accounts_scanned"] += 1
+            
+            # Pobieramy wyniki wyszukiwania (słownik z podziałem na źródła)
+            search_results = engine.run_search_for_account(account)
+            
+            for source, (leads, status_code, response_hash) in search_results.items():
+                leads_found_count = len(leads)
+                leads_created_count = 0
+                
+                # Zapisujemy parametry zapytania
+                query_params = {
+                    "cpvs": json.loads(account.target_cpvs),
+                    "keywords": json.loads(account.target_keywords)
+                }
+                
+                for lead in leads:
+                    url = lead.get("url", "").strip()
+                    if not url:
+                        continue
+                        
+                    # Deduplikacja w SQLite
+                    if await url_exists(url):
+                        logger.info("[%s] Duplikat URL pomijam: %s", source, url)
+                        continue
+                        
+                    # Zapis do Odoo
+                    odoo_id = None
+                    try:
+                        # Przekazujemy parametry z konta
+                        odoo_id = odoo.create_lead(
+                            lead,
+                            company_id=account.odoo_company_id,
+                            user_id=account.odoo_user_id,
+                            tag_ids=json.loads(account.odoo_tag_ids),
+                            team_id=account.odoo_team_id,
+                            source_id=account.odoo_source_id
+                        )
+                        if odoo_id:
+                            stats["odoo_ok"] += 1
+                            logger.info("[%s] Odoo OK → id=%s", source, odoo_id)
+                        else:
+                            stats["odoo_fail"] += 1
+                    except Exception as exc:
+                        logger.error("[%s] Błąd Odoo: %s", source, exc)
+                        stats["odoo_fail"] += 1
+                        
+                    # Zapis do SQLite
+                    try:
+                        await save_lead(lead, odoo_id=odoo_id)
+                        leads_created_count += 1
+                        stats["leads_new"] += 1
+                    except sqlite3.IntegrityError:
+                        logger.warning("[%s] IntegrityError dla URL: %s", source, url)
+                        
+                stats["leads_found"] += leads_found_count
+                
+                # Zapis twardego dowodu w ResearchLog
+                log_entry = ResearchLog(
+                    account_id=account.id,
+                    timestamp=datetime.utcnow(),
+                    source=source,
+                    query_params=json.dumps(query_params),
+                    raw_response_hash=response_hash,
+                    response_status_code=status_code,
+                    leads_found_count=leads_found_count,
+                    leads_created_count=leads_created_count,
+                    log_text=f"Skanowanie ukończone. Znaleziono {leads_found_count} leadów, zapisano {leads_created_count}."
+                )
+                session.add(log_entry)
+                
+            await session.commit()
+            
     logger.info("=== OSINT Pipeline DONE | stats=%s ===", stats)
     return stats
 
@@ -150,11 +206,16 @@ async def lifespan(app: FastAPI):
     # --- startup ---
     await init_db()
 
+    # Odczytujemy konfigurację crona z bazy (lub fallback do config)
+    cron_hour = int(get_db_setting_sync("CRON_HOUR", str(settings.cron_hour)))
+    cron_minute = int(get_db_setting_sync("CRON_MINUTE", str(settings.cron_minute)))
+    cron_tz = get_db_setting_sync("CRON_TIMEZONE", settings.cron_timezone)
+
     # Automatyczny start crona
     trigger = CronTrigger(
-        hour=settings.cron_hour,
-        minute=settings.cron_minute,
-        timezone=settings.cron_timezone,
+        hour=cron_hour,
+        minute=cron_minute,
+        timezone=cron_tz,
     )
     scheduler.add_job(
         run_osint_pipeline,
@@ -167,9 +228,9 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     logger.info(
         "Scheduler started — cron=%02d:%02d %s",
-        settings.cron_hour,
-        settings.cron_minute,
-        settings.cron_timezone,
+        cron_hour,
+        cron_minute,
+        cron_tz,
     )
 
     yield
@@ -263,6 +324,26 @@ async def get_me(current_user: Annotated[User, Depends(get_current_user)]):
     return {"username": current_user.username, "role": current_user.role}
 
 
+@app.post("/api/auth/change-password", tags=["Auth"])
+async def change_password(
+    req: ChangePasswordRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db)
+):
+    """Zmienia hasło aktualnie zalogowanego użytkownika."""
+    if not verify_password(req.old_password, current_user.salt, current_user.password_hash):
+        raise HTTPException(status_code=400, detail="Obecne hasło jest niepoprawne.")
+        
+    from auth import generate_salt, hash_password
+    new_salt = generate_salt()
+    current_user.salt = new_salt
+    current_user.password_hash = hash_password(req.new_password, new_salt)
+    
+    await db.commit()
+    logger.info("Password changed successfully for user: %s", current_user.username)
+    return {"success": True, "message": "Hasło zostało pomyślnie zmienione."}
+
+
 # ---------------------------------------------------------------------------
 # API Endpoints - Dashboard Accounts (Multi-tenancy CRUD)
 # ---------------------------------------------------------------------------
@@ -301,7 +382,6 @@ async def create_account(
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db)
 ):
-    # Weryfikacja unikalności nazwy
     check_name = await db.execute(select(Account).filter(Account.name == req.name).limit(1))
     if check_name.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Konto o takiej nazwie już istnieje.")
@@ -415,7 +495,6 @@ async def get_settings_list(
 ):
     result = await db.execute(select(Setting).order_by(Setting.key.asc()))
     rows = result.scalars().all()
-    # Maskujemy klucze API dla bezpieczeństwa w GUI
     safe_settings = []
     for r in rows:
         val = r.value or ""
@@ -436,13 +515,19 @@ async def update_setting(
     if not item:
         raise HTTPException(status_code=404, detail="Ustawienie nie istnieje.")
     
-    # Blokada zapisu zamaskowanych wartości
     if req.value.startswith("...") or "..." in req.value:
         raise HTTPException(status_code=400, detail="Nieprawidłowa wartość klucza API.")
 
     item.value = req.value
     await db.commit()
     return {"success": True}
+
+
+@app.get("/api/settings/default-prompt", tags=["Settings"])
+async def get_default_prompt(current_user: Annotated[User, Depends(get_current_user)]):
+    """Zwraca obecnie stosowany domyślny prompt systemowy silnika."""
+    today_str, start_str = get_date_limits()
+    return {"default_prompt": get_system_instruction(today_str, start_str)}
 
 
 # ---------------------------------------------------------------------------
@@ -487,13 +572,9 @@ async def run_sandbox_test(
     req: SandboxRequest,
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> dict:
-    """
-    Testuje dany prompt i surowy tekst bezpośrednio w Gemini.
-    """
     from google import genai
     from google.genai import types
     
-    # Odczytujemy aktualny klucz API z pliku lub bazy
     api_key = settings.gemini_api_key
     try:
         async with AsyncSessionLocal() as session:
@@ -534,7 +615,7 @@ async def serve_dashboard():
             return f.read()
     return HTMLResponse("<h2>Błąd: Brak pliku index.html we frakcji static.</h2>", status_code=404)
 
-# Rejestracja zasobów statycznych (styles.css, app.js)
+# Rejestracja ze statycznymi zasobami
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 os.makedirs(static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")

@@ -1,13 +1,15 @@
 """
 odoo_integration.py — Integracja z Odoo przez XML-RPC.
 Tworzy rekordy crm.lead na podstawie danych z OSINT Engine.
+Wspiera architekturę wielofirmową (company_id, user_id, tag_ids) per kampania.
 """
 
 import logging
 import xmlrpc.client
-from typing import Optional
+from typing import Optional, List
 
 from config import get_settings
+from database import get_db_setting_sync
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,6 @@ class OdooClient:
 
     def __init__(self) -> None:
         self._settings = get_settings()
-        self._uid: Optional[int] = None
 
     # ------------------------------------------------------------------
     # Autoryzacja
@@ -25,51 +26,52 @@ class OdooClient:
     def _authenticate(self) -> int:
         """
         Loguje się do Odoo i zwraca UID użytkownika.
-        Wynik jest cache'owany na czas życia instancji.
+        Pobiera dane logowania dynamicznie z bazy danych (ustawienia globalne).
         """
-        if self._uid is not None:
-            return self._uid
+        odoo_url = get_db_setting_sync("ODOO_URL", self._settings.odoo_url)
+        odoo_db = get_db_setting_sync("ODOO_DB", self._settings.odoo_db)
+        odoo_user = get_db_setting_sync("ODOO_USER", self._settings.odoo_user)
+        odoo_api_key = get_db_setting_sync("ODOO_API_KEY", self._settings.odoo_api_key)
 
-        s = self._settings
         try:
             common = xmlrpc.client.ServerProxy(
-                f"{s.odoo_url}/xmlrpc/2/common", allow_none=True
+                f"{odoo_url}/xmlrpc/2/common", allow_none=True
             )
-            uid = common.authenticate(s.odoo_db, s.odoo_user, s.odoo_api_key, {})
+            uid = common.authenticate(odoo_db, odoo_user, odoo_api_key, {})
             if not uid:
                 raise ValueError(
                     "Odoo authenticate() zwróciło False — sprawdź ODOO_USER/ODOO_API_KEY."
                 )
-            self._uid = uid
-            logger.info("Odoo auth OK → uid=%s db=%s", uid, s.odoo_db)
+            logger.info("Odoo auth OK → uid=%s db=%s", uid, odoo_db)
             return uid
         except Exception as exc:
             logger.error("Odoo auth FAILED: %s", exc)
             raise
 
     def _models_proxy(self) -> xmlrpc.client.ServerProxy:
-        s = self._settings
+        odoo_url = get_db_setting_sync("ODOO_URL", self._settings.odoo_url)
         return xmlrpc.client.ServerProxy(
-            f"{s.odoo_url}/xmlrpc/2/object", allow_none=True
+            f"{odoo_url}/xmlrpc/2/object", allow_none=True
         )
 
     # ------------------------------------------------------------------
     # Publiczne API
     # ------------------------------------------------------------------
-    def create_lead(self, lead: dict) -> Optional[int]:
+    def create_lead(
+        self,
+        lead: dict,
+        company_id: Optional[int] = None,
+        user_id: Optional[int] = None,
+        tag_ids: Optional[List[int]] = None,
+        team_id: Optional[int] = None,
+        source_id: Optional[int] = None
+    ) -> Optional[int]:
         """
         Tworzy nową szansę sprzedaży w modelu crm.lead.
-
-        Oczekiwane klucze w ``lead``:
-          tytul, tytul_generowany, lokalizacja, inwestor, wykonawca,
-          zakres, uzasadnienie, url, priorytet, data, typ,
-          email (opcjonalny), telefon (opcjonalny),
-          termin_skladania (opcjonalny, YYYY-MM-DD),
-          opis_szczegolowy (opcjonalny)
-
-        Zwraca Odoo record id lub None przy błędzie.
+        Wspiera parametry wielofirmowości (company_id, user_id, tag_ids).
         """
-        s = self._settings
+        odoo_db = get_db_setting_sync("ODOO_DB", self._settings.odoo_db)
+        odoo_api_key = get_db_setting_sync("ODOO_API_KEY", self._settings.odoo_api_key)
 
         # --- buduj opis HTML ---
         typ = lead.get("typ") or "brak danych"
@@ -146,10 +148,19 @@ class OdooClient:
             "type": "lead",
         }
 
-        if s.odoo_team_id:
-            vals["team_id"] = s.odoo_team_id
-        if s.odoo_source_id:
-            vals["source_id"] = s.odoo_source_id
+        # Dynamiczne mapowanie Odoo
+        if company_id:
+            vals["company_id"] = company_id
+        if user_id is not None:
+            vals["user_id"] = user_id
+        if tag_ids:
+            # Mapowanie M2M Odoo
+            vals["tag_ids"] = [(6, 0, tag_ids)]
+        if team_id:
+            vals["team_id"] = team_id
+        if source_id:
+            vals["source_id"] = source_id
+
         if lead.get("email"):
             vals["email_from"] = lead["email"]
         if lead.get("telefon"):
@@ -168,9 +179,9 @@ class OdooClient:
             uid = self._authenticate()
             models = self._models_proxy()
             record_id: int = models.execute_kw(
-                s.odoo_db,
+                odoo_db,
                 uid,
-                s.odoo_api_key,
+                odoo_api_key,
                 "crm.lead",
                 "create",
                 [vals],

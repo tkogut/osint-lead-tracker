@@ -66,3 +66,10 @@ class SettingUpdate(BaseModel):
     """Zaktualizowanie pojedynczego ustawienia globalnego."""
     key: str
     value: str
+
+
+class ChangePasswordRequest(BaseModel):
+    """Ządanie zmiany hasła administratora."""
+    old_password: str
+    new_password: str
+

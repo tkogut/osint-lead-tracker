@@ -6,9 +6,9 @@
 - [x] **TSK-003**: Create database migration/initialization script to seed the initial default account and admin user if empty.
 
 ## [Phase 2: Engine Parameterization & Scheduler]
-- [ ] **TSK-004**: Refactor `src/osint_engine.py` to accept an `Account` configuration dynamically instead of reading global `Settings` from `.env`.
-- [ ] **TSK-005**: Modify `run_osint_pipeline` in `src/main.py` to iterate over all active accounts, run research per account, and log lightweight "Hard Proofs" in `ResearchLog`.
-- [ ] **TSK-011**: Update Odoo integration client in `src/odoo_integration.py` to accept `company_id`, `user_id` (salesperson), and `tag_ids` dynamically per lead insertion.
+- [x] **TSK-004**: Refactor `src/osint_engine.py` to accept an `Account` configuration dynamically instead of reading global `Settings` from `.env`.
+- [x] **TSK-005**: Modify `run_osint_pipeline` in `src/main.py` to iterate over all active accounts, run research per account, and log lightweight "Hard Proofs" in `ResearchLog`.
+- [x] **TSK-011**: Update Odoo integration client in `src/odoo_integration.py` to accept `company_id`, `user_id` (salesperson), and `tag_ids` dynamically per lead insertion.
 
 ## [Phase 3: Backend API & Authentication]
 - [x] **TSK-006**: Implement secure session-based authentication (login, logout, active sessions) in `src/main.py`.
