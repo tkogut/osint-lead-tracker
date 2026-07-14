@@ -19,8 +19,9 @@ from fastapi import Depends, FastAPI, HTTPException, Security, status, Response,
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from config import get_settings
 from database import get_recent_leads, init_db, save_lead, url_exists, AsyncSessionLocal, get_db_setting_sync
@@ -173,7 +174,7 @@ async def run_osint_pipeline() -> dict[str, Any]:
                         await save_lead(lead, odoo_id=odoo_id)
                         leads_created_count += 1
                         stats["leads_new"] += 1
-                    except sqlite3.IntegrityError:
+                    except IntegrityError:
                         logger.warning("[%s] IntegrityError dla URL: %s", source, url)
                         
                 stats["leads_found"] += leads_found_count
@@ -281,6 +282,17 @@ async def trigger_osint(_token: Annotated[str, Depends(verify_token)]) -> dict:
 
 @app.get("/leads", tags=["OSINT"], summary="Ostatnie leady (X-API-Token)")
 async def list_leads(_token: Annotated[str, Depends(verify_token)], limit: int = 50) -> dict:
+    if limit < 1 or limit > 500:
+        raise HTTPException(status_code=400, detail="limit musi być w zakresie 1–500")
+    rows = await get_recent_leads(limit=limit)
+    return {"count": len(rows), "leads": rows}
+
+
+@app.get("/api/leads", tags=["OSINT"], summary="Ostatnie leady (Sesyjnie)")
+async def list_leads_session(
+    current_user: Annotated[User, Depends(get_current_user)],
+    limit: int = 100
+) -> dict:
     if limit < 1 or limit > 500:
         raise HTTPException(status_code=400, detail="limit musi być w zakresie 1–500")
     rows = await get_recent_leads(limit=limit)
@@ -531,8 +543,68 @@ async def get_default_prompt(current_user: Annotated[User, Depends(get_current_u
 
 
 # ---------------------------------------------------------------------------
-# API Endpoints - Research Logs (Hard Proof Viewer)
+# API Endpoints - Research Logs (Hard Proof Viewer) & Analytics
 # ---------------------------------------------------------------------------
+@app.get("/api/analytics/kpis", tags=["Analytics"])
+async def get_analytics_kpis(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db)
+):
+    # Total scans
+    result_total = await db.execute(select(func.count(ResearchLog.id)))
+    total_scans = result_total.scalar() or 0
+    
+    # Success scans
+    result_success = await db.execute(select(func.count(ResearchLog.id)).filter(ResearchLog.response_status_code == 200))
+    success_scans = result_success.scalar() or 0
+    
+    failed_scans = total_scans - success_scans
+    success_rate = (success_scans / total_scans * 100.0) if total_scans > 0 else 0.0
+    
+    # Total leads found
+    result_found = await db.execute(select(func.sum(ResearchLog.leads_found_count)))
+    total_leads_found = result_found.scalar() or 0
+    
+    # Total leads created
+    result_created = await db.execute(select(func.sum(ResearchLog.leads_created_count)))
+    total_leads_created = result_created.scalar() or 0
+    
+    return {
+        "total_scans": total_scans,
+        "success_rate": round(success_rate, 2),
+        "failed_scans": failed_scans,
+        "total_leads_found": int(total_leads_found) if total_leads_found else 0,
+        "total_leads_created": int(total_leads_created) if total_leads_created else 0
+    }
+
+
+@app.get("/api/analytics/timeline", tags=["Analytics"])
+async def get_analytics_timeline(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = select(
+        func.date(ResearchLog.timestamp).label("day"),
+        func.count(ResearchLog.id).label("scans"),
+        func.sum(ResearchLog.leads_created_count).label("leads_created")
+    ).group_by(
+        func.date(ResearchLog.timestamp)
+    ).order_by(
+        func.date(ResearchLog.timestamp).asc()
+    )
+    result = await db.execute(stmt)
+    rows = result.all()
+    
+    timeline = []
+    for row in rows:
+        timeline.append({
+            "date": row.day,
+            "scans": row.scans,
+            "leads_created": int(row.leads_created) if row.leads_created is not None else 0
+        })
+    return timeline
+
+
 @app.get("/api/logs", tags=["Logs"])
 async def get_research_logs(
     current_user: Annotated[User, Depends(get_current_user)],
@@ -540,7 +612,7 @@ async def get_research_logs(
     limit: int = 100
 ):
     result = await db.execute(
-        select(ResearchLog, Account.name)
+        select(ResearchLog, Account)
         .join(Account, Account.id == ResearchLog.account_id)
         .order_by(ResearchLog.timestamp.desc())
         .limit(limit)
@@ -548,10 +620,11 @@ async def get_research_logs(
     rows = result.all()
     
     resp = []
-    for log, acc_name in rows:
+    for log, acc in rows:
         resp.append({
             "id": log.id,
-            "account_name": acc_name,
+            "account_id": log.account_id,
+            "account_name": acc.name,
             "timestamp": log.timestamp.isoformat(),
             "source": log.source,
             "query_params": json.loads(log.query_params) if log.query_params else {},
@@ -559,7 +632,12 @@ async def get_research_logs(
             "response_status_code": log.response_status_code,
             "leads_found_count": log.leads_found_count,
             "leads_created_count": log.leads_created_count,
-            "log_text": log.log_text
+            "log_text": log.log_text,
+            "odoo_company_id": acc.odoo_company_id,
+            "odoo_user_id": acc.odoo_user_id,
+            "odoo_tag_ids": json.loads(acc.odoo_tag_ids) if acc.odoo_tag_ids else [],
+            "odoo_team_id": acc.odoo_team_id,
+            "odoo_source_id": acc.odoo_source_id
         })
     return resp
 

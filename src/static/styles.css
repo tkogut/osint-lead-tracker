@@ -714,3 +714,99 @@ input:focus, select:focus, textarea:focus {
 .toast-success { border-left-color: var(--success); }
 .toast-error { border-left-color: var(--error); }
 .toast-warning { border-left-color: var(--warning); }
+
+/* System Status Indicators (Notification Gate) */
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.dot-green {
+    background-color: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: statusPulse 2s infinite;
+}
+
+.dot-red {
+    background-color: var(--error);
+    box-shadow: 0 0 8px var(--error);
+    animation: statusPulse 1s infinite;
+}
+
+@keyframes statusPulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
+
+/* Timeline Activity Chart */
+.timeline-chart-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 8px;
+}
+
+.timeline-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.timeline-date {
+    width: 100px;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.timeline-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-grow: 1;
+}
+
+.timeline-bar-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.timeline-bar {
+    height: 12px;
+    border-radius: 6px;
+    transition: width 0.5s ease-in-out;
+}
+
+.bar-scans {
+    background: linear-gradient(90deg, var(--primary), #7085f5);
+    box-shadow: 0 0 6px rgba(81, 107, 235, 0.3);
+}
+
+.bar-leads {
+    background: linear-gradient(90deg, var(--success), #58d68d);
+    box-shadow: 0 0 6px rgba(46, 204, 113, 0.3);
+}
+
+.bar-val {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    width: 24px;
+}

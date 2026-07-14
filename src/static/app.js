@@ -125,6 +125,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.classList.remove("centered-layout");
         userDisplayName.textContent = currentUser.username;
         loadDashboardData();
+        checkNotificationGate();
     }
 
     // Login Submit
@@ -197,26 +198,110 @@ document.addEventListener("DOMContentLoaded", () => {
     async function loadDashboardData() {
         leadsTableBody.innerHTML = `<tr><td colspan="7" class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie leadów...</td></tr>`;
         
-        // Ponieważ API /leads wymaga nagłówka X-API-Token, pobierzemy go z bazy poprzez proxy /api/settings lub podamy token jeśli jest dostępny.
-        // Jednak na Dashboardzie wygodniej pobrać listę z naszego endpointu. Stwórzmy małe obejście. Dla wygody Dashboardu
-        // możemy bezpośrednio pobrać leady. Nasz endpoint /leads wymaga verify_token (API token).
-        // Aby to uprościć, w backendzie GET /leads używa X-API-Token. Pobierzemy token z ustawień API na front-endzie.
         try {
-            // Najpierw pobierzmy token API z bazy
-            const settings = await apiRequest("/api/settings");
-            const tokenSetting = settings.find(s => s.key === "API_TOKEN");
-            const token = tokenSetting ? tokenSetting.value : "";
-            
-            // Pobieramy leady
-            const res = await fetch("/leads?limit=100", {
-                headers: { "X-API-Token": token }
-            });
-            const data = await res.json();
+            // Pobieramy leady za pomocą sesyjnie zabezpieczonego endpointu /api/leads
+            const data = await apiRequest("/api/leads?limit=100");
             
             // Wyświetlamy
             renderLeads(data.leads || []);
+            
+            // Faza 3: Pobieramy KPIs, Oś Czasu oraz status Notification Gate
+            loadAnalyticsKPIs();
+            loadAnalyticsTimeline();
+            checkNotificationGate();
         } catch (e) {
             leadsTableBody.innerHTML = `<tr><td colspan="7" class="loading-state text-error">Błąd ładowania danych: ${e.message}</td></tr>`;
+        }
+    }
+
+    async function loadAnalyticsKPIs() {
+        try {
+            const kpis = await apiRequest("/api/analytics/kpis");
+            if (!kpis) return;
+            
+            document.getElementById("stat-total-scans").textContent = kpis.total_scans;
+            document.getElementById("stat-success-rate").textContent = `${kpis.success_rate}%`;
+            document.getElementById("stat-failed-scans").textContent = kpis.failed_scans;
+        } catch (e) {
+            console.error("Error loading KPIs", e);
+        }
+    }
+
+    async function loadAnalyticsTimeline() {
+        const container = document.getElementById("analytics-timeline-chart");
+        container.innerHTML = `<div class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie osi czasu...</div>`;
+        
+        try {
+            const timeline = await apiRequest("/api/analytics/timeline");
+            if (!timeline || timeline.length === 0) {
+                container.innerHTML = `<div class="loading-state">Brak danych historycznych do wyświetlenia.</div>`;
+                return;
+            }
+            
+            const maxVal = Math.max(...timeline.map(d => Math.max(d.scans, d.leads_created)), 1);
+            
+            container.innerHTML = timeline.map(d => {
+                const scanWidth = (d.scans / maxVal) * 100;
+                const leadWidth = (d.leads_created / maxVal) * 100;
+                
+                return `
+                    <div class="timeline-row">
+                        <span class="timeline-date">${d.date}</span>
+                        <div class="timeline-bars">
+                            <div class="timeline-bar-group">
+                                <div class="timeline-bar bar-scans" style="width: ${scanWidth}%;" title="Skanowania: ${d.scans}"></div>
+                                <span class="bar-val" title="Skanowania">${d.scans}</span>
+                            </div>
+                            <div class="timeline-bar-group">
+                                <div class="timeline-bar bar-leads" style="width: ${leadWidth}%;" title="Zapisane Szanse: ${d.leads_created}"></div>
+                                <span class="bar-val" title="Zapisane Szanse">${d.leads_created}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        } catch (e) {
+            container.innerHTML = `<div class="loading-state text-error">Błąd pobierania osi czasu.</div>`;
+        }
+    }
+
+    async function checkNotificationGate() {
+        try {
+            // Pobieramy ostatnie 5 logów do weryfikacji API statusów
+            const logs = await apiRequest("/api/logs?limit=5");
+            if (!logs || logs.length === 0) {
+                updateStatusIndicator(true);
+                return;
+            }
+            const last5 = logs.slice(0, 5);
+            const failedScan = last5.find(log => log.response_status_code !== 200);
+            const banner = document.getElementById("api-failure-banner");
+            
+            if (failedScan) {
+                const msgSpan = document.getElementById("api-failure-msg");
+                msgSpan.textContent = `Skan z dnia ${failedScan.timestamp.replace("T", " ").slice(0, 19)} dla źródła ${failedScan.source} zakończył się statusem ${failedScan.response_status_code}.`;
+                if (banner) banner.classList.remove("hidden");
+                updateStatusIndicator(false, `Błąd API (${failedScan.source}: ${failedScan.response_status_code})`);
+            } else {
+                if (banner) banner.classList.add("hidden");
+                updateStatusIndicator(true);
+            }
+        } catch (e) {
+            console.error("Error checking notification gate:", e);
+        }
+    }
+
+    function updateStatusIndicator(isOk, text = "Status: OK") {
+        const dot = document.querySelector(".status-dot");
+        const statusText = document.getElementById("status-text");
+        if (dot && statusText) {
+            if (isOk) {
+                dot.className = "status-dot dot-green";
+                statusText.textContent = text;
+            } else {
+                dot.className = "status-dot dot-red";
+                statusText.textContent = text;
+            }
         }
     }
 
@@ -230,7 +315,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         statTotalLeads.textContent = leads.length;
-        statAutoScales.textContent = leads.filter(l => l.tytul.toLowerCase().includes("waga") || l.zakres.toLowerCase().includes("waga")).length;
+        statAutoScales.textContent = leads.filter(l => 
+            (l.tytul || '').toLowerCase().includes("waga") || 
+            (l.zakres || '').toLowerCase().includes("waga")
+        ).length;
         statOdooLeads.textContent = leads.filter(l => l.odoo_id !== null).length;
 
         leadsTableBody.innerHTML = leads.map(l => {
@@ -265,6 +353,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const accounts = await apiRequest("/api/accounts");
             accountsList = accounts;
             renderAccounts(accounts);
+            populateCampaignFilter(accounts);
         } catch (e) {
             accountsContainer.innerHTML = `<div class="loading-state text-error">Nie udało się załadować kont.</div>`;
         }
@@ -311,6 +400,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="detail-row">
                             <span>Odoo User ID:</span>
                             <span>${userIdDisplay}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span>Odoo Tag IDs:</span>
+                            <span>${acc.odoo_tag_ids && acc.odoo_tag_ids.length > 0 ? acc.odoo_tag_ids.join(", ") : "Brak"}</span>
                         </div>
                         <div class="detail-row">
                             <span>Odoo Team ID:</span>
@@ -486,19 +579,95 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // --- Logs (Hard Proof Viewer) ---
+    let allLogs = [];
+
     async function loadLogsData() {
-        logsTableBody.innerHTML = `<tr><td colspan="7" class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie rejestru...</td></tr>`;
+        logsTableBody.innerHTML = `<tr><td colspan="9" class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie rejestru...</td></tr>`;
         try {
+            // Ensure accounts list is loaded to populate the campaign dropdown
+            if (accountsList.length === 0) {
+                const accounts = await apiRequest("/api/accounts");
+                accountsList = accounts || [];
+                populateCampaignFilter(accountsList);
+            }
+            
             const logs = await apiRequest("/api/logs");
-            renderLogs(logs);
+            allLogs = logs || [];
+            applyLogFilters();
         } catch (e) {
-            logsTableBody.innerHTML = `<tr><td colspan="7" class="loading-state text-error">Błąd pobierania rejestru.</td></tr>`;
+            logsTableBody.innerHTML = `<tr><td colspan="9" class="loading-state text-error">Błąd pobierania rejestru.</td></tr>`;
         }
+    }
+
+    function populateCampaignFilter(accounts) {
+        const select = document.getElementById("log-filter-campaign");
+        if (!select) return;
+        
+        select.innerHTML = '<option value="">Wszystkie kampanie</option>';
+        accounts.forEach(acc => {
+            const opt = document.createElement("option");
+            opt.value = acc.id;
+            opt.textContent = acc.name;
+            select.appendChild(opt);
+        });
+    }
+
+    function applyLogFilters() {
+        const searchText = document.getElementById("log-search").value.toLowerCase();
+        const campaignFilter = document.getElementById("log-filter-campaign").value;
+        const statusFilter = document.getElementById("log-filter-status").value;
+        const sourceFilter = document.getElementById("log-filter-source").value;
+        const dateStart = document.getElementById("log-filter-date-start").value;
+        const dateEnd = document.getElementById("log-filter-date-end").value;
+
+        const filtered = allLogs.filter(log => {
+            // 1. Text search
+            if (searchText) {
+                const campaignName = (log.account_name || "").toLowerCase();
+                const logText = (log.log_text || "").toLowerCase();
+                const source = (log.source || "").toLowerCase();
+                const hash = (log.raw_response_hash || "").toLowerCase();
+                
+                const match = campaignName.includes(searchText) || 
+                              logText.includes(searchText) || 
+                              source.includes(searchText) || 
+                              hash.includes(searchText);
+                if (!match) return false;
+            }
+
+            // 2. Campaign filter
+            if (campaignFilter && String(log.account_id) !== String(campaignFilter)) {
+                return false;
+            }
+
+            // 3. Status filter (success = 200, error != 200)
+            if (statusFilter) {
+                const isSuccess = log.response_status_code === 200;
+                if (statusFilter === "success" && !isSuccess) return false;
+                if (statusFilter === "error" && isSuccess) return false;
+            }
+
+            // 4. Source filter
+            if (sourceFilter && log.source !== sourceFilter) {
+                return false;
+            }
+
+            // 5. Date range filter
+            if (dateStart || dateEnd) {
+                const logDate = log.timestamp.split("T")[0]; // YYYY-MM-DD
+                if (dateStart && logDate < dateStart) return false;
+                if (dateEnd && logDate > dateEnd) return false;
+            }
+
+            return true;
+        });
+
+        renderLogs(filtered);
     }
 
     function renderLogs(logs) {
         if (logs.length === 0) {
-            logsTableBody.innerHTML = `<tr><td colspan="7" class="loading-state">Brak wpisów w rejestrze.</td></tr>`;
+            logsTableBody.innerHTML = `<tr><td colspan="9" class="loading-state">Brak wpisów w rejestrze spełniających kryteria.</td></tr>`;
             return;
         }
 
@@ -507,6 +676,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const statusClass = log.response_status_code === 200 ? "priority-sredni" : "priority-high";
             const shortHash = log.raw_response_hash ? log.raw_response_hash.slice(0, 8) + "..." : "brak";
             
+            // Odoo Mapping details for multicompany compliance checking
+            const companyDisplay = log.odoo_company_id !== null ? log.odoo_company_id : "—";
+            const userDisplay = log.odoo_user_id !== null ? log.odoo_user_id : "—";
+            const tagsDisplay = log.odoo_tag_ids && log.odoo_tag_ids.length > 0 ? log.odoo_tag_ids.join(",") : "—";
+            const odooMapStr = `Co: ${companyDisplay} / Usr: ${userDisplay} / Tags: ${tagsDisplay}`;
+
             return `
                 <tr>
                     <td>${timeStr}</td>
@@ -516,9 +691,56 @@ document.addEventListener("DOMContentLoaded", () => {
                     <td><span class="${statusClass}">${log.response_status_code}</span></td>
                     <td>${log.leads_found_count}</td>
                     <td>${log.leads_created_count}</td>
+                    <td><small style="color: var(--text-muted); font-family: monospace;">${odooMapStr}</small></td>
+                    <td>
+                        <button class="btn-secondary view-log-details-btn" data-id="${log.id}" style="padding: 6px 12px; font-size: 12px;">
+                            <i class="fa-solid fa-eye"></i> Szczegóły
+                        </button>
+                    </td>
                 </tr>
             `;
         }).join("");
+
+        // Bind details buttons
+        document.querySelectorAll(".view-log-details-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const logId = parseInt(btn.dataset.id);
+                openLogDetailsModal(logId);
+            });
+        });
+    }
+
+    function openLogDetailsModal(logId) {
+        const log = allLogs.find(l => l.id === logId);
+        if (!log) return;
+
+        document.getElementById("log-detail-campaign").textContent = log.account_name;
+        document.getElementById("log-detail-timestamp").textContent = log.timestamp.replace("T", " ").slice(0, 19);
+        document.getElementById("log-detail-source").textContent = log.source;
+        
+        const statusSpan = document.getElementById("log-detail-status");
+        statusSpan.textContent = log.response_status_code;
+        statusSpan.className = log.response_status_code === 200 ? "badge badge-active" : "badge priority-high";
+        
+        document.getElementById("log-detail-found").textContent = log.leads_found_count;
+        document.getElementById("log-detail-created").textContent = log.leads_created_count;
+        document.getElementById("log-detail-hash").textContent = log.raw_response_hash || "Brak hasha";
+        
+        document.getElementById("log-detail-params").textContent = JSON.stringify(log.query_params, null, 2);
+        
+        document.getElementById("log-detail-odoo-company").textContent = log.odoo_company_id !== null ? log.odoo_company_id : "Nieprzypisane (Puste)";
+        document.getElementById("log-detail-odoo-user").textContent = log.odoo_user_id !== null ? log.odoo_user_id : "Nieprzypisane (Puste)";
+        document.getElementById("log-detail-odoo-tags").textContent = log.odoo_tag_ids && log.odoo_tag_ids.length > 0 ? log.odoo_tag_ids.join(", ") : "Brak tagów";
+        document.getElementById("log-detail-odoo-team").textContent = log.odoo_team_id !== null ? log.odoo_team_id : "Nieprzypisane (Puste)";
+        document.getElementById("log-detail-odoo-source").textContent = log.odoo_source_id !== null ? log.odoo_source_id : "Nieprzypisane (Puste)";
+        
+        document.getElementById("log-detail-text").textContent = log.log_text || "Brak dodatkowego tekstu logu.";
+
+        document.getElementById("log-modal").classList.remove("hidden");
+    }
+
+    function closeLogDetailsModal() {
+        document.getElementById("log-modal").classList.add("hidden");
     }
 
     // --- Settings (.env) ---
@@ -600,8 +822,9 @@ document.addEventListener("DOMContentLoaded", () => {
             
             if (data.triggered) {
                 const s = data.stats;
-                showToast(`Skan ukończony! Znaleziono: ${s.found}, Nowe: ${s.new}, Odoo OK: ${s.odoo_ok}`);
+                showToast(`Skan ukończony! Znaleziono: ${s.leads_found}, Nowe: ${s.leads_new}, Odoo OK: ${s.odoo_ok}`);
                 loadDashboardData();
+                checkNotificationGate();
             }
         } catch (e) {
             showToast(`Błąd skanowania: ${e.message}`, "error");
@@ -634,6 +857,32 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+
+    // --- Faza 3 Event Listeners for Filters ---
+    const logSearchInput = document.getElementById("log-search");
+    if (logSearchInput) logSearchInput.addEventListener("input", applyLogFilters);
+    
+    const logFilterCamp = document.getElementById("log-filter-campaign");
+    if (logFilterCamp) logFilterCamp.addEventListener("change", applyLogFilters);
+    
+    const logFilterStat = document.getElementById("log-filter-status");
+    if (logFilterStat) logFilterStat.addEventListener("change", applyLogFilters);
+    
+    const logFilterSrc = document.getElementById("log-filter-source");
+    if (logFilterSrc) logFilterSrc.addEventListener("change", applyLogFilters);
+    
+    const logFilterStart = document.getElementById("log-filter-date-start");
+    if (logFilterStart) logFilterStart.addEventListener("change", applyLogFilters);
+    
+    const logFilterEnd = document.getElementById("log-filter-date-end");
+    if (logFilterEnd) logFilterEnd.addEventListener("change", applyLogFilters);
+
+    // Modal close listeners for log details
+    const logModalCloseBtn = document.getElementById("log-modal-close-btn");
+    if (logModalCloseBtn) logModalCloseBtn.addEventListener("click", closeLogDetailsModal);
+    
+    const logModalOkBtn = document.getElementById("log-modal-ok-btn");
+    if (logModalOkBtn) logModalOkBtn.addEventListener("click", closeLogDetailsModal);
 
     // --- Start ---
     checkSession();

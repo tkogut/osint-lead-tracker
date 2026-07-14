@@ -92,12 +92,25 @@
                     <h2 id="current-tab-title">Dashboard</h2>
                     <p id="current-tab-desc">Przegląd pozyskanych leadów i statystyki</p>
                 </div>
-                <div class="header-actions">
+                <div class="header-actions" style="display: flex; align-items: center; gap: 16px;">
+                    <div id="system-status-indicator" class="status-indicator">
+                        <span class="status-dot dot-green"></span>
+                        <span id="status-text">Status: OK</span>
+                    </div>
                     <button id="trigger-scan-btn" class="btn-scan animate-shimmer">
                         <i class="fa-solid fa-bolt"></i> Uruchom Skanowanie
                     </button>
                 </div>
             </header>
+
+            <!-- WARNING BANNER / STATUS INDICATOR (NOTIFICATION GATE) -->
+            <div id="api-failure-banner" class="alert alert-error hidden" style="margin-bottom: 24px; display: flex; align-items: center; gap: 12px; font-size: 14px; padding: 16px 20px;">
+                <i class="fa-solid fa-circle-exclamation" style="font-size: 20px;"></i>
+                <div style="flex-grow: 1;">
+                    <strong>Ostrzeżenie: Wykryto błąd zewnętrznego API!</strong>
+                    <span id="api-failure-msg">Jeden z ostatnich skanów zakończył się niepowodzeniem.</span>
+                </div>
+            </div>
 
             <!-- TABS CONTAINER -->
             <div class="tabs-container">
@@ -126,6 +139,44 @@
                                 <h3>Wysłane do Odoo</h3>
                                 <span id="stat-odoo-leads">0</span>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- OSINT Analytics KPIs -->
+                    <div class="section-header-actions" style="margin-top: 32px; margin-bottom: 16px;">
+                        <h3><i class="fa-solid fa-chart-pie"></i> Zaawansowana Analityka Skanowania</h3>
+                    </div>
+                    <div class="kpi-grid">
+                        <div class="kpi-card glass-card">
+                            <div class="kpi-icon icon-blue"><i class="fa-solid fa-magnifying-glass"></i></div>
+                            <div class="kpi-info">
+                                <h3>Liczba Skanów (ResearchLog)</h3>
+                                <span id="stat-total-scans">0</span>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass-card">
+                            <div class="kpi-icon icon-green"><i class="fa-solid fa-circle-check"></i></div>
+                            <div class="kpi-info">
+                                <h3>Skuteczność API</h3>
+                                <span id="stat-success-rate">0%</span>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass-card">
+                            <div class="kpi-icon icon-purple"><i class="fa-solid fa-circle-xmark"></i></div>
+                            <div class="kpi-info">
+                                <h3>Błędne Skanowania</h3>
+                                <span id="stat-failed-scans">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Timeline Visualisation -->
+                    <div class="table-container glass-card" style="margin-top: 32px; margin-bottom: 32px;">
+                        <div class="table-header">
+                            <h3><i class="fa-solid fa-chart-line"></i> Oś Czasu Aktywności (Skanowania vs Zapisane Szanse)</h3>
+                        </div>
+                        <div id="analytics-timeline-chart" class="timeline-chart-container">
+                            <div class="loading-state">Ładowanie wykresu aktywności...</div>
                         </div>
                     </div>
 
@@ -219,8 +270,31 @@
                 <!-- TAB: LOGS (Hard Proof Viewer) -->
                 <section id="tab-logs" class="tab-pane">
                     <div class="table-container glass-card">
-                        <div class="table-header">
+                        <div class="table-header" style="flex-wrap: wrap; gap: 16px;">
                             <h3><i class="fa-solid fa-list-check"></i> Rejestr i Logi (Twardy Dowód)</h3>
+                            <div class="table-actions" style="display: flex; flex-wrap: wrap; gap: 12px; width: 100%; margin-top: 12px;">
+                                <input type="text" id="log-search" placeholder="Szukaj w logach..." style="flex: 1; min-width: 150px;">
+                                <select id="log-filter-campaign" style="flex: 1; min-width: 150px;">
+                                    <option value="">Wszystkie kampanie</option>
+                                </select>
+                                <select id="log-filter-status" style="flex: 1; min-width: 120px;">
+                                    <option value="">Wszystkie statusy</option>
+                                    <option value="success">Sukces (200)</option>
+                                    <option value="error">Błąd (inny niż 200)</option>
+                                </select>
+                                <select id="log-filter-source" style="flex: 1; min-width: 120px;">
+                                    <option value="">Wszystkie źródła</option>
+                                    <option value="BZP">BZP</option>
+                                    <option value="Google">Google</option>
+                                    <option value="GUNB">GUNB</option>
+                                </select>
+                                <div style="display: flex; align-items: center; gap: 8px; flex: 1.5; min-width: 260px;">
+                                    <span style="color: var(--text-muted); font-size: 12px; white-space: nowrap;">Od:</span>
+                                    <input type="date" id="log-filter-date-start" style="padding: 8px 12px;">
+                                    <span style="color: var(--text-muted); font-size: 12px; white-space: nowrap;">Do:</span>
+                                    <input type="date" id="log-filter-date-end" style="padding: 8px 12px;">
+                                </div>
+                            </div>
                         </div>
                         <div class="table-responsive">
                             <table>
@@ -233,11 +307,13 @@
                                         <th>Status</th>
                                         <th>Znalezione</th>
                                         <th>Dodane</th>
+                                        <th>Odoo Mapping (Co/Usr/Tags)</th>
+                                        <th>Akcje</th>
                                     </tr>
                                 </thead>
                                 <tbody id="logs-table-body">
                                     <tr>
-                                        <td colspan="7" class="loading-state">Ładowanie logów...</td>
+                                        <td colspan="9" class="loading-state">Ładowanie logów...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -368,6 +444,61 @@
                     <button type="submit" class="btn-primary">Zapisz Konto</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL: LOG DETAILS -->
+    <div id="log-modal" class="modal-overlay hidden">
+        <div class="modal-content glass-card animate-zoom" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3>Szczegóły Logu Researchu</h3>
+                <button class="modal-close" id="log-modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px; font-size: 14px;">
+                <div>
+                    <strong>Kampania:</strong> <span id="log-detail-campaign"></span>
+                </div>
+                <div>
+                    <strong>Czas wykonania:</strong> <span id="log-detail-timestamp"></span>
+                </div>
+                <div>
+                    <strong>Źródło:</strong> <span id="log-detail-source"></span>
+                </div>
+                <div>
+                    <strong>Kod statusu:</strong> <span id="log-detail-status"></span>
+                </div>
+                <div>
+                    <strong>Znalezione leady:</strong> <span id="log-detail-found"></span>
+                </div>
+                <div>
+                    <strong>Zapisane leady:</strong> <span id="log-detail-created"></span>
+                </div>
+                <div>
+                    <strong>Pełny Hash SHA-256 (Twardy Dowód):</strong>
+                    <div style="background: rgba(0, 0, 0, 0.2); padding: 8px 12px; border-radius: 6px; font-family: monospace; word-break: break-all; margin-top: 4px; border: 1px solid var(--border-color);" id="log-detail-hash"></div>
+                </div>
+                <div>
+                    <strong>Parametry zapytania (Query Params JSON):</strong>
+                    <pre style="background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 6px; font-family: monospace; overflow-x: auto; margin-top: 4px; border: 1px solid var(--border-color);" id="log-detail-params"></pre>
+                </div>
+                <div>
+                    <strong>Mapowanie Odoo (Zgodność Multicompany):</strong>
+                    <div style="background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 6px; margin-top: 4px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 6px;">
+                        <div>• Company ID: <span id="log-detail-odoo-company" style="font-weight: 600;"></span></div>
+                        <div>• User ID (Handlowiec): <span id="log-detail-odoo-user" style="font-weight: 600;"></span></div>
+                        <div>• Tag IDs: <span id="log-detail-odoo-tags" style="font-weight: 600;"></span></div>
+                        <div>• Team ID: <span id="log-detail-odoo-team" style="font-weight: 600;"></span></div>
+                        <div>• Source ID: <span id="log-detail-odoo-source" style="font-weight: 600;"></span></div>
+                    </div>
+                </div>
+                <div>
+                    <strong>Tekst logu:</strong>
+                    <pre style="background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 6px; font-family: monospace; white-space: pre-wrap; margin-top: 4px; border: 1px solid var(--border-color);" id="log-detail-text"></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-primary" id="log-modal-ok-btn">Zamknij</button>
+            </div>
         </div>
     </div>
 
