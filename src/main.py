@@ -219,7 +219,7 @@ async def trigger_osint(_token: Annotated[str, Depends(verify_token)]) -> dict:
 
 
 @app.get("/leads", tags=["OSINT"], summary="Ostatnie leady (X-API-Token)")
-async def list_leads(limit: int = 50, _token: Annotated[str, Depends(verify_token)]) -> dict:
+async def list_leads(_token: Annotated[str, Depends(verify_token)], limit: int = 50) -> dict:
     if limit < 1 or limit > 500:
         raise HTTPException(status_code=400, detail="limit musi być w zakresie 1–500")
     rows = await get_recent_leads(limit=limit)
