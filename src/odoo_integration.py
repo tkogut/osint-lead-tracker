@@ -35,10 +35,10 @@ class OdooClient:
             common = xmlrpc.client.ServerProxy(
                 f"{s.odoo_url}/xmlrpc/2/common", allow_none=True
             )
-            uid = common.authenticate(s.odoo_db, s.odoo_user, s.odoo_password, {})
+            uid = common.authenticate(s.odoo_db, s.odoo_user, s.odoo_api_key, {})
             if not uid:
                 raise ValueError(
-                    "Odoo authenticate() zwróciło False — sprawdź ODOO_USER/ODOO_PASSWORD."
+                    "Odoo authenticate() zwróciło False — sprawdź ODOO_USER/ODOO_API_KEY."
                 )
             self._uid = uid
             logger.info("Odoo auth OK → uid=%s db=%s", uid, s.odoo_db)
@@ -170,7 +170,7 @@ class OdooClient:
             record_id: int = models.execute_kw(
                 s.odoo_db,
                 uid,
-                s.odoo_password,
+                s.odoo_api_key,
                 "crm.lead",
                 "create",
                 [vals],

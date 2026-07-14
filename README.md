@@ -74,7 +74,7 @@ GEMINI_API_KEY="twój-klucz-api-gemini"
 ODOO_URL="https://twoje-odoo.pl"
 ODOO_DB="nazwa_bazy_odoo"
 ODOO_USER="twoj_login_odoo"
-ODOO_PASSWORD="twoje_haslo_lub_token_odoo"
+ODOO_API_KEY="twój_klucz_api_odoo"
 ODOO_TEAM_ID=0         # Opcjonalne: ID zespołu sprzedaży w Odoo
 ODOO_SOURCE_ID=0       # Opcjonalne: ID źródła pozyskania leada
 

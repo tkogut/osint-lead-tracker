@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     odoo_url: str
     odoo_db: str
     odoo_user: str
-    odoo_password: str
+    odoo_api_key: str
     odoo_team_id: int = 0
     odoo_source_id: int = 0
 

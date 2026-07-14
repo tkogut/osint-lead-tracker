@@ -5,6 +5,11 @@ Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w t
 
 ---
 
+## [1.3.0] - 2026-07-14
+
+### Changed
+- **Klucz API zamiast hasła Odoo**: Zmieniono nazwę zmiennej środowiskowej z `ODOO_PASSWORD` na `ODOO_API_KEY` w konfiguracji ustawień i integracji XML-RPC, ułatwiając bezpieczne uwierzytelnianie tokenami (API Keys).
+
 ## [1.2.0] - 2026-07-13
 
 ### Added
