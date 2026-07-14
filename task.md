@@ -25,3 +25,9 @@
 
 ## [Phase 4: Frontend UI (Lead Dashboard)]
 - [x] **TSK-010**: Create modern, responsive HTML/CSS/JS frontend in `src/static/` with a premium dark-mode dashboard (Deep Blue palette, glassmorphism, Outfit font) containing Dashboard, Accounts, Sandbox, Logs and Settings tabs.
+
+## [Phase 5: Prompt Versioning & CRM Feedback Loop]
+- [ ] **TSK-017**: Create the `PromptVersion` database model and update the `Lead` model with status and mapping relations.
+- [ ] **TSK-018**: Implement backend feedback sync background task `/api/leads/sync` querying Odoo lead states.
+- [ ] **TSK-019**: Implement backend prompt versioning and performance ranking API `/api/analytics/prompts`.
+- [ ] **TSK-020**: Design and implement the prompt history panel and version reversion tool in the Campaign Edit modal UI.
