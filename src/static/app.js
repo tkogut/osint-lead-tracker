@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- State ---
     let currentUser = null;
     let accountsList = [];
+    let allLeads = [];
 
     // --- DOM Elements ---
     const loginContainer = document.getElementById("login-container");
@@ -194,23 +195,32 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
+    const leadSearch = document.getElementById("lead-search");
+    const leadFilterStatus = document.getElementById("lead-filter-status");
+    const leadSort = document.getElementById("lead-sort");
+
+    if (leadSearch) leadSearch.addEventListener("input", filterAndRenderLeads);
+    if (leadFilterStatus) leadFilterStatus.addEventListener("change", filterAndRenderLeads);
+    if (leadSort) leadSort.addEventListener("change", filterAndRenderLeads);
+
     // --- Dashboard & Leads ---
     async function loadDashboardData() {
-        leadsTableBody.innerHTML = `<tr><td colspan="7" class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie leadów...</td></tr>`;
+        leadsTableBody.innerHTML = `<tr><td colspan="8" class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie leadów...</td></tr>`;
         
         try {
             // Pobieramy leady za pomocą sesyjnie zabezpieczonego endpointu /api/leads
             const data = await apiRequest("/api/leads?limit=100");
+            allLeads = data.leads || [];
             
             // Wyświetlamy
-            renderLeads(data.leads || []);
+            filterAndRenderLeads();
             
             // Faza 3: Pobieramy KPIs, Oś Czasu oraz status Notification Gate
             loadAnalyticsKPIs();
             loadAnalyticsTimeline();
             checkNotificationGate();
         } catch (e) {
-            leadsTableBody.innerHTML = `<tr><td colspan="7" class="loading-state text-error">Błąd ładowania danych: ${e.message}</td></tr>`;
+            leadsTableBody.innerHTML = `<tr><td colspan="8" class="loading-state text-error">Błąd ładowania danych: ${e.message}</td></tr>`;
         }
     }
 
@@ -305,9 +315,48 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    function filterAndRenderLeads() {
+        let filtered = [...allLeads];
+
+        // Search
+        const query = leadSearch ? leadSearch.value.toLowerCase().trim() : "";
+        if (query) {
+            filtered = filtered.filter(l => 
+                (l.tytul || "").toLowerCase().includes(query) ||
+                (l.inwestor || "").toLowerCase().includes(query) ||
+                (l.lokalizacja || "").toLowerCase().includes(query) ||
+                (l.zakres || "").toLowerCase().includes(query)
+            );
+        }
+
+        // Status
+        const statusVal = leadFilterStatus ? leadFilterStatus.value : "";
+        if (statusVal) {
+            filtered = filtered.filter(l => l.status === statusVal);
+        }
+
+        // Sort
+        const sortVal = leadSort ? leadSort.value : "newest";
+        if (sortVal === "newest") {
+            filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        } else if (sortVal === "oldest") {
+            filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        } else if (sortVal === "priority") {
+            const priorityWeight = { high: 3, medium: 2, low: 1 };
+            filtered.sort((a, b) => {
+                const wA = priorityWeight[(a.priorytet || "").toLowerCase()] || 0;
+                const wB = priorityWeight[(b.priorytet || "").toLowerCase()] || 0;
+                if (wB !== wA) return wB - wA;
+                return new Date(b.created_at) - new Date(a.created_at);
+            });
+        }
+
+        renderLeads(filtered);
+    }
+
     function renderLeads(leads) {
         if (leads.length === 0) {
-            leadsTableBody.innerHTML = `<tr><td colspan="7" class="loading-state">Brak znalezionych leadów.</td></tr>`;
+            leadsTableBody.innerHTML = `<tr><td colspan="8" class="loading-state">Brak znalezionych leadów.</td></tr>`;
             statTotalLeads.textContent = "0";
             statAutoScales.textContent = "0";
             statOdooLeads.textContent = "0";
@@ -328,12 +377,26 @@ document.addEventListener("DOMContentLoaded", () => {
                 ? `<span class="badge badge-active" title="Odoo ID: ${l.odoo_id}"><i class="fa-solid fa-cloud-arrow-up"></i> Odoo (${l.odoo_id})</span>`
                 : `<span class="badge badge-inactive"><i class="fa-solid fa-cloud-arrow-down"></i> Brak</span>`;
 
+            let statusBadge = '';
+            if (l.status === 'new') {
+                statusBadge = `<span class="badge" style="background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.3);">Nowy</span>`;
+            } else if (l.status === 'in_progress') {
+                statusBadge = `<span class="badge" style="background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.3);">W toku</span>`;
+            } else if (l.status === 'won') {
+                statusBadge = `<span class="badge" style="background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3);">Wygrany</span>`;
+            } else if (l.status === 'lost') {
+                statusBadge = `<span class="badge" style="background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3);">Przegrany</span>`;
+            } else {
+                statusBadge = `<span class="badge" style="background:rgba(255,255,255,0.1); color:#aaa; border:1px solid rgba(255,255,255,0.2);">${l.status || 'N/A'}</span>`;
+            }
+
             return `
                 <tr>
                     <td><strong>${l.tytul}</strong></td>
                     <td>${l.inwestor || "Prywatny"}</td>
                     <td>${l.lokalizacja || "N/A"}</td>
                     <td>${odooBadge}</td>
+                    <td>${statusBadge}</td>
                     <td>${dateStr}</td>
                     <td><span class="${priorityClass}">${l.priorytet}</span></td>
                     <td>
@@ -496,17 +559,39 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
             listEl.innerHTML = versions.map(v => `
-                <div class="version-item" style="padding:8px 10px;border-radius:6px;background:rgba(255,255,255,0.04);margin-bottom:6px;font-size:0.8rem;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <div class="version-item" style="padding:8px 10px;border-radius:6px;background:rgba(255,255,255,0.04);margin-bottom:6px;font-size:0.8rem; position:relative;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px; padding-right:80px;">
                         <span style="color:var(--accent-primary);font-weight:600;">v${v.version}</span>
                         <span style="color:var(--text-muted);">${new Date(v.created_at).toLocaleDateString('pl-PL')}</span>
                     </div>
-                    <div style="color:var(--text-secondary);margin-bottom:4px;">
+                    <div style="color:var(--text-secondary);margin-bottom:4px; padding-right:80px;">
                         ${v.total_leads} leadów | 🏆 ${v.won_leads} wygranych (${v.conversion_rate}%)
                     </div>
-                    <div style="color:var(--text-muted);font-size:0.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${v.prompt_preview}...</div>
+                    <div style="color:var(--text-muted);font-size:0.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; padding-right:80px;">${v.prompt_preview}...</div>
+                    <button type="button" class="btn-primary restore-prompt-btn" 
+                            data-version="${v.version}"
+                            style="position:absolute; right:8px; top:50%; transform:translateY(-50%); padding:4px 8px; font-size:11px; height:auto; width:auto;">
+                        Przywróć
+                    </button>
                 </div>
             `).join('');
+
+            // Wire event listeners to the Restore buttons
+            const buttons = listEl.querySelectorAll('.restore-prompt-btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const versionNum = parseInt(btn.getAttribute('data-version'));
+                    const found = versions.find(v => v.version === versionNum);
+                    if (found && found.prompt_text) {
+                        const promptTextarea = document.getElementById('acc-prompt');
+                        if (promptTextarea) {
+                            promptTextarea.value = found.prompt_text;
+                            showToast(`Przywrócono treść promptu z wersji v${found.version}!`, "success");
+                        }
+                    }
+                });
+            });
         } catch(e) {
             listEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;">Błąd ładowania historii.</div>';
         }

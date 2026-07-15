@@ -415,6 +415,7 @@ async def get_prompt_analytics(
             "version": pv.version,
             "created_at": pv.created_at.isoformat(),
             "prompt_preview": pv.prompt_text[:200] if pv.prompt_text else "",
+            "prompt_text": pv.prompt_text,
             "total_leads": total,
             "won_leads": won,
             "lost_leads": lost,

@@ -184,8 +184,20 @@
                     <div class="table-container glass-card">
                         <div class="table-header">
                             <h3><i class="fa-solid fa-list"></i> Ostatnio pozyskane szanse</h3>
-                            <div class="table-actions">
-                                <input type="text" id="lead-search" placeholder="Szukaj leadów...">
+                            <div class="table-actions" style="display: flex; gap: 12px; align-items: center;">
+                                <input type="text" id="lead-search" placeholder="Szukaj leadów..." style="min-width: 200px;">
+                                <select id="lead-filter-status" style="padding: 8px 12px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-primary); font-size: 14px;">
+                                    <option value="">Wszystkie statusy</option>
+                                    <option value="new">Nowy (new)</option>
+                                    <option value="in_progress">W toku (in_progress)</option>
+                                    <option value="won">Wygrany (won)</option>
+                                    <option value="lost">Przegrany (lost)</option>
+                                </select>
+                                <select id="lead-sort" style="padding: 8px 12px; border-radius: 6px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-primary); font-size: 14px;">
+                                    <option value="newest">Najnowsze najpierw</option>
+                                    <option value="oldest">Najstarsze najpierw</option>
+                                    <option value="priority">Priorytet (Wysoki → Niski)</option>
+                                </select>
                             </div>
                         </div>
                         <div class="table-responsive">
@@ -196,6 +208,7 @@
                                         <th>Inwestor</th>
                                         <th>Lokalizacja</th>
                                         <th>Źródło</th>
+                                        <th>Status</th>
                                         <th>Data</th>
                                         <th>Priorytet</th>
                                         <th>Akcje</th>
@@ -203,7 +216,7 @@
                                 </thead>
                                 <tbody id="leads-table-body">
                                     <tr>
-                                        <td colspan="7" class="loading-state">Ładowanie danych...</td>
+                                        <td colspan="8" class="loading-state">Ładowanie danych...</td>
                                     </tr>
                                 </tbody>
                             </table>

@@ -136,6 +136,7 @@ async def get_recent_leads(limit: int = 50) -> list[dict]:
                 "priorytet": l.priorytet,
                 "data_pub": l.data_pub,
                 "odoo_id": l.odoo_id,
+                "status": l.status,
                 "created_at": l.created_at
             }
             for l in leads
