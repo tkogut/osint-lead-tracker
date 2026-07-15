@@ -4,6 +4,7 @@ Zawiera interfejs API dla modułu Lead Dashboard (Auth, Accounts, Settings, Logs
 Wspiera Fazu 2 (Engine Parameterization, Option A Scheduler w Dockerze, wielofirmowość Odoo).
 """
 
+import asyncio
 import json
 import logging
 import sqlite3
@@ -153,8 +154,8 @@ async def run_osint_pipeline() -> dict[str, Any]:
             logger.info("Skanowanie dla konta: %s (ID: %s)", account.name, account.id)
             stats["accounts_scanned"] += 1
             
-            # Pobieramy wyniki wyszukiwania (słownik z podziałem na źródła)
-            search_results = engine.run_search_for_account(account)
+            # Pobieramy wyniki wyszukiwania (słownik z podziałem na źródła) - nieblokująco dla Event Loop
+            search_results = await asyncio.to_thread(engine.run_search_for_account, account)
             
             for source, (leads, status_code, response_hash) in search_results.items():
                 leads_found_count = len(leads)
@@ -176,11 +177,12 @@ async def run_osint_pipeline() -> dict[str, Any]:
                         logger.info("[%s] Duplikat URL pomijam: %s", source, url)
                         continue
                         
-                    # Zapis do Odoo
+                    # Zapis do Odoo - nieblokująco dla Event Loop
                     odoo_id = None
                     try:
                         # Przekazujemy parametry z konta
-                        odoo_id = odoo.create_lead(
+                        odoo_id = await asyncio.to_thread(
+                            odoo.create_lead,
                             lead,
                             company_id=account.odoo_company_id,
                             user_id=account.odoo_user_id,
