@@ -66,6 +66,34 @@ async def verify_token(
     return token
 
 
+api_key_header_optional = APIKeyHeader(name="X-API-Token", auto_error=False)
+
+
+async def verify_token_or_session(
+    token: Annotated[Optional[str], Security(api_key_header_optional)] = None,
+    session_token: Optional[str] = Cookie(None),
+    db: AsyncSession = Depends(get_db)
+) -> str:
+    if session_token:
+        user = await validate_session_token(db, session_token)
+        if user:
+            return "session_auth"
+            
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Wymagany token API lub aktywna sesja.",
+        )
+        
+    api_token = get_db_setting_sync("API_TOKEN", settings.api_token)
+    if token != api_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API token.",
+        )
+    return token
+
+
 # ---------------------------------------------------------------------------
 # Database Session Dependency
 # ---------------------------------------------------------------------------
@@ -273,8 +301,8 @@ async def health() -> dict:
     }
 
 
-@app.post("/trigger-osint", tags=["OSINT"], summary="Ręczne uruchomienie skanu (X-API-Token)")
-async def trigger_osint(_token: Annotated[str, Depends(verify_token)]) -> dict:
+@app.post("/trigger-osint", tags=["OSINT"], summary="Ręczne uruchomienie skanu (X-API-Token / Sesja)")
+async def trigger_osint(_token: Annotated[str, Depends(verify_token_or_session)]) -> dict:
     logger.info("Manual trigger via /trigger-osint")
     stats = await run_osint_pipeline()
     return {"triggered": True, "stats": stats}
