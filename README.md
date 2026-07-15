@@ -49,16 +49,25 @@ graph TD
 2. **Optymalizacja Wydajności (GUNB Caching)**:
    * System wysyła lekkie zapytania `HEAD` w celu sprawdzenia `Content-Length` plików ZIP.
    * Pobieranie danych następuje tylko wtedy, gdy baza urzędu uległa aktualizacji, co oszczędza ponad 350 MB transferu przy rutynowych skanach.
-3. **Kwalifikacja przez Gemini 2.5 Flash**:
+3. **Kwalifikacja przez Modele Gemini (2.5 Flash / 2.5 Pro)**:
+   * Dynamiczna parametryzacja modelu LLM, temperatury i max tokens na poziomie każdej kampanii.
    * Zabezpieczenie przed przeterminowanymi lub rozstrzygniętymi zamówieniami.
-   * Odczyt dokładnych parametrów (zakres, nośność wagi) z treści ogłoszeń.
-   * Automatyczna ocena priorytetu biznesowego (wysoki/średni/niski).
-4. **Formatowanie HTML w Odoo**:
-   * Tworzenie przejrzystych tabel szczegółowych na karcie leada w Odoo.
-   * Generowanie bezpośrednich, poprawnie zakodowanych linków publicznych do ogłoszeń e-Zamówień i wniosków GUNB.
-5. **Deduplikacja i Bezpieczeństwo**:
+   * Ekstrakcja kluczowych danych (zakres wagi, typ, dane inwestora) i ocena priorytetu biznesowego.
+4. **Formatowanie HTML i Mapowanie Odoo Multicompany**:
+   * Tworzenie przejrzystych tabel szczegółowych na karcie leada w Odoo CRM.
+   * Przypisywanie leadów do właściwych spółek (`company_id`), handlowców (`user_id`), zespołów (`team_id`), źródeł (`source_id`) oraz tagów (`tag_ids`) dynamicznie na podstawie kampanii.
+5. **Dedykowany Rejestr "Twardych Dowodów" i Analityka KPI**:
+   * Zapisywanie szczegółowych logów z unikalnym skrótem SHA-256 surowej odpowiedzi z API.
+   * Wykresy i metryki KPI obrazujące liczbę skanów, współczynnik sukcesu LLM oraz wykryte błędy w czasie.
+   * Notification Gate powiadamiający w czasie rzeczywistym o błędach autoryzacji Odoo lub statusach 4xx/5xx w logach API.
+6. **Wersjonowanie i Historia Promptów Systemowych (Faza 5)**:
+   * Pełna historia zmian promptów per kampania.
+   * Statystyki efektywności i konwersji (lead count, won count, rate %) powiązane z konkretną wersją promptu.
+   * Opcja błyskawicznego przywrócenia (restore) wybranego promptu z poziomu UI.
+7. **Deduplikacja i Bezpieczeństwo**:
    * Unikalny indeks URL w bazie SQLite uniemożliwia wielokrotne tworzenie tej samej szansy w CRM.
-   * Autoryzacja żądań tokenem nagłówkowym `X-API-Token`.
+   * Autoryzacja sesyjna panelu oraz tokenowa (`X-API-Token`) dla zewnętrznych wywołań.
+   * Wbudowane maskowanie kluczy API i haseł przed wyciekiem w logach i czatach.
 
 ---
 
@@ -105,15 +114,15 @@ Liveness probe zwracający stan działania mikroserwisu oraz datę kolejnego aut
   {
     "status": "ok",
     "service": "osint-lead-tracker",
-    "version": "1.0.0",
+    "version": "1.5.0",
     "scheduler": "running",
-    "next_run": "2026-07-14T06:00:00+02:00"
+    "next_run": "2026-07-15T06:00:00+02:00"
   }
   ```
 
 ### 2. `POST /trigger-osint`
 Wymusza natychmiastowe uruchomienie potoku OSINT.
-* **Autoryzacja**: Nagłówek `X-API-Token` (zgodny z `API_TOKEN`).
+* **Autoryzacja**: Nagłówek `X-API-Token` (zgodny z `API_TOKEN`) lub aktywna sesja administratora.
 * **Przykładowa odpowiedź**:
   ```json
   {
@@ -128,10 +137,26 @@ Wymusza natychmiastowe uruchomienie potoku OSINT.
   }
   ```
 
-### 3. `GET /leads`
-Zwraca ostatnie N przetworzonych leadów zapisanych w bazie SQLite.
-* **Autoryzacja**: Nagłówek `X-API-Token`.
-* **Parametry**: `limit` (opcjonalny, domyślnie 50, zakres 1-500).
+### 3. `GET /api/leads`
+Zwraca ostatnie N przetworzonych leadów zapisanych w bazie SQLite (endpoint sesyjnie zabezpieczony na potrzeby UI).
+* **Autoryzacja**: Aktywna sesja administratora.
+* **Parametry**: `limit` (opcjonalny, domyślnie 100).
+
+### 4. `GET /api/analytics/kpis`
+Zwraca zagregowane dane statystyczne KPI (współczynnik sukcesu LLM, łączna liczba skanów, błędy API).
+* **Autoryzacja**: Aktywna sesja administratora.
+
+### 5. `GET /api/analytics/timeline`
+Zwraca statystyki wyszukiwań i nowych leadów na osi czasu.
+* **Autoryzacja**: Aktywna sesja administratora.
+
+### 6. `GET /api/analytics/prompts`
+Zwraca historię modyfikacji promptów wraz ze wskaźnikami konwersji i sprzedaży CRM.
+* **Autoryzacja**: Aktywna sesja administratora.
+
+### 7. `POST /api/leads/sync-crm`
+Uruchamia ręczną synchronizację statusów szans z Odoo.
+* **Autoryzacja**: Aktywna sesja administratora.
 
 ---
 

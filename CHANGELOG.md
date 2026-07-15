@@ -5,6 +5,23 @@ Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w t
 
 ---
 
+## [1.5.0] - 2026-07-15
+
+### Added
+- **Historia wersji i przywracanie promptów (Faza 5)**: Wdrożono tabelę `prompt_versions` rejestrującą zmiany w promptach systemowych per kampania. Z poziomu UI dodano listę wersji ze statystykami efektywności (konwersja %, wygrane/przegrane leady) oraz przycisk pozwalający przywrócić dowolną poprzednią wersję.
+- **Synchronizacja statusów leadów z CRM**: Dodano background task `/api/leads/sync-crm` automatycznie odpytujący Odoo XML-RPC i aktualizujący statusy szans w lokalnej bazie SQLite (Won, Lost, Active %).
+- **Filtrowanie i sortowanie leadów**: Wdrożono w interfejsie graficznym zaawansowane filtrowanie listy leadów po statusach CRM oraz sortowanie wyników.
+- **Zaawansowane raporty i weryfikacja logów (Faza 3 Expansion)**: Dodano endpointy analityczne (`GET /api/analytics/kpis` i `/api/analytics/timeline`) agregujące liczbę skanów, znalezione namiary i błędy API na osi czasu.
+- **Twarde dowody w logach**: Wprowadzono rejestrowanie skrótów SHA-256 surowych odpowiedzi z API oraz parametrów zapytania bezpośrednio w szczegółach logu w UI.
+- **Weryfikacja Odoo Multicompany**: Wizualizacja w sekcji Accounts i w logach dokładnego mapowania Odoo (`company_id`, `user_id`, `tag_ids`, `team_id`, `source_id`).
+- **Notification Gate**: System powiadomień i alertów w UI, natychmiast sygnalizujący awarie zewnętrznych API (błędy 4xx/5xx w logach) lub problemy z połączeniem z Odoo.
+- **Zintegrowany Swarm Triad Handshake Gate**: Wdrożono skrypty `generate-handshake.py` i `validate-handshakes.py` weryfikujące poprawność wykonania zadań. Zmodyfikowano `smart_commit.sh` jako blokadę (Gate) uniemożliwiającą push dla roli Coordinator bez handshake'u od Buildera.
+- **Obsługa zmiany hasła**: Wdrożono zmianę hasła administratora panelu z poziomu UI Settings.
+
+### Changed
+- **Dwukolumnowy układ modalu edycji**: Modal dodawania/edycji kampanii został podzielony na dwie przejrzyste kolumny — po lewej konfiguracja wyszukiwania i CRM, po prawej dynamiczny prompt systemowy z historią wersji.
+- **Maskowanie poświadczeń (Secrets Redaction)**: Wdrożono automatyczne maskowanie i usuwanie surowych wartości kluczy API i haseł (np. `GEMINI_API_KEY`) z logów systemu i raportów przesyłanych do czatu dewelopera.
+
 ## [1.3.0] - 2026-07-14
 
 ### Changed

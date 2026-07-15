@@ -1,7 +1,8 @@
 {
   "conversation_id": "75929465-d0da-44dd-9e12-84c71b876bdd",
   "role": "Auditor",
-  "status": "FAIL",
+  "status": "FAILURE",
+  "files_modified": [],
   "issues_found": [
     {
       "severity": "CRITICAL",
