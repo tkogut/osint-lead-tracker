@@ -65,6 +65,35 @@ Every skill in `.agents/skills/` must contain:
 No task is marked `[x] COMPLETE` without the following confirmation:
 > "Handshake Verified: Plan-Alignment and Math-Consistency checked. Ready for Coordinator Push."
 
+### 5.1 Handshake Protocol — Egzekucja
+
+**Builder** — po zakończeniu implementacji uruchamia:
+```bash
+python3 scripts/generate-handshake.py \
+    --role builder \
+    --conversation-id <UUID_SESJI> \
+    --status SUCCESS \
+    --files "src/main.py,src/static/app.js,..." \
+    --math-check PASSED \
+    --notes "Opis wykonanej pracy"
+```
+
+**Coordinator** — push jest automatycznie zablokowany przez `smart_commit.sh`, dopóki Builder nie złoży handshake:
+```bash
+# Zwykły push (wymaga handshake Buildera):
+bash .agents/skills/git-pushing/scripts/smart_commit.sh "feat: opis"
+
+# Awaryjne pominięcie (tylko hotfix prod):
+SKIP_HANDSHAKE=1 bash .agents/skills/git-pushing/scripts/smart_commit.sh "hotfix: opis"
+```
+
+**Ręczna walidacja:**
+```bash
+python3 scripts/validate-handshakes.py --require-roles builder,auditor
+```
+
+Pliki handshake: `.agents/swarm/<conversation_id>_<role>_handshake.json`
+
 ---
 
 ## 6. CAVEMAN STANDARD (Anti-Split-Brain)
