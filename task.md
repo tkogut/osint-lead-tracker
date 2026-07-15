@@ -1,5 +1,5 @@
 # Backlog: Lead Dashboard Module (AGENTS-OS v5.0)
-**Ostatnia synchronizacja:** 2026-07-15T13:29:00+02:00 | **Gałąź:** `main` | **Commit:** `b1b6ff1`
+**Ostatnia synchronizacja:** 2026-07-15T14:15:00+02:00 | **Gałąź:** `main` | **Commit:** `211c964`
 
 ---
 
@@ -35,15 +35,22 @@
 - [x] **TSK-019**: Implement backend prompt versioning (auto-create on `custom_prompt` change) and performance ranking API `GET /api/analytics/prompts?account_id=<ID>`. Zwraca: `version`, `created_at`, `total_leads`, `won_leads`, `lost_leads`, `conversion_rate`. Bug fix: `case()` zamiast `func.cast()` dla SQLite. — `src/main.py`
 - [x] **TSK-020**: Design and implement the prompt history panel (`#prompt-version-section`) and version list in the Campaign Edit modal UI. Function `loadPromptVersionHistory(accountId)` w JS. — `src/static/index.html`, `src/static/app.js`
 
-**Swarm Triad:**
+**Swarm Triad (Phase 5 Core):**
 - Builder `ecf5ed62` → `ecf5ed62_builder_handshake.json` ✅ SUCCESS
 - Auditor `75929465` → `75929465_auditor_handshake.json` ⚠️ 2 CRITICAL BUGS wykryte i naprawione przez Coordinator
 - Commit: `b1b6ff1` → VPS deployed ✅
 
+## [Phase 5 Expansion: Revert Prompt & Lead Filtering] ✅ DONE — 2026-07-15
+- [x] **TSK-021**: Przycisk "Przywróć tę wersję" — nadpisuje prompt wybraną wersją historyczną z bazy i odświeża UI. Zabezpieczono przed błędami parsowania cudzysłowów w JS. — `src/static/app.js`, `src/main.py` (dodano `prompt_text` do API).
+- [x] **TSK-022**: Widok leadów z filtrem po statusie (`new`/`in_progress`/`won`/`lost`) i sortowaniem (najnowsze, najstarsze, priorytet). Dodano kolumnę "Status" z dopasowanymi kolorystycznie badge'ami do tabeli leadów. — `src/static/index.html`, `src/static/app.js`, `src/database.py` (fix: dodanie `status` do API).
+
+**Swarm Triad (TSK-021/022):**
+- Builder `906072fc` → `906072fc-7778-498e-9e05-70e8194b44b8_builder_handshake.json` ✅ SUCCESS
+- Auditor `05942848` → `05942848-ba6f-4d2a-8d4f-e6eb084666d4_auditor_handshake.json` ⚠️ 1 BUG (brak statusu w database.py) wykryty i naprawiony przez Coordinator
+- Commit: `211c964` → VPS deployed ✅
+
 ---
 
-## [Phase 6: Backlog (Nie zaplanowane)]
-- [ ] **TSK-021**: Przycisk "Przywróć tę wersję" — nadpisuje prompt wybraną wersją historyczną i tworzy nową `PromptVersion`.
-- [ ] **TSK-022**: Widok leadów z filtrem po statusie (`new`/`in_progress`/`won`/`lost`) i sortowaniem.
+## [Phase 6: Backlog (Wstrzymane / Nie zaplanowane)]
 - [ ] **TSK-023**: Eksport raportów PDF / CSV z danymi KPI kampanii.
 - [ ] **TSK-024**: Powiadomienia e-mail przy nowych leadach (integracja SMTP).
