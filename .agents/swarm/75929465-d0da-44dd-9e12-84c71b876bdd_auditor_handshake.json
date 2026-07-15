@@ -1,0 +1,25 @@
+{
+  "conversation_id": "75929465-d0da-44dd-9e12-84c71b876bdd",
+  "role": "Auditor",
+  "status": "FAIL",
+  "issues_found": [
+    {
+      "severity": "CRITICAL",
+      "id": "BUG-001",
+      "file": "src/main.py",
+      "lines": [394, 395, 396],
+      "description": "func.cast(Lead.status == 'won', SAInteger) does not work in SQLite — produces NULL not integer counts. Must use SQLAlchemy case() expression. Also 'case' is not imported.",
+      "fix": "Replace func.sum(func.cast(...)) with func.sum(case((Lead.status == 'won', 1), else_=0)) and add case to sqlalchemy imports."
+    },
+    {
+      "severity": "CRITICAL",
+      "id": "BUG-002",
+      "file": "src/database.py:94 + src/main.py:204",
+      "lines": [94, 204],
+      "description": "save_lead() has no prompt_version_id parameter. All leads stored with NULL prompt_version_id. /api/analytics/prompts always returns total_leads=0 per version.",
+      "fix": "Add prompt_version_id: Optional[int] = None to save_lead() and set on new_lead. Pass prompt_version_id from run_osint_pipeline() after resolving active PromptVersion per account."
+    }
+  ],
+  "math_consistency_check": "FAILED",
+  "timestamp": "2026-07-15T13:23:00+02:00"
+}

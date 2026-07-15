@@ -1,33 +1,49 @@
 # Backlog: Lead Dashboard Module (AGENTS-OS v5.0)
+**Ostatnia synchronizacja:** 2026-07-15T13:29:00+02:00 | **Gałąź:** `main` | **Commit:** `b1b6ff1`
 
-## [Phase 1: Database & Multi-tenancy Core]
+---
+
+## [Phase 1: Database & Multi-tenancy Core] ✅ DONE
 - [x] **TSK-001**: Implement SQLAlchemy models in `src/models.py` supporting Account, ResearchLog, User, Session, Setting.
 - [x] **TSK-002**: Refactor `src/database.py` to support both asynchronous operations (for FastAPI) and synchronous SQLAlchemy sessions for background tasks.
 - [x] **TSK-003**: Create database migration/initialization script to seed the initial default account and admin user if empty.
 
-## [Phase 2: Engine Parameterization & Scheduler]
+## [Phase 2: Engine Parameterization & Scheduler] ✅ DONE
 - [x] **TSK-004**: Refactor `src/osint_engine.py` to accept an `Account` configuration dynamically instead of reading global `Settings` from `.env`.
 - [x] **TSK-005**: Modify `run_osint_pipeline` in `src/main.py` to iterate over all active accounts, run research per account, and log lightweight "Hard Proofs" in `ResearchLog`.
 - [x] **TSK-011**: Update Odoo integration client in `src/odoo_integration.py` to accept `company_id`, `user_id` (salesperson), and `tag_ids` dynamically per lead insertion.
 
-## [Phase 3: Backend API & Authentication]
+## [Phase 3: Backend API & Authentication] ✅ DONE
 - [x] **TSK-006**: Implement secure session-based authentication (login, logout, active sessions) in `src/main.py`.
 - [x] **TSK-007**: Implement CRUD endpoints for `Account` management (restricted to admin users).
 - [x] **TSK-008**: Implement REST API endpoint for the LLM Sandbox (`POST /api/sandbox/test`) which takes a custom prompt, temperature, and raw notice text, runs Gemini, and returns the parsed result.
 - [x] **TSK-009**: Implement API endpoint to retrieve `ResearchLog` entries with filtering by account and status.
 
-## [Phase 3 Expansion: Analytics & Monitoring]
+## [Phase 3 Expansion: Analytics & Monitoring] ✅ DONE
 - [x] **TSK-012**: Implement backend API endpoints for analytics (`GET /api/analytics/kpis` and `GET /api/analytics/timeline`).
 - [x] **TSK-013**: Implement advanced UI search, filtering and detail modal/accordion for `ResearchLog` (Twarde Dowody).
 - [x] **TSK-014**: Implement UI Notification Gate showing alerts for API failure status codes (4xx/5xx).
 - [x] **TSK-015**: Visualize Odoo Multicompany mapping fields (`company_id`, `user_id`, `tag_ids`) in Accounts and Logs tabs.
 - [x] **TSK-016**: Restructure Campaign Edit modal layout to two-column format (left settings, right prompt).
 
-## [Phase 4: Frontend UI (Lead Dashboard)]
+## [Phase 4: Frontend UI (Lead Dashboard)] ✅ DONE
 - [x] **TSK-010**: Create modern, responsive HTML/CSS/JS frontend in `src/static/` with a premium dark-mode dashboard (Deep Blue palette, glassmorphism, Outfit font) containing Dashboard, Accounts, Sandbox, Logs and Settings tabs.
 
-## [Phase 5: Prompt Versioning & CRM Feedback Loop]
-- [ ] **TSK-017**: Create the `PromptVersion` database model and update the `Lead` model with status and mapping relations.
-- [ ] **TSK-018**: Implement backend feedback sync background task `/api/leads/sync` querying Odoo lead states.
-- [ ] **TSK-019**: Implement backend prompt versioning and performance ranking API `/api/analytics/prompts`.
-- [ ] **TSK-020**: Design and implement the prompt history panel and version reversion tool in the Campaign Edit modal UI.
+## [Phase 5: Prompt Versioning & CRM Feedback Loop] ✅ DONE — 2026-07-15
+- [x] **TSK-017**: Create the `PromptVersion` database model and update the `Lead` model with `status`, `prompt_version_id`, `last_synced_at` columns. Idempotentna migracja ALTER TABLE w `init_db()`. — `src/models.py`, `src/database.py`
+- [x] **TSK-018**: Implement backend feedback sync background task `POST /api/leads/sync` querying Odoo lead states (`probability`, `active`). Scheduler cron 07:00 daily (`odoo_sync`). Method `get_lead_status()` w OdooClient. — `src/main.py`, `src/odoo_integration.py`
+- [x] **TSK-019**: Implement backend prompt versioning (auto-create on `custom_prompt` change) and performance ranking API `GET /api/analytics/prompts?account_id=<ID>`. Zwraca: `version`, `created_at`, `total_leads`, `won_leads`, `lost_leads`, `conversion_rate`. Bug fix: `case()` zamiast `func.cast()` dla SQLite. — `src/main.py`
+- [x] **TSK-020**: Design and implement the prompt history panel (`#prompt-version-section`) and version list in the Campaign Edit modal UI. Function `loadPromptVersionHistory(accountId)` w JS. — `src/static/index.html`, `src/static/app.js`
+
+**Swarm Triad:**
+- Builder `ecf5ed62` → `ecf5ed62_builder_handshake.json` ✅ SUCCESS
+- Auditor `75929465` → `75929465_auditor_handshake.json` ⚠️ 2 CRITICAL BUGS wykryte i naprawione przez Coordinator
+- Commit: `b1b6ff1` → VPS deployed ✅
+
+---
+
+## [Phase 6: Backlog (Nie zaplanowane)]
+- [ ] **TSK-021**: Przycisk "Przywróć tę wersję" — nadpisuje prompt wybraną wersją historyczną i tworzy nową `PromptVersion`.
+- [ ] **TSK-022**: Widok leadów z filtrem po statusie (`new`/`in_progress`/`won`/`lost`) i sortowaniem.
+- [ ] **TSK-023**: Eksport raportów PDF / CSV z danymi KPI kampanii.
+- [ ] **TSK-024**: Powiadomienia e-mail przy nowych leadach (integracja SMTP).
