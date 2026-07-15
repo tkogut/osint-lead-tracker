@@ -66,6 +66,14 @@ async def verify_token(
     return token
 
 
+# ---------------------------------------------------------------------------
+# Database Session Dependency
+# ---------------------------------------------------------------------------
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        yield session
+
+
 api_key_header_optional = APIKeyHeader(name="X-API-Token", auto_error=False)
 
 
@@ -92,14 +100,6 @@ async def verify_token_or_session(
             detail="Invalid API token.",
         )
     return token
-
-
-# ---------------------------------------------------------------------------
-# Database Session Dependency
-# ---------------------------------------------------------------------------
-async def get_db():
-    async with AsyncSessionLocal() as session:
-        yield session
 
 
 # ---------------------------------------------------------------------------
