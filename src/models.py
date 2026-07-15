@@ -64,6 +64,7 @@ class Account(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     logs = relationship("ResearchLog", back_populates="account", cascade="all, delete-orphan")
+    prompt_versions = relationship("PromptVersion", back_populates="account", cascade="all, delete-orphan")
 
 
 class ResearchLog(Base):
@@ -113,3 +114,20 @@ class Lead(Base):
     data_pub = Column(String(50))
     odoo_id = Column(Integer, nullable=True)
     created_at = Column(String(100), nullable=False, default=lambda: datetime.utcnow().isoformat())
+    # Phase 5: status, prompt versioning, sync
+    status = Column(String(50), nullable=False, default='new')
+    prompt_version_id = Column(Integer, ForeignKey('prompt_versions.id', ondelete='SET NULL'), nullable=True)
+    last_synced_at = Column(DateTime, nullable=True)
+
+
+class PromptVersion(Base):
+    """Wersjonowanie promptów systemowych per kampania."""
+    __tablename__ = "prompt_versions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    version = Column(Integer, nullable=False, default=1)
+    prompt_text = Column(Text, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    account = relationship("Account", back_populates="prompt_versions")

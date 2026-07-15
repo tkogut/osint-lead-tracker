@@ -20,7 +20,7 @@ from fastapi import Depends, FastAPI, HTTPException, Security, status, Response,
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import select, delete, func
+from sqlalchemy import select, delete, func, Integer as SAInteger, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
@@ -28,7 +28,7 @@ from config import get_settings
 from database import get_recent_leads, init_db, save_lead, url_exists, AsyncSessionLocal, get_db_setting_sync
 from odoo_integration import get_odoo_client
 from osint_engine import get_engine, get_date_limits, get_system_instruction
-from models import User, Session as UserSession, Account, ResearchLog, Setting
+from models import User, Session as UserSession, Account, ResearchLog, Setting, PromptVersion, Lead
 from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest, SettingUpdate, ChangePasswordRequest
 from auth import verify_password, create_user_session, validate_session_token
 
@@ -153,6 +153,15 @@ async def run_osint_pipeline() -> dict[str, Any]:
         for account in accounts:
             logger.info("Skanowanie dla konta: %s (ID: %s)", account.name, account.id)
             stats["accounts_scanned"] += 1
+
+            # Resolve aktywnej wersji promptu dla konta (BUG-002 fix)
+            pv_result = await session.execute(
+                select(PromptVersion.id)
+                .filter(PromptVersion.account_id == account.id)
+                .order_by(PromptVersion.version.desc())
+                .limit(1)
+            )
+            active_prompt_version_id = pv_result.scalar_one_or_none()
             
             # Pobieramy wyniki wyszukiwania (słownik z podziałem na źródła) - nieblokująco dla Event Loop
             search_results = await asyncio.to_thread(engine.run_search_for_account, account)
@@ -201,7 +210,7 @@ async def run_osint_pipeline() -> dict[str, Any]:
                         
                     # Zapis do SQLite
                     try:
-                        await save_lead(lead, odoo_id=odoo_id)
+                        await save_lead(lead, odoo_id=odoo_id, prompt_version_id=active_prompt_version_id)
                         leads_created_count += 1
                         stats["leads_new"] += 1
                     except IntegrityError:
@@ -227,6 +236,44 @@ async def run_osint_pipeline() -> dict[str, Any]:
             
     logger.info("=== OSINT Pipeline DONE | stats=%s ===", stats)
     return stats
+
+
+async def sync_lead_statuses() -> dict:
+    """Synchronizuje statusy leadów z Odoo CRM."""
+    logger.info("=== Odoo Lead Status Sync START ===")
+    odoo = get_odoo_client()
+    synced = 0
+    errors = 0
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Lead).filter(
+                Lead.odoo_id.isnot(None),
+                Lead.status.notin_(['won', 'lost'])
+            )
+        )
+        leads = result.scalars().all()
+        for lead in leads:
+            try:
+                data = await asyncio.to_thread(
+                    odoo.get_lead_status, lead.odoo_id
+                )
+                if data:
+                    prob = data.get('probability', 0)
+                    active = data.get('active', True)
+                    if prob == 100:
+                        lead.status = 'won'
+                    elif not active and prob == 0:
+                        lead.status = 'lost'
+                    elif active and prob > 0:
+                        lead.status = 'in_progress'
+                    lead.last_synced_at = datetime.utcnow()
+                    synced += 1
+            except Exception as e:
+                logger.error("Lead sync error id=%s: %s", lead.id, e)
+                errors += 1
+        await session.commit()
+    logger.info("=== Odoo Lead Status Sync DONE synced=%s errors=%s ===", synced, errors)
+    return {"synced": synced, "errors": errors}
 
 
 # ---------------------------------------------------------------------------
@@ -255,6 +302,12 @@ async def lifespan(app: FastAPI):
         name="Daily OSINT scan",
         replace_existing=True,
         misfire_grace_time=3600,
+    )
+    scheduler.add_job(
+        sync_lead_statuses,
+        CronTrigger(hour=7, minute=0, timezone=settings.cron_timezone),
+        id='odoo_sync',
+        replace_existing=True
     )
     scheduler.start()
     logger.info(
@@ -327,6 +380,56 @@ async def list_leads_session(
         raise HTTPException(status_code=400, detail="limit musi być w zakresie 1–500")
     rows = await get_recent_leads(limit=limit)
     return {"count": len(rows), "leads": rows}
+
+
+# ---------------------------------------------------------------------------
+# API Endpoints - Analytics: Prompt Versions
+# ---------------------------------------------------------------------------
+@app.get("/api/analytics/prompts", tags=["Analytics"], summary="Historia i KPI wersji promptów")
+async def get_prompt_analytics(
+    current_user: Annotated[User, Depends(get_current_user)],
+    account_id: int,
+    db: AsyncSession = Depends(get_db)
+) -> list:
+    result = await db.execute(
+        select(PromptVersion).filter(PromptVersion.account_id == account_id).order_by(PromptVersion.version.asc())
+    )
+    versions = result.scalars().all()
+    out = []
+    for pv in versions:
+        lead_result = await db.execute(
+            select(
+                func.count(Lead.id).label('total'),
+                func.sum(case((Lead.status == 'won', 1), else_=0)).label('won'),
+                func.sum(case((Lead.status == 'lost', 1), else_=0)).label('lost'),
+                func.sum(case((Lead.status == 'in_progress', 1), else_=0)).label('in_progress')
+            ).filter(Lead.prompt_version_id == pv.id)
+        )
+        row = lead_result.one()
+        total = row.total or 0
+        won = row.won or 0
+        lost = row.lost or 0
+        in_prog = row.in_progress or 0
+        out.append({
+            "id": pv.id,
+            "version": pv.version,
+            "created_at": pv.created_at.isoformat(),
+            "prompt_preview": pv.prompt_text[:200] if pv.prompt_text else "",
+            "total_leads": total,
+            "won_leads": won,
+            "lost_leads": lost,
+            "in_progress_leads": in_prog,
+            "conversion_rate": round(won / total * 100, 1) if total > 0 else 0.0
+        })
+    return out
+
+
+@app.post("/api/leads/sync", tags=["OSINT"], summary="Synchronizacja statusów z Odoo")
+async def trigger_lead_sync(
+    _token: Annotated[str, Depends(verify_token_or_session)]
+) -> dict:
+    result = await sync_lead_statuses()
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -480,6 +583,19 @@ async def update_account(
     acc.name = req.name
     acc.target_cpvs = json.dumps(req.target_cpvs)
     acc.target_keywords = json.dumps(req.target_keywords)
+    # Wersjonowanie promptu
+    if req.custom_prompt and req.custom_prompt != acc.custom_prompt:
+        last_ver_result = await db.execute(
+            select(func.max(PromptVersion.version)).filter(PromptVersion.account_id == acc.id)
+        )
+        last_ver = last_ver_result.scalar() or 0
+        new_pv = PromptVersion(
+            account_id=acc.id,
+            version=last_ver + 1,
+            prompt_text=req.custom_prompt,
+            created_at=datetime.utcnow()
+        )
+        db.add(new_pv)
     acc.custom_prompt = req.custom_prompt
     acc.llm_model = req.llm_model
     acc.llm_temperature = req.llm_temperature
