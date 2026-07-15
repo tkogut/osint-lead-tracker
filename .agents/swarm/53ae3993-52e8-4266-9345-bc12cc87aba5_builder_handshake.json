@@ -3,11 +3,9 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "CHANGELOG.md",
-    "README.md",
-    "src/main.py"
+    "README.md"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-15T14:40:59Z",
-  "notes": "Porting handshake gate configs, bumping version to v1.5.0, updating README and CHANGELOG documentation"
+  "timestamp": "2026-07-15T14:47:38Z",
+  "notes": "docs: add explanatory note about dynamic Odoo mapping campaign settings vs global env fallback params in README.md"
 }

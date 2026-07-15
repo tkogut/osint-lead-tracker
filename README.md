@@ -100,6 +100,9 @@ CRON_MINUTE=0
 CRON_TIMEZONE="Europe/Warsaw"
 ```
 
+> [!NOTE]
+> Parametry mapowania Odoo takie jak **Odoo Company ID** (`odoo_company_id`), **Odoo User ID / Handlowiec** (`odoo_user_id`), **Odoo Tag IDs** (`odoo_tag_ids`), a także dedykowane parametry **Team ID** (`odoo_team_id`) i **Source ID** (`odoo_source_id`) są konfigurowane **dynamicznie w panelu graficznym (zakładka Accounts)** osobno dla każdej kampanii (Account). Zapisywane są one w bazie danych SQLite. Zmienne `ODOO_TEAM_ID` i `ODOO_SOURCE_ID` w pliku `.env` pełnią jedynie rolę opcjonalnych domyślnych wartości (fallbacks).
+
 ---
 
 ## 🔌 Endpointy API
