@@ -528,7 +528,8 @@ async def update_setting(
         raise HTTPException(status_code=404, detail="Ustawienie nie istnieje.")
     
     if req.value.startswith("...") or "..." in req.value:
-        raise HTTPException(status_code=400, detail="Nieprawidłowa wartość klucza API.")
+        # Maskowana wartość oznacza brak zmian ze strony użytkownika - ignorujemy bez błędu
+        return {"success": True}
 
     item.value = req.value
     await db.commit()
