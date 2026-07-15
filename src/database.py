@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import sessionmaker
 
 from config import get_settings
-from models import Base, Lead, Setting
+from models import Base, Lead, Setting, PromptVersion
 
 def get_db_setting_sync(key: str, default: str = "") -> str:
     """Odczytuje ustawienie z bazy danych w sposób synchroniczny (dla potoków tła)."""
@@ -43,10 +43,44 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
 async def init_db() -> None:
     """Tworzy wszystkie tabele bazy danych, jeśli nie istnieją."""
     import os
+    import sqlite3 as _sqlite3
     os.makedirs(os.path.dirname(settings.sqlite_path), exist_ok=True)
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("DB init OK (SQLAlchemy Async) -> %s", settings.sqlite_path)
+
+    # Idempotent SQLite column migrations (Phase 5)
+    try:
+        _db_path = settings.sqlite_path
+        _con = _sqlite3.connect(_db_path)
+        _cur = _con.cursor()
+        # Create prompt_versions table if not exists (fallback)
+        _cur.execute("""
+            CREATE TABLE IF NOT EXISTS prompt_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                version INTEGER NOT NULL DEFAULT 1,
+                prompt_text TEXT NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+        """)
+        for _sql in [
+            "ALTER TABLE leads ADD COLUMN status VARCHAR(50) DEFAULT 'new'",
+            "ALTER TABLE leads ADD COLUMN prompt_version_id INTEGER REFERENCES prompt_versions(id)",
+            "ALTER TABLE leads ADD COLUMN last_synced_at DATETIME",
+        ]:
+            try:
+                _cur.execute(_sql)
+                logger.info("Migration OK: %s", _sql[:60])
+            except _sqlite3.OperationalError as _oe:
+                if "duplicate column name" in str(_oe):
+                    pass  # idempotent
+                else:
+                    logger.warning("Migration warning: %s", _oe)
+        _con.commit()
+        _con.close()
+    except Exception as _e:
+        logger.error("Phase 5 migration error: %s", _e)
 
 
 async def url_exists(url: str) -> bool:
@@ -57,7 +91,7 @@ async def url_exists(url: str) -> bool:
         return lead is not None
 
 
-async def save_lead(lead_dict: dict, odoo_id: Optional[int] = None) -> int:
+async def save_lead(lead_dict: dict, odoo_id: Optional[int] = None, prompt_version_id: Optional[int] = None) -> int:
     """Zapisuje leada do SQLite."""
     async with AsyncSessionLocal() as session:
         new_lead = Lead(
@@ -72,6 +106,7 @@ async def save_lead(lead_dict: dict, odoo_id: Optional[int] = None) -> int:
             priorytet=lead_dict.get("priorytet"),
             data_pub=lead_dict.get("data"),
             odoo_id=odoo_id,
+            prompt_version_id=prompt_version_id,
             created_at=datetime.utcnow().isoformat()
         )
         session.add(new_lead)

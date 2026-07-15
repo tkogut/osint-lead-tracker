@@ -471,12 +471,45 @@ document.addEventListener("DOMContentLoaded", () => {
             const defaultPromptData = await apiRequest("/api/settings/default-prompt");
             document.getElementById("acc-prompt").value = defaultPromptData ? defaultPromptData.default_prompt : "";
         }
-        
+
+        // Load prompt version history
+        if (accountId) {
+            loadPromptVersionHistory(accountId);
+            document.getElementById('prompt-version-section').classList.remove('hidden');
+        } else {
+            document.getElementById('prompt-version-section').classList.add('hidden');
+        }
+
         accountModal.classList.remove("hidden");
     }
 
     function closeAccountModal() {
         accountModal.classList.add("hidden");
+    }
+
+    async function loadPromptVersionHistory(accountId) {
+        const listEl = document.getElementById('prompt-version-list');
+        try {
+            const versions = await apiRequest(`/api/analytics/prompts?account_id=${accountId}`);
+            if (!versions || versions.length === 0) {
+                listEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;">Brak historii wersji promptu.</div>';
+                return;
+            }
+            listEl.innerHTML = versions.map(v => `
+                <div class="version-item" style="padding:8px 10px;border-radius:6px;background:rgba(255,255,255,0.04);margin-bottom:6px;font-size:0.8rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                        <span style="color:var(--accent-primary);font-weight:600;">v${v.version}</span>
+                        <span style="color:var(--text-muted);">${new Date(v.created_at).toLocaleDateString('pl-PL')}</span>
+                    </div>
+                    <div style="color:var(--text-secondary);margin-bottom:4px;">
+                        ${v.total_leads} leadów | 🏆 ${v.won_leads} wygranych (${v.conversion_rate}%)
+                    </div>
+                    <div style="color:var(--text-muted);font-size:0.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${v.prompt_preview}...</div>
+                </div>
+            `).join('');
+        } catch(e) {
+            listEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;">Błąd ładowania historii.</div>';
+        }
     }
 
     // Submit Account Form (Create/Update)

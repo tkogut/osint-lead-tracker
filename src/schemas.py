@@ -2,7 +2,7 @@
 schemas.py — Schematy walidacji Pydantic dla interfejsów API Lead Dashboard.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Text
 from pydantic import BaseModel, Field
 
 
@@ -73,3 +73,31 @@ class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str
 
+
+class LeadResponse(BaseModel):
+    """Model odpowiedzi leada z polami Phase 5."""
+    id: int
+    url: Optional[str]
+    tytul: Optional[str]
+    typ: Optional[str]
+    lokalizacja: Optional[str]
+    inwestor: Optional[str]
+    wykonawca: Optional[str]
+    zakres: Optional[Text]
+    uzasadnienie: Optional[Text]
+    priorytet: Optional[str]
+    data_pub: Optional[str]
+    odoo_id: Optional[int]
+    status: str = 'new'
+    prompt_version_id: Optional[int]
+    last_synced_at: Optional[str]
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class LeadSyncResponse(BaseModel):
+    """Odpowiedź operacji synchronizacji leadów z Odoo."""
+    synced: int
+    errors: int
