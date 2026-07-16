@@ -65,6 +65,7 @@ class Account(Base):
 
     logs = relationship("ResearchLog", back_populates="account", cascade="all, delete-orphan")
     prompt_versions = relationship("PromptVersion", back_populates="account", cascade="all, delete-orphan")
+    snapshots = relationship("RunPerformanceSnapshot", back_populates="account", cascade="all, delete-orphan")
 
 
 class ResearchLog(Base):
@@ -84,6 +85,12 @@ class ResearchLog(Base):
     leads_found_count = Column(Integer, nullable=False, default=0)
     leads_created_count = Column(Integer, nullable=False, default=0)
     log_text = Column(Text, nullable=True)
+
+    # Phase 6: Grounding metadata and token economy
+    grounding_chunks_count = Column(Integer, nullable=True, default=0)
+    grounding_queries_count = Column(Integer, nullable=True, default=0)
+    input_tokens = Column(Integer, nullable=True, default=0)
+    output_tokens = Column(Integer, nullable=True, default=0)
 
     account = relationship("Account", back_populates="logs")
 
@@ -118,6 +125,7 @@ class Lead(Base):
     status = Column(String(50), nullable=False, default='new')
     prompt_version_id = Column(Integer, ForeignKey('prompt_versions.id', ondelete='SET NULL'), nullable=True)
     last_synced_at = Column(DateTime, nullable=True)
+    pending_approval = Column(Boolean, nullable=False, default=False)
 
 
 class PromptVersion(Base):
@@ -131,3 +139,23 @@ class PromptVersion(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     account = relationship("Account", back_populates="prompt_versions")
+
+
+class RunPerformanceSnapshot(Base):
+    """Snapshot wydajności per przebieg (źródło + konto) — metryki Grounding i tokenów."""
+    __tablename__ = "run_performance_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    source = Column(String(50), nullable=False)          # BZP / Google / GUNB
+    run_date = Column(String(10), nullable=False)        # YYYY-MM-DD
+    leads_generated = Column(Integer, nullable=False, default=0)
+    grounding_chunks_count = Column(Integer, nullable=False, default=0)
+    grounding_queries_count = Column(Integer, nullable=False, default=0)
+    input_tokens = Column(Integer, nullable=False, default=0)
+    output_tokens = Column(Integer, nullable=False, default=0)
+    api_errors = Column(Integer, nullable=False, default=0)
+    circuit_breaker_triggered = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    account = relationship("Account", back_populates="snapshots")

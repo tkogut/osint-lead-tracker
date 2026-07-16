@@ -28,7 +28,7 @@ from config import get_settings
 from database import get_recent_leads, init_db, save_lead, url_exists, AsyncSessionLocal, get_db_setting_sync
 from odoo_integration import get_odoo_client
 from osint_engine import get_engine, get_date_limits, get_system_instruction
-from models import User, Session as UserSession, Account, ResearchLog, Setting, PromptVersion, Lead
+from models import User, Session as UserSession, Account, ResearchLog, Setting, PromptVersion, Lead, RunPerformanceSnapshot
 from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest, SettingUpdate, ChangePasswordRequest
 from auth import verify_password, create_user_session, validate_session_token
 
@@ -47,6 +47,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 settings = get_settings()
 scheduler = AsyncIOScheduler(timezone=settings.cron_timezone)
+_analytics_queue: asyncio.Queue = asyncio.Queue()
 
 # ---------------------------------------------------------------------------
 # Security (X-API-Token for external APIs)
@@ -125,6 +126,26 @@ async def get_current_user(
 
 
 # ---------------------------------------------------------------------------
+# Analytics Queue Single Writer (Phase 6: prevents SQLite database is locked)
+# ---------------------------------------------------------------------------
+async def _analytics_writer_worker() -> None:
+    """Singleton writer — sekwencyjnie zapisuje snapshoty analityczne do SQLite."""
+    while True:
+        event = await _analytics_queue.get()
+        if event is None:  # sygnał zatrzymania
+            _analytics_queue.task_done()
+            break
+        try:
+            async with AsyncSessionLocal() as sess:
+                sess.add(event)
+                await sess.commit()
+        except Exception as _e:
+            logger.error("Analytics writer error: %s", _e)
+        finally:
+            _analytics_queue.task_done()
+
+
+# ---------------------------------------------------------------------------
 # Core pipeline (shared between scheduler and manual trigger)
 # ---------------------------------------------------------------------------
 async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]:
@@ -142,7 +163,8 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
         "leads_found": 0,
         "leads_new": 0,
         "odoo_ok": 0,
-        "odoo_fail": 0
+        "odoo_fail": 0,
+        "circuit_breaker_triggered": 0
     }
     
     async with AsyncSessionLocal() as session:
@@ -168,12 +190,16 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
             )
             active_prompt_version_id = pv_result.scalar_one_or_none()
             
+            # Circuit Breaker limit (Phase 6) — odczytaj z bazy lub użyj domyślnego
+            max_leads_per_run = int(get_db_setting_sync("MAX_LEADS_PER_RUN", "10"))
+
             # Pobieramy wyniki wyszukiwania (słownik z podziałem na źródła) - nieblokująco dla Event Loop
             search_results = await asyncio.to_thread(engine.run_search_for_account, account)
             
-            for source, (leads, status_code, response_hash) in search_results.items():
+            for source, (leads, status_code, response_hash, grounding_chunks, grounding_queries, input_tokens, output_tokens) in search_results.items():
                 leads_found_count = len(leads)
                 leads_created_count = 0
+                circuit_triggered = False
                 
                 # Zapisujemy parametry zapytania
                 query_params = {
@@ -181,49 +207,69 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
                     "keywords": json.loads(account.target_keywords)
                 }
                 
-                for lead in leads:
-                    url = lead.get("url", "").strip()
-                    if not url:
-                        continue
-                        
-                    # Deduplikacja w SQLite
-                    if await url_exists(url):
-                        logger.info("[%s] Duplikat URL pomijam: %s", source, url)
-                        continue
-                        
-                    # Zapis do Odoo - nieblokująco dla Event Loop
-                    odoo_id = None
-                    try:
-                        # Przekazujemy parametry z konta
-                        odoo_id = await asyncio.to_thread(
-                            odoo.create_lead,
-                            lead,
-                            company_id=account.odoo_company_id,
-                            user_id=account.odoo_user_id,
-                            tag_ids=json.loads(account.odoo_tag_ids),
-                            team_id=account.odoo_team_id,
-                            source_id=account.odoo_source_id
-                        )
-                        if odoo_id:
-                            stats["odoo_ok"] += 1
-                            logger.info("[%s] Odoo OK → id=%s", source, odoo_id)
-                        else:
+                # === CIRCUIT BREAKER (Phase 6) ===
+                if leads_found_count > max_leads_per_run:
+                    logger.warning(
+                        "[%s] CIRCUIT BREAKER TRIGGERED: %d leads > limit %d. Quarantining leads, SKIPPING Odoo.",
+                        source, leads_found_count, max_leads_per_run
+                    )
+                    circuit_triggered = True
+                    stats["circuit_breaker_triggered"] = stats.get("circuit_breaker_triggered", 0) + 1
+                    # Save all leads as pending_approval, skip Odoo
+                    for lead in leads:
+                        url = lead.get("url", "").strip()
+                        if not url or await url_exists(url):
+                            continue
+                        try:
+                            await save_lead(lead, odoo_id=None, prompt_version_id=active_prompt_version_id, pending_approval=True)
+                            leads_created_count += 1
+                            stats["leads_new"] += 1
+                        except IntegrityError:
+                            logger.warning("[%s] IntegrityError (pending) dla URL: %s", source, url)
+                else:
+                    for lead in leads:
+                        url = lead.get("url", "").strip()
+                        if not url:
+                            continue
+                            
+                        # Deduplikacja w SQLite
+                        if await url_exists(url):
+                            logger.info("[%s] Duplikat URL pomijam: %s", source, url)
+                            continue
+                            
+                        # Zapis do Odoo - nieblokująco dla Event Loop
+                        odoo_id = None
+                        try:
+                            # Przekazujemy parametry z konta
+                            odoo_id = await asyncio.to_thread(
+                                odoo.create_lead,
+                                lead,
+                                company_id=account.odoo_company_id,
+                                user_id=account.odoo_user_id,
+                                tag_ids=json.loads(account.odoo_tag_ids),
+                                team_id=account.odoo_team_id,
+                                source_id=account.odoo_source_id
+                            )
+                            if odoo_id:
+                                stats["odoo_ok"] += 1
+                                logger.info("[%s] Odoo OK → id=%s", source, odoo_id)
+                            else:
+                                stats["odoo_fail"] += 1
+                        except Exception as exc:
+                            logger.error("[%s] Błąd Odoo: %s", source, exc)
                             stats["odoo_fail"] += 1
-                    except Exception as exc:
-                        logger.error("[%s] Błąd Odoo: %s", source, exc)
-                        stats["odoo_fail"] += 1
-                        
-                    # Zapis do SQLite
-                    try:
-                        await save_lead(lead, odoo_id=odoo_id, prompt_version_id=active_prompt_version_id)
-                        leads_created_count += 1
-                        stats["leads_new"] += 1
-                    except IntegrityError:
-                        logger.warning("[%s] IntegrityError dla URL: %s", source, url)
+                            
+                        # Zapis do SQLite
+                        try:
+                            await save_lead(lead, odoo_id=odoo_id, prompt_version_id=active_prompt_version_id, pending_approval=False)
+                            leads_created_count += 1
+                            stats["leads_new"] += 1
+                        except IntegrityError:
+                            logger.warning("[%s] IntegrityError dla URL: %s", source, url)
                         
                 stats["leads_found"] += leads_found_count
                 
-                # Zapis twardego dowodu w ResearchLog
+                # Zapis twardego dowodu w ResearchLog (z metadanymi Phase 6)
                 log_entry = ResearchLog(
                     account_id=account.id,
                     timestamp=datetime.utcnow(),
@@ -233,9 +279,29 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
                     response_status_code=status_code,
                     leads_found_count=leads_found_count,
                     leads_created_count=leads_created_count,
-                    log_text=f"Skanowanie ukończone. Znaleziono {leads_found_count} leadów, zapisano {leads_created_count}."
+                    grounding_chunks_count=grounding_chunks,
+                    grounding_queries_count=grounding_queries,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    log_text=f"Skanowanie ukończone. Znaleziono {leads_found_count} leadów, zapisano {leads_created_count}." + (" [CIRCUIT BREAKER]" if circuit_triggered else "")
                 )
                 session.add(log_entry)
+
+                # Snapshot analityczny do kolejki (asyncio.Queue → Single Writer)
+                snapshot = RunPerformanceSnapshot(
+                    account_id=account.id,
+                    source=source,
+                    run_date=datetime.utcnow().strftime("%Y-%m-%d"),
+                    leads_generated=leads_created_count,
+                    grounding_chunks_count=grounding_chunks,
+                    grounding_queries_count=grounding_queries,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    api_errors=1 if status_code != 200 else 0,
+                    circuit_breaker_triggered=circuit_triggered,
+                    created_at=datetime.utcnow()
+                )
+                await _analytics_queue.put(snapshot)
                 
             await session.commit()
             
@@ -322,11 +388,19 @@ async def lifespan(app: FastAPI):
         cron_tz,
     )
 
+    # Start analytics queue single writer (Phase 6)
+    writer_task = asyncio.create_task(_analytics_writer_worker())
+    logger.info("Analytics queue writer started.")
+
     yield
 
     # --- shutdown ---
     scheduler.shutdown(wait=False)
     logger.info("Scheduler stopped.")
+    # Stop analytics writer gracefully
+    await _analytics_queue.put(None)
+    await writer_task
+    logger.info("Analytics writer stopped.")
 
 
 # ---------------------------------------------------------------------------
@@ -391,6 +465,171 @@ async def list_leads_session(
         raise HTTPException(status_code=400, detail="limit musi być w zakresie 1–500")
     rows = await get_recent_leads(limit=limit)
     return {"count": len(rows), "leads": rows}
+
+
+# ---------------------------------------------------------------------------
+# API Endpoints - Analytics: Dashboard KPIs (Phase 6)
+# ---------------------------------------------------------------------------
+@app.get("/api/analytics/dashboard", tags=["Analytics"], summary="Dashboard KPIs — Grounding metrics i Token Economy")
+async def get_dashboard_analytics(
+    current_user: Annotated[User, Depends(get_current_user)],
+    account_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Agreguje KPI ze snapshotów i ResearchLog dla dashboardu."""
+    # 7-day window
+    from datetime import timedelta
+    cutoff = datetime.utcnow() - timedelta(days=7)
+    cutoff_str = cutoff.strftime("%Y-%m-%d")
+
+    snap_query = select(
+        func.sum(RunPerformanceSnapshot.leads_generated).label("yield_total"),
+        func.sum(RunPerformanceSnapshot.grounding_chunks_count).label("total_chunks"),
+        func.sum(RunPerformanceSnapshot.grounding_queries_count).label("total_queries"),
+        func.sum(RunPerformanceSnapshot.input_tokens).label("input_tokens_7d"),
+        func.sum(RunPerformanceSnapshot.output_tokens).label("output_tokens_7d"),
+        func.sum(RunPerformanceSnapshot.api_errors).label("api_errors_7d"),
+        func.sum(case((RunPerformanceSnapshot.circuit_breaker_triggered == True, 1), else_=0)).label("circuit_breaker_events"),
+        func.count(RunPerformanceSnapshot.id).label("run_count")
+    ).filter(RunPerformanceSnapshot.run_date >= cutoff_str)
+
+    if account_id is not None:
+        snap_query = snap_query.filter(RunPerformanceSnapshot.account_id == account_id)
+
+    snap_result = await db.execute(snap_query)
+    row = snap_result.one()
+
+    yield_total = row.yield_total or 0
+    total_chunks = row.total_chunks or 0
+    total_queries = row.total_queries or 0
+    input_tokens_7d = row.input_tokens_7d or 0
+    output_tokens_7d = row.output_tokens_7d or 0
+    api_errors_7d = row.api_errors_7d or 0
+    circuit_breaker_events = row.circuit_breaker_events or 0
+    run_count = row.run_count or 0
+
+    yield_per_chunk = round(yield_total / total_chunks, 3) if total_chunks > 0 else 0.0
+    cost_per_run_avg_tokens = round((input_tokens_7d + output_tokens_7d) / run_count, 0) if run_count > 0 else 0
+
+    # Count pending approvals
+    pending_filter = select(func.count(Lead.id)).filter(Lead.pending_approval == True)
+    if account_id is not None:
+        # Filter by account not directly possible on Lead, so skip for now
+        pass
+    pending_result = await db.execute(pending_filter)
+    pending_count = pending_result.scalar() or 0
+
+    return {
+        "yield_total_7d": yield_total,
+        "yield_per_chunk": yield_per_chunk,
+        "total_chunks_analyzed_7d": total_chunks,
+        "total_queries_fired_7d": total_queries,
+        "input_tokens_7d": input_tokens_7d,
+        "output_tokens_7d": output_tokens_7d,
+        "cost_per_run_avg_tokens": cost_per_run_avg_tokens,
+        "api_errors_7d": api_errors_7d,
+        "circuit_breaker_events_7d": circuit_breaker_events,
+        "pending_approval_count": pending_count,
+        "runs_count_7d": run_count
+    }
+
+
+@app.get("/api/leads/pending", tags=["OSINT"], summary="Leady oczekujące na zatwierdzenie (Circuit Breaker)")
+async def get_pending_leads(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Zwraca leady zablokowane przez Circuit Breaker, oczekujące na ręczne zatwierdzenie."""
+    result = await db.execute(
+        select(Lead).filter(Lead.pending_approval == True).order_by(Lead.created_at.desc()).limit(100)
+    )
+    leads = result.scalars().all()
+    return {
+        "count": len(leads),
+        "leads": [
+            {
+                "id": l.id, "tytul": l.tytul, "inwestor": l.inwestor,
+                "lokalizacja": l.lokalizacja, "priorytet": l.priorytet,
+                "url": l.url, "created_at": l.created_at
+            }
+            for l in leads
+        ]
+    }
+
+
+@app.post("/api/leads/{lead_id}/approve", tags=["OSINT"], summary="Zatwierdź lead i wyślij do Odoo")
+async def approve_lead(
+    lead_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Zatwierdza lead z kwarantanny Circuit Breakera i wysyła do Odoo XML-RPC."""
+    result = await db.execute(select(Lead).filter(Lead.id == lead_id).limit(1))
+    lead = result.scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead nie istnieje.")
+    if not lead.pending_approval:
+        raise HTTPException(status_code=400, detail="Lead nie jest w trybie oczekiwania.")
+
+    # Pobieramy mapowanie firmy dla leada na podstawie prompt_version
+    company_id = None
+    user_id = None
+    tag_ids = []
+    team_id = None
+    source_id = None
+
+    if lead.prompt_version_id:
+        acc_result = await db.execute(
+            select(Account)
+            .join(PromptVersion, PromptVersion.account_id == Account.id)
+            .filter(PromptVersion.id == lead.prompt_version_id)
+            .limit(1)
+        )
+        account = acc_result.scalar_one_or_none()
+        if account:
+            company_id = account.odoo_company_id
+            user_id = account.odoo_user_id
+            try:
+                tag_ids = json.loads(account.odoo_tag_ids)
+            except Exception:
+                pass
+            team_id = account.odoo_team_id
+            source_id = account.odoo_source_id
+
+    odoo = get_odoo_client()
+    lead_dict = {
+        "tytul": lead.tytul, "url": lead.url, "lokalizacja": lead.lokalizacja,
+        "inwestor": lead.inwestor, "wykonawca": lead.wykonawca, "zakres": lead.zakres,
+        "uzasadnienie": lead.uzasadnienie, "priorytet": lead.priorytet
+    }
+    
+    try:
+        odoo_id = await asyncio.to_thread(
+            odoo.create_lead,
+            lead_dict,
+            company_id=company_id,
+            user_id=user_id,
+            tag_ids=tag_ids,
+            team_id=team_id,
+            source_id=source_id
+        )
+    except Exception as exc:
+        logger.error("Approve lead Odoo error id=%s: %s", lead_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Błąd integracji Odoo CRM: {exc}"
+        )
+
+    if not odoo_id:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Błąd integracji Odoo CRM — nie udało się utworzyć szansy (brak ID zwrotnego)."
+        )
+
+    lead.odoo_id = odoo_id
+    lead.pending_approval = False
+    await db.commit()
+    return {"approved": True, "lead_id": lead_id, "odoo_id": odoo_id}
 
 
 # ---------------------------------------------------------------------------

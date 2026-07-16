@@ -117,27 +117,38 @@
                 
                 <!-- TAB: DASHBOARD -->
                 <section id="tab-dashboard" class="tab-pane active">
-                    <!-- KPI Cards -->
+                    <!-- KPI Cards (Phase 6: Analytics Architecture) -->
                     <div class="kpi-grid">
                         <div class="kpi-card glass-card">
                             <div class="kpi-icon icon-blue"><i class="fa-solid fa-bullseye"></i></div>
                             <div class="kpi-info">
-                                <h3>Wszystkie Leady</h3>
+                                <h3>Yield (7d)</h3>
                                 <span id="stat-total-leads">0</span>
+                                <small style="color: var(--text-muted); font-size: 11px;">Wygenerowane leady</small>
                             </div>
                         </div>
                         <div class="kpi-card glass-card">
-                            <div class="kpi-icon icon-green"><i class="fa-solid fa-scale-balanced"></i></div>
+                            <div class="kpi-icon icon-green"><i class="fa-solid fa-link"></i></div>
                             <div class="kpi-info">
-                                <h3>Wagi Samochodowe</h3>
-                                <span id="stat-auto-scales">0</span>
+                                <h3>Yield / Chunk</h3>
+                                <span id="stat-yield-per-chunk">0.000</span>
+                                <small style="color: var(--text-muted); font-size: 11px;">Lead na analizowany link</small>
                             </div>
                         </div>
                         <div class="kpi-card glass-card">
-                            <div class="kpi-icon icon-purple"><i class="fa-solid fa-square-check"></i></div>
+                            <div class="kpi-icon icon-purple"><i class="fa-solid fa-magnifying-glass-chart"></i></div>
                             <div class="kpi-info">
-                                <h3>Wysłane do Odoo</h3>
-                                <span id="stat-odoo-leads">0</span>
+                                <h3>Queries (7d)</h3>
+                                <span id="stat-queries-fired">0</span>
+                                <small style="color: var(--text-muted); font-size: 11px;">Zapytania Google</small>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass-card" id="kpi-pending-card" style="display:none;">
+                            <div class="kpi-icon" style="background: rgba(245,158,11,0.15); color:#fbbf24;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                            <div class="kpi-info">
+                                <h3>Kwarantanna</h3>
+                                <span id="stat-pending-count">0</span>
+                                <small style="color: #fbbf24; font-size: 11px;">Circuit Breaker — czeka na zatwierdzenie</small>
                             </div>
                         </div>
                     </div>
@@ -177,6 +188,29 @@
                         </div>
                         <div id="analytics-timeline-chart" class="timeline-chart-container">
                             <div class="loading-state">Ładowanie wykresu aktywności...</div>
+                        </div>
+                    </div>
+
+                    <!-- Pending Leads Alert (Circuit Breaker) -->
+                    <div id="pending-leads-section" class="table-container glass-card hidden" style="margin-bottom: 24px; border: 1px solid rgba(245,158,11,0.3);">
+                        <div class="table-header">
+                            <h3 style="color: #fbbf24;"><i class="fa-solid fa-shield-halved"></i> Kwarantanna: Leady oczekujące na zatwierdzenie</h3>
+                            <small style="color: var(--text-muted);">Circuit Breaker wstrzymał te leady. Sprawdź i zatwierdź ręcznie przed wysłaniem do Odoo.</small>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Tytuł</th>
+                                        <th>Inwestor</th>
+                                        <th>Lokalizacja</th>
+                                        <th>Priorytet</th>
+                                        <th>Akcje</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pending-leads-table-body">
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 

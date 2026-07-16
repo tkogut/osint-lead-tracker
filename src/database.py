@@ -64,10 +64,32 @@ async def init_db() -> None:
                 created_at DATETIME NOT NULL
             )
         """)
+        # Create run_performance_snapshots table
+        _cur.execute("""
+            CREATE TABLE IF NOT EXISTS run_performance_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                source VARCHAR(50) NOT NULL,
+                run_date VARCHAR(10) NOT NULL,
+                leads_generated INTEGER NOT NULL DEFAULT 0,
+                grounding_chunks_count INTEGER NOT NULL DEFAULT 0,
+                grounding_queries_count INTEGER NOT NULL DEFAULT 0,
+                input_tokens INTEGER NOT NULL DEFAULT 0,
+                output_tokens INTEGER NOT NULL DEFAULT 0,
+                api_errors INTEGER NOT NULL DEFAULT 0,
+                circuit_breaker_triggered BOOLEAN NOT NULL DEFAULT 0,
+                created_at DATETIME NOT NULL
+            )
+        """)
         for _sql in [
             "ALTER TABLE leads ADD COLUMN status VARCHAR(50) DEFAULT 'new'",
             "ALTER TABLE leads ADD COLUMN prompt_version_id INTEGER REFERENCES prompt_versions(id)",
             "ALTER TABLE leads ADD COLUMN last_synced_at DATETIME",
+            "ALTER TABLE leads ADD COLUMN pending_approval BOOLEAN DEFAULT 0",
+            "ALTER TABLE research_logs ADD COLUMN grounding_chunks_count INTEGER DEFAULT 0",
+            "ALTER TABLE research_logs ADD COLUMN grounding_queries_count INTEGER DEFAULT 0",
+            "ALTER TABLE research_logs ADD COLUMN input_tokens INTEGER DEFAULT 0",
+            "ALTER TABLE research_logs ADD COLUMN output_tokens INTEGER DEFAULT 0",
         ]:
             try:
                 _cur.execute(_sql)
@@ -91,7 +113,7 @@ async def url_exists(url: str) -> bool:
         return lead is not None
 
 
-async def save_lead(lead_dict: dict, odoo_id: Optional[int] = None, prompt_version_id: Optional[int] = None) -> int:
+async def save_lead(lead_dict: dict, odoo_id: Optional[int] = None, prompt_version_id: Optional[int] = None, pending_approval: bool = False) -> int:
     """Zapisuje leada do SQLite."""
     async with AsyncSessionLocal() as session:
         # Map alternate keys returned by custom prompts
@@ -114,6 +136,7 @@ async def save_lead(lead_dict: dict, odoo_id: Optional[int] = None, prompt_versi
             data_pub=data_pub,
             odoo_id=odoo_id,
             prompt_version_id=prompt_version_id,
+            pending_approval=pending_approval,
             created_at=datetime.utcnow().isoformat()
         )
         session.add(new_lead)
