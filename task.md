@@ -54,6 +54,11 @@
 - Auditor `bd7463c5` → `bd7463c5-3383-4d3e-8db2-7489f3da3884_auditor_handshake.json` ✅ SUCCESS
 - Commit: `d74f53b` → VPS deployed ✅
 
+**Swarm Triad (Scan Specific Campaign):**
+- Builder `7f4eb6cb` → `7f4eb6cb-9643-450c-b41e-13a57e3e289d_builder_handshake.json` ✅ SUCCESS
+- Auditor `e73a5ae7` → `e73a5ae7-38a8-4b19-a2d3-b3b501935e4b_auditor_handshake.json` ✅ SUCCESS
+- Commit: `55596f6` → VPS deployed ✅
+
 ---
 
 ## [Phase 6: Backlog (Wstrzymane / Nie zaplanowane)]
