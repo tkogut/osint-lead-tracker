@@ -59,8 +59,26 @@
 - Auditor `e73a5ae7` → `e73a5ae7-38a8-4b19-a2d3-b3b501935e4b_auditor_handshake.json` ✅ SUCCESS
 - Commit: `55596f6` → VPS deployed ✅
 
+## [Phase 6: Analytics Architecture & Performance Upgrades] ✅ DONE — 2026-07-16
+- [x] **TSK-025**: Implementacja nowej bazy metryk (Yield, Yield/Chunk, Queries) opartej o dynamiczne dane z `grounding_metadata` Gemini, eliminując "próżne wskaźniki".
+- [x] **TSK-026**: Integracja systemu buforowania i zabezpieczeń **Circuit Breaker** (`MAX_LEADS_PER_RUN`) zapobiegającego zatruciu Odoo CRM spamem lub halucynacjami Gemini. Leady trafiają do kwarantanny (`pending_approval`) na dashboardzie.
+- [x] **TSK-027**: Dodanie asynchronicznej kolejki `asyncio.Queue` z dedykowanym workerem (Single Writer) do zapisu snapshotów w bazie SQLite, całkowicie eliminując błędy `database is locked`.
+- [x] **TSK-028**: Zastąpienie sztywnego opisu "Budowa wagi samochodowej" w pozwolenize budowlanych GUNB dynamiczną nazwą kampanii (Account Name).
+- [x] **TSK-029**: Wdrożenie w panelu UI sekcji Kwarantanny z listą oczekujących leadów, podglądem i manualną akceptacją do Odoo (z poprawnym dziedziczeniem mapowań firmy/handlowca i obsługa błędów transakcji).
+
+**Swarm Triad (Analytics & Performance Upgrade):**
+- Builder `1e23a48f` → `1e23a48f-a938-404c-bfe7-ec2774e0103f_builder_handshake.json` ✅ SUCCESS
+- Auditor `49d69000` → `49d69000-026d-41a8-8592-bd84e1567d76_auditor_handshake.json` ✅ SUCCESS
+- Commit: `24f71ab` → VPS deployed ✅
+
+**Swarm Triad (Dynamic GUNB Title):**
+- Builder `8725d757` → `8725d757-71bb-4108-8894-097ce6288579_builder_handshake.json` ✅ SUCCESS
+- Auditor `7c508b9f` → `7c508b9f-cee2-48f2-bc6d-e4a1fa9ad717_auditor_handshake.json` ✅ SUCCESS
+- Commit: `211c6c7` → VPS deployed ✅
+
 ---
 
-## [Phase 6: Backlog (Wstrzymane / Nie zaplanowane)]
+## [Phase 7: Backlog / Oczekiwanie na doładowanie Tokenów API]
+- [ ] **TSK-030 (PLAN-016)**: Wybór aktywnych źródeł wyszukiwania (checkboxy: BZP, Google, GUNB) per kampania z walidacją "Zero-Source" w API oraz dynamicznym wykluczaniem z logów analitycznych.
 - [ ] **TSK-023**: Eksport raportów PDF / CSV z danymi KPI kampanii.
 - [ ] **TSK-024**: Powiadomienia e-mail przy nowych leadach (integracja SMTP).
