@@ -564,10 +564,10 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
                                 nazwa_organu = row[organ_idx].strip() if organ_idx != -1 else ""
                                 city = row[city_idx].strip() if city_idx != -1 else ""
                                 woj = row[woj_idx].strip() if woj_idx != -1 else ""
-                                
+                                campaign_name = account.name if account else "Budowa wagi samochodowej"
                                 lead_data = {
                                     "url": f"https://wyszukiwarka.gunb.gov.pl/wniosek/{urllib.parse.quote(numer_gunb, safe='')}",
-                                    "tytul": f"Budowa wagi samochodowej - {inwestor or 'Inwestor prywatny'}",
+                                    "tytul": f"{campaign_name} - {inwestor or 'Inwestor prywatny'}",
                                     "typ": "lead",
                                     "lokalizacja": f"{city}, woj. {woj}".strip(", "),
                                     "inwestor": inwestor or "Inwestor prywatny (dane w rejestrze RWDZ)",
