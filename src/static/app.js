@@ -422,6 +422,40 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    async function scanAccount(accountId, btn) {
+        const acc = accountsList.find(a => a.id === accountId);
+        const campaignName = acc ? acc.name : `ID ${accountId}`;
+        
+        btn.disabled = true;
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ...`;
+        showToast(`Rozpoczęto skanowanie dla kampanii: ${campaignName}...`, "warning");
+
+        try {
+            const settings = await apiRequest("/api/settings");
+            const tokenSetting = settings.find(s => s.key === "API_TOKEN");
+            const token = tokenSetting ? tokenSetting.value : "";
+            
+            const res = await fetch(`/trigger-osint?account_id=${accountId}`, {
+                method: "POST",
+                headers: { "X-API-Token": token }
+            });
+            const data = await res.json();
+            
+            if (data.triggered) {
+                const s = data.stats;
+                showToast(`Skan kampanii "${campaignName}" ukończony! Znaleziono: ${s.leads_found}, Nowe: ${s.leads_new}, Odoo OK: ${s.odoo_ok}`);
+                loadDashboardData();
+                checkNotificationGate();
+            }
+        } catch (e) {
+            showToast(`Błąd skanowania: ${e.message}`, "error");
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
+
     function renderAccounts(accounts) {
         if (accounts.length === 0) {
             accountsContainer.innerHTML = `<div class="loading-state">Brak aktywnych kampanii. Dodaj pierwszą klikając „Dodaj Kampanię”.</div>`;
@@ -475,6 +509,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                     
                     <div class="account-card-actions">
+                        <button class="btn-primary scan-acc-btn" data-id="${acc.id}" style="padding: 6px 12px; font-size: 13px;">
+                            <i class="fa-solid fa-play"></i> Skanuj
+                        </button>
                         <button class="btn-secondary edit-acc-btn" data-id="${acc.id}">
                             <i class="fa-solid fa-pen-to-square"></i> Edytuj
                         </button>
@@ -487,6 +524,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }).join("");
 
         // Attach listeners
+        document.querySelectorAll(".scan-acc-btn").forEach(btn => {
+            btn.addEventListener("click", () => scanAccount(parseInt(btn.dataset.id), btn));
+        });
         document.querySelectorAll(".edit-acc-btn").forEach(btn => {
             btn.addEventListener("click", () => openAccountModal(parseInt(btn.dataset.id)));
         });
