@@ -2,6 +2,7 @@
   "conversation_id": "05942848-ba6f-4d2a-8d4f-e6eb084666d4",
   "role": "Auditor",
   "status": "SUCCESS",
+  "files_modified": [],
   "issues_found": [],
   "math_consistency_check": "PASSED",
   "timestamp": "2026-07-15T14:15:30Z"

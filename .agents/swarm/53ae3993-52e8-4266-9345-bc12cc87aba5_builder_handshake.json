@@ -1,0 +1,11 @@
+{
+  "conversation_id": "53ae3993-52e8-4266-9345-bc12cc87aba5",
+  "role": "Builder Agent",
+  "status": "SUCCESS",
+  "files_modified": [
+    "README.md"
+  ],
+  "math_consistency_check": "PASSED",
+  "timestamp": "2026-07-15T14:47:38Z",
+  "notes": "docs: add explanatory note about dynamic Odoo mapping campaign settings vs global env fallback params in README.md"
+}
