@@ -94,17 +94,24 @@ async def url_exists(url: str) -> bool:
 async def save_lead(lead_dict: dict, odoo_id: Optional[int] = None, prompt_version_id: Optional[int] = None) -> int:
     """Zapisuje leada do SQLite."""
     async with AsyncSessionLocal() as session:
+        # Map alternate keys returned by custom prompts
+        tytul = lead_dict.get("tytul") or lead_dict.get("tytul_generowany") or lead_dict.get("nazwa_inwestycji") or ""
+        inwestor = lead_dict.get("inwestor") or lead_dict.get("nazwa_inwestora") or ""
+        zakres = lead_dict.get("zakres") or lead_dict.get("opis_szczegolowy") or ""
+        uzasadnienie = lead_dict.get("uzasadnienie") or lead_dict.get("potencjal_handlowy") or ""
+        data_pub = lead_dict.get("data") or lead_dict.get("termin_skladania") or lead_dict.get("data_pub") or ""
+
         new_lead = Lead(
             url=lead_dict.get("url", ""),
-            tytul=lead_dict.get("tytul", ""),
+            tytul=tytul,
             typ=lead_dict.get("typ"),
             lokalizacja=lead_dict.get("lokalizacja"),
-            inwestor=lead_dict.get("inwestor"),
+            inwestor=inwestor,
             wykonawca=lead_dict.get("wykonawca"),
-            zakres=lead_dict.get("zakres"),
-            uzasadnienie=lead_dict.get("uzasadnienie"),
+            zakres=zakres,
+            uzasadnienie=uzasadnienie,
             priorytet=lead_dict.get("priorytet"),
-            data_pub=lead_dict.get("data"),
+            data_pub=data_pub,
             odoo_id=odoo_id,
             prompt_version_id=prompt_version_id,
             created_at=datetime.utcnow().isoformat()

@@ -198,7 +198,29 @@ class OSINTEngine:
         if account and account.custom_prompt:
             custom_prompt = account.custom_prompt + "\n\n"
 
-        prompt = f"""{custom_prompt}Przeanalizuj poniższe ogłoszenie o zamówieniu publicznym i określ, czy dotyczy ono wagi samochodowej (wag samochodowych / najazdowych / stanowisk do ważenia pojazdów) lub odpowiada zdefiniowanym wymaganiom.
+        if account and account.custom_prompt:
+            # Custom campaigns prompt
+            prompt = f"""{custom_prompt}Przeanalizuj poniższe ogłoszenie o zamówieniu publicznym i określ, czy odpowiada ono powyższym wymaganiom.
+
+Szczegóły ogłoszenia:
+- Tytuł: {notice.get('orderObject')}
+- Organizacja: {notice.get('organizationName')} ({notice.get('organizationCity')})
+- CPV: {notice.get('cpvCode')}
+- Numer: {notice.get('noticeNumber')}
+
+Treść ogłoszenia:
+\"\"\"
+{text_content}
+\"\"\"
+
+Wymagania:
+1. Zdecyduj, czy ogłoszenie jest wartościowym leadem zgodnie ze zdefiniowanymi powyżej kryteriami kampanii.
+2. Jeśli ogłoszenie NIE spełnia kryteriów kampanii, zwróć wyłącznie słowo: ODRZUĆ.
+3. Jeśli ogłoszenie spełnia kryteria, zwróć dane leada w formacie JSON zgodnym ze strukturą opisaną powyżej.
+Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników markdown."""
+        else:
+            # Default prompt for car scales (Wagi Samochodowe)
+            prompt = f"""Przeanalizuj poniższe ogłoszenie o zamówieniu publicznym i określ, czy dotyczy ono wagi samochodowej (wag samochodowych / najazdowych / stanowisk do ważenia pojazdów) lub odpowiada zdefiniowanym wymaganiom.
 
 Szczegóły ogłoszenia:
 - Tytuł: {notice.get('orderObject')}
