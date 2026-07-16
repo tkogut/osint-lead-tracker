@@ -49,6 +49,11 @@
 - Auditor `05942848` → `05942848-ba6f-4d2a-8d4f-e6eb084666d4_auditor_handshake.json` ⚠️ 1 BUG (brak statusu w database.py) wykryty i naprawiony przez Coordinator
 - Commit: `211c964` → VPS deployed ✅
 
+**Swarm Triad (Custom Campaigns Fix):**
+- Builder `d42568ec` → `d42568ec-abf2-4796-8fdf-b21a0d1e9b55_builder_handshake.json` ✅ SUCCESS
+- Auditor `bd7463c5` → `bd7463c5-3383-4d3e-8db2-7489f3da3884_auditor_handshake.json` ✅ SUCCESS
+- Commit: `d74f53b` → VPS deployed ✅
+
 ---
 
 ## [Phase 6: Backlog (Wstrzymane / Nie zaplanowane)]
