@@ -5,6 +5,16 @@ Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w t
 
 ---
 
+## [1.6.0] - 2026-07-16
+
+### Added
+- **Architektura Analityczna Dashboardu (Faza 6)**:
+  - Wdrożono bezpiecznik **Circuit Breaker** (oparty na bazie danych limit `MAX_LEADS_PER_RUN`) zapobiegający zatruciu Odoo CRM przez anomalie lub halucynacje LLM. Leady przekraczające limit trafiają do kwarantanny (`pending_approval`).
+  - Dodano asynchroniczną kolejkę zapisu `asyncio.Queue` z dedykowanym workerem (Single Writer) eliminującą błędy SQLite `database is locked`.
+  - Wprowadzono precyzyjną analitykę zużycia tokenów Gemini (Input/Output Tokens) oraz metryk Google Grounding (`grounding_chunks`, `web_search_queries`), eliminując martwe wskaźniki (vanity metrics).
+  - Wdrożono sekcję **Kwarantanny** w panelu UI Dashboard wraz z możliwością manualnego przeglądania, odrzucania oraz akceptacji leadów (z poprawnym pobieraniem mapowania multi-company danej kampanii i zabezpieczeniem przed utratą danych w CRM).
+  - Dodano możliwość manualnego uruchamiania skanowania dla pojedynczej, wybranej kampanii bezpośrednio z kart w zakładce "Kampanie".
+
 ## [1.5.0] - 2026-07-15
 
 ### Added

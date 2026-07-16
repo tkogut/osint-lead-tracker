@@ -117,7 +117,7 @@ Liveness probe zwracający stan działania mikroserwisu oraz datę kolejnego aut
   {
     "status": "ok",
     "service": "osint-lead-tracker",
-    "version": "1.5.0",
+    "version": "1.6.0",
     "scheduler": "running",
     "next_run": "2026-07-15T06:00:00+02:00"
   }
@@ -159,6 +159,18 @@ Zwraca historię modyfikacji promptów wraz ze wskaźnikami konwersji i sprzeda�
 
 ### 7. `POST /api/leads/sync-crm`
 Uruchamia ręczną synchronizację statusów szans z Odoo.
+* **Autoryzacja**: Aktywna sesja administratora.
+
+### 8. `GET /api/analytics/dashboard`
+Zwraca statystyki wydajności (Yield 7d, Yield per Chunk, zapytania Google Grounding, zużycie tokenów input/output oraz zdarzenia kwarantanny Circuit Breaker).
+* **Autoryzacja**: Aktywna sesja administratora.
+
+### 9. `GET /api/leads/pending`
+Zwraca listę leadów zatrzymanych w kwarantannie przez Circuit Breaker (oczekujących na zatwierdzenie).
+* **Autoryzacja**: Aktywna sesja administratora.
+
+### 10. `POST /api/leads/{lead_id}/approve`
+Zatwierdza lead z kwarantanny, przesyła go do odpowiedniej firmy w Odoo CRM na podstawie mapowania kampanii i oznacza jako zaakceptowany.
 * **Autoryzacja**: Aktywna sesja administratora.
 
 ---
