@@ -127,7 +127,7 @@ async def get_current_user(
 # ---------------------------------------------------------------------------
 # Core pipeline (shared between scheduler and manual trigger)
 # ---------------------------------------------------------------------------
-async def run_osint_pipeline() -> dict[str, Any]:
+async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]:
     """
     Uruchamia wyszukiwanie dla wszystkich aktywnych kont (kampanii).
     Zapisuje wyniki do bazy danych, logi (ResearchLog) i przekazuje leady do Odoo.
@@ -146,9 +146,14 @@ async def run_osint_pipeline() -> dict[str, Any]:
     }
     
     async with AsyncSessionLocal() as session:
-        # Pobieramy aktywne konta
-        result = await session.execute(select(Account).filter(Account.is_active == True))
-        accounts = result.scalars().all()
+        if account_id is not None:
+            # Skanujemy tylko tę konkretną kampanię (nawet jeśli nieaktywna, na żądanie)
+            result = await session.execute(select(Account).filter(Account.id == account_id))
+            accounts = result.scalars().all()
+        else:
+            # Pobieramy aktywne konta
+            result = await session.execute(select(Account).filter(Account.is_active == True))
+            accounts = result.scalars().all()
         
         for account in accounts:
             logger.info("Skanowanie dla konta: %s (ID: %s)", account.name, account.id)
@@ -357,9 +362,15 @@ async def health() -> dict:
 
 
 @app.post("/trigger-osint", tags=["OSINT"], summary="Ręczne uruchomienie skanu (X-API-Token / Sesja)")
-async def trigger_osint(_token: Annotated[str, Depends(verify_token_or_session)]) -> dict:
-    logger.info("Manual trigger via /trigger-osint")
-    stats = await run_osint_pipeline()
+async def trigger_osint(
+    _token: Annotated[str, Depends(verify_token_or_session)],
+    account_id: Optional[int] = None
+) -> dict:
+    if account_id is not None:
+        logger.info("Manual trigger via /trigger-osint for account_id=%s", account_id)
+    else:
+        logger.info("Manual trigger via /trigger-osint for all accounts")
+    stats = await run_osint_pipeline(account_id=account_id)
     return {"triggered": True, "stats": stats}
 
 
