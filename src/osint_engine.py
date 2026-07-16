@@ -285,7 +285,7 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
             logger.error("Błąd podczas weryfikacji ogłoszenia BZP %s: %s", notice.get("noticeNumber"), exc)
             return None
 
-    def _search_bzp(self, start_date: str, today_date: str, account: Optional[Any] = None) -> Tuple[List[dict], int, str]:
+    def _search_bzp(self, start_date: str, today_date: str, account: Optional[Any] = None) -> Tuple[List[dict], int, str, int, int, int, int]:
         """Przeszukuje bazę e-Zamówień (BZP API)."""
         logger.info("e-Zamówienia API: start skanowania (%s do %s)…", start_date, today_date)
         
@@ -338,9 +338,9 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
 
         response_hash = hashlib.sha256(combined_responses).hexdigest()
         logger.info("e-Zamówienia API: ukończono. Znaleziono i zweryfikowano %d lead(ów)", len(leads))
-        return leads, last_status_code, response_hash
+        return leads, last_status_code, response_hash, 0, 0, 0, 0
 
-    def _search_google(self, start_date: str, today_date: str, account: Optional[Any] = None) -> Tuple[List[dict], int, str]:
+    def _search_google(self, start_date: str, today_date: str, account: Optional[Any] = None) -> Tuple[List[dict], int, str, int, int, int, int]:
         """Przeszukuje publiczny internet za pomocą Google Search Grounding."""
         logger.info("Google Search Grounding: start skanowania…")
         
@@ -390,15 +390,38 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
             raw_text = response.text or ""
             leads = _parse_leads(raw_text)
             response_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
-            logger.info("Google Search Grounding: ukończono. Znaleziono %d lead(ów)", len(leads))
-            return leads, 200, response_hash
+
+            # Extract grounding metadata and token usage
+            grounding_chunks = 0
+            grounding_queries = 0
+            input_tokens = 0
+            output_tokens = 0
+
+            if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                input_tokens = getattr(response.usage_metadata, 'prompt_token_count', 0) or 0
+                output_tokens = getattr(response.usage_metadata, 'candidates_token_count', 0) or 0
+
+            if hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                gm = getattr(candidate, 'grounding_metadata', None)
+                if gm:
+                    chunks = getattr(gm, 'grounding_chunks', []) or []
+                    grounding_chunks = len(chunks)
+                    queries = getattr(gm, 'web_search_queries', []) or []
+                    grounding_queries = len(queries)
+
+            logger.info(
+                "Google Search Grounding: ukończono. Znaleziono %d lead(ów), chunks=%d, queries=%d, in_tok=%d, out_tok=%d",
+                len(leads), grounding_chunks, grounding_queries, input_tokens, output_tokens
+            )
+            return leads, 200, response_hash, grounding_chunks, grounding_queries, input_tokens, output_tokens
 
         except Exception as exc:
             logger.error("Google Search Grounding FAILED: %s", exc, exc_info=True)
             err_hash = hashlib.sha256(str(exc).encode("utf-8")).hexdigest()
-            return [], 500, err_hash
+            return [], 500, err_hash, 0, 0, 0, 0
 
-    def _search_gunb(self, start_date: str, today_date: str, account: Optional[Any] = None) -> Tuple[List[dict], int, str]:
+    def _search_gunb(self, start_date: str, today_date: str, account: Optional[Any] = None) -> Tuple[List[dict], int, str, int, int, int, int]:
         """
         Pobiera i analizuje rejestr pozwoleń na budowę RWDZ (GUNB).
         """
@@ -436,13 +459,13 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
             if r.status_code != 200:
                 logger.error("Błąd pobierania strony GUNB: %s", r.status_code)
                 err_hash = hashlib.sha256(f"status_{r.status_code}".encode("utf-8")).hexdigest()
-                return [], r.status_code, err_hash
+                return [], r.status_code, err_hash, 0, 0, 0, 0
             
             links = re.findall(r'href="([^"]+\.zip)"', r.text)
         except Exception as e:
             logger.error("Wyjątek podczas pobierania strony GUNB: %s", e)
             err_hash = hashlib.sha256(str(e).encode("utf-8")).hexdigest()
-            return [], 500, err_hash
+            return [], 500, err_hash, 0, 0, 0, 0
 
         leads = []
         updated_cache = {}
@@ -568,29 +591,29 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
 
         response_hash = hashlib.sha256(combined_headers.encode("utf-8")).hexdigest()
         logger.info("GUNB RWDZ: ukończono. Wykryto %d nowych lead(ów)", len(leads))
-        return leads, last_status_code, response_hash
+        return leads, last_status_code, response_hash, 0, 0, 0, 0
 
     def run_search_for_account(
         self,
         account: Any
-    ) -> dict[str, tuple[list[dict], int, str]]:
+    ) -> dict[str, tuple[list[dict], int, str, int, int, int, int]]:
         """Uruchamia wyszukiwanie dla konkretnego konta/kampanii."""
         today_str, start_str = get_date_limits()
         logger.info("OSINT Account Search START for '%s' (%s do %s)", account.name, start_str, today_str)
 
         # 1. BZP API
-        bzp_leads, bzp_status, bzp_hash = self._search_bzp(start_str, today_str, account=account)
+        bzp_leads, bzp_status, bzp_hash, bzp_chunks, bzp_queries, bzp_in_tok, bzp_out_tok = self._search_bzp(start_str, today_str, account=account)
 
         # 2. Google Search Grounding
-        google_leads, google_status, google_hash = self._search_google(start_str, today_str, account=account)
+        google_leads, google_status, google_hash, google_chunks, google_queries, google_in_tok, google_out_tok = self._search_google(start_str, today_str, account=account)
 
         # 3. GUNB RWDZ
-        gunb_leads, gunb_status, gunb_hash = self._search_gunb(start_str, today_str, account=account)
+        gunb_leads, gunb_status, gunb_hash, gunb_chunks, gunb_queries, gunb_in_tok, gunb_out_tok = self._search_gunb(start_str, today_str, account=account)
 
         return {
-            "BZP": (bzp_leads, bzp_status, bzp_hash),
-            "Google": (google_leads, google_status, google_hash),
-            "GUNB": (gunb_leads, gunb_status, gunb_hash)
+            "BZP": (bzp_leads, bzp_status, bzp_hash, bzp_chunks, bzp_queries, bzp_in_tok, bzp_out_tok),
+            "Google": (google_leads, google_status, google_hash, google_chunks, google_queries, google_in_tok, google_out_tok),
+            "GUNB": (gunb_leads, gunb_status, gunb_hash, gunb_chunks, gunb_queries, gunb_in_tok, gunb_out_tok)
         }
 
     def run_search(self) -> list[dict]:
@@ -598,9 +621,9 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
         today_str, start_str = get_date_limits()
         logger.info("OSINT Pipeline START (%s do %s)", start_str, today_str)
 
-        bzp_leads, _, _ = self._search_bzp(start_str, today_str)
-        google_leads, _, _ = self._search_google(start_str, today_str)
-        gunb_leads, _, _ = self._search_gunb(start_str, today_str)
+        bzp_leads, _, _, _, _, _, _ = self._search_bzp(start_str, today_str)
+        google_leads, _, _, _, _, _, _ = self._search_google(start_str, today_str)
+        gunb_leads, _, _, _, _, _, _ = self._search_gunb(start_str, today_str)
 
         # Łączenie i deduplikacja
         all_leads = []

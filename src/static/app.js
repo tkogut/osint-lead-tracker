@@ -227,13 +227,42 @@ document.addEventListener("DOMContentLoaded", () => {
     async function loadAnalyticsKPIs() {
         try {
             const kpis = await apiRequest("/api/analytics/kpis");
-            if (!kpis) return;
-            
-            document.getElementById("stat-total-scans").textContent = kpis.total_scans;
-            document.getElementById("stat-success-rate").textContent = `${kpis.success_rate}%`;
-            document.getElementById("stat-failed-scans").textContent = kpis.failed_scans;
+            if (kpis) {
+                document.getElementById("stat-total-scans").textContent = kpis.total_scans;
+                document.getElementById("stat-success-rate").textContent = `${kpis.success_rate}%`;
+                document.getElementById("stat-failed-scans").textContent = kpis.failed_scans;
+            }
         } catch (e) {
             console.error("Error loading KPIs", e);
+        }
+
+        // Fetch Phase 6 analytics KPIs (Yield 7d, Yield/Chunk, Queries, Quarantine)
+        try {
+            const kpis = await apiRequest("/api/analytics/dashboard");
+            if (kpis) {
+                const yieldPerChunkEl = document.getElementById("stat-yield-per-chunk");
+                const queriesEl = document.getElementById("stat-queries-fired");
+                const pendingEl = document.getElementById("stat-pending-count");
+                const pendingCard = document.getElementById("kpi-pending-card");
+                if (yieldPerChunkEl) yieldPerChunkEl.textContent = kpis.yield_per_chunk !== undefined ? kpis.yield_per_chunk : "0.000";
+                if (queriesEl) queriesEl.textContent = kpis.total_queries_fired_7d !== undefined ? kpis.total_queries_fired_7d : "0";
+                if (pendingEl) pendingEl.textContent = kpis.pending_approval_count !== undefined ? kpis.pending_approval_count : "0";
+                if (pendingCard) {
+                    if (kpis.pending_approval_count > 0) {
+                        pendingCard.style.display = "";
+                    } else {
+                        pendingCard.style.display = "none";
+                    }
+                }
+                if (kpis.pending_approval_count > 0) {
+                    loadPendingLeads();
+                } else {
+                    const section = document.getElementById("pending-leads-section");
+                    if (section) section.classList.add("hidden");
+                }
+            }
+        } catch(e) {
+            console.error("Error loading Phase 6 dashboard KPIs", e);
         }
     }
 
@@ -358,17 +387,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (leads.length === 0) {
             leadsTableBody.innerHTML = `<tr><td colspan="8" class="loading-state">Brak znalezionych leadów.</td></tr>`;
             statTotalLeads.textContent = "0";
-            statAutoScales.textContent = "0";
-            statOdooLeads.textContent = "0";
+            if (statAutoScales) statAutoScales.textContent = "0";
+            if (statOdooLeads) statOdooLeads.textContent = "0";
             return;
         }
 
         statTotalLeads.textContent = leads.length;
-        statAutoScales.textContent = leads.filter(l => 
-            (l.tytul || '').toLowerCase().includes("waga") || 
-            (l.zakres || '').toLowerCase().includes("waga")
-        ).length;
-        statOdooLeads.textContent = leads.filter(l => l.odoo_id !== null).length;
 
         leadsTableBody.innerHTML = leads.map(l => {
             const dateStr = l.created_at ? l.created_at.slice(0, 10) : "N/A";
@@ -419,6 +443,57 @@ document.addEventListener("DOMContentLoaded", () => {
             populateCampaignFilter(accounts);
         } catch (e) {
             accountsContainer.innerHTML = `<div class="loading-state text-error">Nie udało się załadować kont.</div>`;
+        }
+    }
+
+    async function loadPendingLeads() {
+        const section = document.getElementById("pending-leads-section");
+        const tbody = document.getElementById("pending-leads-table-body");
+        if (!section || !tbody) return;
+        try {
+            const data = await apiRequest("/api/leads/pending");
+            if (data.count === 0) {
+                section.classList.add("hidden");
+                return;
+            }
+            section.classList.remove("hidden");
+            tbody.innerHTML = data.leads.map(l => `
+                <tr>
+                    <td><strong>${l.tytul}</strong></td>
+                    <td>${l.inwestor || 'N/A'}</td>
+                    <td>${l.lokalizacja || 'N/A'}</td>
+                    <td><span class="priority-${l.priorytet}">${l.priorytet}</span></td>
+                    <td>
+                        <button class="btn-primary approve-lead-btn" data-id="${l.id}" style="padding: 5px 10px; font-size: 12px;">
+                            <i class="fa-solid fa-check"></i> Zatwierdź
+                        </button>
+                        <a href="${l.url}" target="_blank" class="btn-secondary" style="padding: 5px 10px; font-size: 12px; text-decoration: none; margin-left: 4px;">
+                            <i class="fa-solid fa-external-link"></i>
+                        </a>
+                    </td>
+                </tr>
+            `).join("");
+            document.querySelectorAll(".approve-lead-btn").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    const leadId = parseInt(btn.dataset.id);
+                    btn.disabled = true;
+                    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>`;
+                    try {
+                        const res = await apiRequest(`/api/leads/${leadId}/approve`, { method: "POST" });
+                        if (res.approved) {
+                            showToast(`Lead #${leadId} zatwierdzony i wysłany do Odoo (ID: ${res.odoo_id || 'brak'}).`);
+                            loadPendingLeads();
+                            loadDashboardData();
+                        }
+                    } catch(e) {
+                        showToast(`Błąd zatwierdzania: ${e.message}`, "error");
+                        btn.disabled = false;
+                        btn.innerHTML = `<i class="fa-solid fa-check"></i> Zatwierdź`;
+                    }
+                });
+            });
+        } catch(e) {
+            section.classList.add("hidden");
         }
     }
 
