@@ -151,15 +151,15 @@ class OdooClient:
         # Dynamiczne mapowanie Odoo
         if company_id:
             vals["company_id"] = company_id
-        if user_id is not None:
-            vals["user_id"] = user_id
+        
+        # Odoo Many2one fields - must be False (not None) to explicitly clear/remain empty
+        vals["user_id"] = user_id if user_id else False
+        vals["team_id"] = team_id if team_id else False
+        vals["source_id"] = source_id if source_id else False
+
         if tag_ids:
             # Mapowanie M2M Odoo
             vals["tag_ids"] = [(6, 0, tag_ids)]
-        if team_id:
-            vals["team_id"] = team_id
-        if source_id:
-            vals["source_id"] = source_id
 
         if lead.get("email"):
             vals["email_from"] = lead["email"]
