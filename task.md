@@ -80,5 +80,3 @@
 
 ## [Phase 7: Backlog / Oczekiwanie na doładowanie Tokenów API]
 - [ ] **TSK-030 (PLAN-016)**: Wybór aktywnych źródeł wyszukiwania (checkboxy: BZP, Google, GUNB) per kampania z walidacją "Zero-Source" w API oraz dynamicznym wykluczaniem z logów analitycznych.
-- [ ] **TSK-023**: Eksport raportów PDF / CSV z danymi KPI kampanii.
-- [ ] **TSK-024**: Powiadomienia e-mail przy nowych leadach (integracja SMTP).
