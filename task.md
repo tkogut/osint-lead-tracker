@@ -86,3 +86,11 @@
 - Auditor `db4ec13c` → `db4ec13c-820d-4e86-ab2d-cd58d2370194_auditor_handshake.json` ✅ SUCCESS
 - Commit: `6dd39da` → Remote pushed ✅
 
+---
+
+## [Phase 8: Hybrydowa Architektura OSINT & Modularne Wtyczki] (W trakcie)
+- [ ] **TSK-031 (PLAN-017)**: Tabela `visited_urls` w SQLite & deduplikacja Tier 0 (Pre-LLM) zapobiegająca zbędnym wywołaniom HTTP/Gemini.
+- [ ] **TSK-032 (PLAN-017)**: Abstrakcyjna klasa bazowa `BaseScraper`, czyszczenie DOM `DOMSanitizer` (Trafilatura) oraz wtyczka `AutomatykaScraper` (`curl_cffi` impersonate Chrome).
+- [ ] **TSK-033 (PLAN-017)**: Wzorzec Strategii i Fabryki w `OSINTEngine` z bezwzględnym zachowaniem 100% kompatybilności dla BZP, GUNB i Google Search Grounding.
+
+
