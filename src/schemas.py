@@ -3,7 +3,7 @@ schemas.py — Schematy walidacji Pydantic dla interfejsów API Lead Dashboard.
 """
 
 from typing import List, Optional, Text
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class LoginRequest(BaseModel):
@@ -17,6 +17,7 @@ class AccountCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     target_cpvs: List[str] = []
     target_keywords: List[str] = []
+    enabled_sources: List[str] = Field(default_factory=lambda: ["BZP", "Google", "GUNB"])
     custom_prompt: Optional[str] = None
     llm_model: str = "gemini-2.5-flash"
     llm_temperature: float = Field(0.1, ge=0.0, le=2.0)
@@ -31,6 +32,13 @@ class AccountCreate(BaseModel):
     odoo_source_id: Optional[int] = None
     is_active: bool = True
 
+    @field_validator("enabled_sources")
+    @classmethod
+    def validate_enabled_sources(cls, v: List[str]) -> List[str]:
+        if not v or len(v) == 0:
+            raise ValueError("Musi być wybrane co najmniej jedno źródło wyszukiwania.")
+        return v
+
 
 class AccountResponse(BaseModel):
     """Model odpowiedzi profilu konta/kampanii."""
@@ -38,6 +46,7 @@ class AccountResponse(BaseModel):
     name: str
     target_cpvs: List[str]
     target_keywords: List[str]
+    enabled_sources: List[str]
     custom_prompt: Optional[str]
     llm_model: str
     llm_temperature: float

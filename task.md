@@ -78,5 +78,10 @@
 
 ---
 
-## [Phase 7: Backlog / Oczekiwanie na doładowanie Tokenów API]
-- [ ] **TSK-030 (PLAN-016)**: Wybór aktywnych źródeł wyszukiwania (checkboxy: BZP, Google, GUNB) per kampania z walidacją "Zero-Source" w API oraz dynamicznym wykluczaniem z logów analitycznych.
+## [Phase 7: Konfigurowalne Źródła Wyszukiwania w Kampaniach] ✅ DONE — 2026-07-21
+- [x] **TSK-030 (PLAN-016)**: Wybór aktywnych źródeł wyszukiwania (checkboxy: BZP, Google, GUNB) per kampania z walidacją "Zero-Source" w API oraz dynamicznym wykluczaniem z logów analitycznych.
+
+**Swarm Triad (Campaign Search Sources):**
+- Builder `db4ec13c` → `db4ec13c-820d-4e86-ab2d-cd58d2370194_builder_handshake.json` ✅ SUCCESS
+- Auditor `db4ec13c` → `db4ec13c-820d-4e86-ab2d-cd58d2370194_auditor_handshake.json` ✅ SUCCESS
+

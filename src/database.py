@@ -90,6 +90,7 @@ async def init_db() -> None:
             "ALTER TABLE research_logs ADD COLUMN grounding_queries_count INTEGER DEFAULT 0",
             "ALTER TABLE research_logs ADD COLUMN input_tokens INTEGER DEFAULT 0",
             "ALTER TABLE research_logs ADD COLUMN output_tokens INTEGER DEFAULT 0",
+            "ALTER TABLE accounts ADD COLUMN enabled_sources TEXT DEFAULT '[\"BZP\", \"Google\", \"GUNB\"]'",
         ]:
             try:
                 _cur.execute(_sql)

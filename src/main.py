@@ -753,11 +753,17 @@ async def get_accounts(
     
     resp = []
     for acc in accounts:
+        try:
+            enabled_sources = json.loads(acc.enabled_sources) if acc.enabled_sources else ["BZP", "Google", "GUNB"]
+        except Exception:
+            enabled_sources = ["BZP", "Google", "GUNB"]
+
         resp.append(AccountResponse(
             id=acc.id,
             name=acc.name,
             target_cpvs=json.loads(acc.target_cpvs),
             target_keywords=json.loads(acc.target_keywords),
+            enabled_sources=enabled_sources,
             custom_prompt=acc.custom_prompt,
             llm_model=acc.llm_model,
             llm_temperature=acc.llm_temperature,
@@ -786,6 +792,7 @@ async def create_account(
         name=req.name,
         target_cpvs=json.dumps(req.target_cpvs),
         target_keywords=json.dumps(req.target_keywords),
+        enabled_sources=json.dumps(req.enabled_sources),
         custom_prompt=req.custom_prompt,
         llm_model=req.llm_model,
         llm_temperature=req.llm_temperature,
@@ -801,11 +808,17 @@ async def create_account(
     await db.commit()
     await db.refresh(new_acc)
     
+    try:
+        enabled_sources = json.loads(new_acc.enabled_sources) if new_acc.enabled_sources else ["BZP", "Google", "GUNB"]
+    except Exception:
+        enabled_sources = ["BZP", "Google", "GUNB"]
+
     return AccountResponse(
         id=new_acc.id,
         name=new_acc.name,
         target_cpvs=json.loads(new_acc.target_cpvs),
         target_keywords=json.loads(new_acc.target_keywords),
+        enabled_sources=enabled_sources,
         custom_prompt=new_acc.custom_prompt,
         llm_model=new_acc.llm_model,
         llm_temperature=new_acc.llm_temperature,
@@ -834,6 +847,7 @@ async def update_account(
     acc.name = req.name
     acc.target_cpvs = json.dumps(req.target_cpvs)
     acc.target_keywords = json.dumps(req.target_keywords)
+    acc.enabled_sources = json.dumps(req.enabled_sources)
     # Wersjonowanie promptu
     if req.custom_prompt and req.custom_prompt != acc.custom_prompt:
         last_ver_result = await db.execute(
@@ -860,11 +874,17 @@ async def update_account(
     
     await db.commit()
     
+    try:
+        enabled_sources = json.loads(acc.enabled_sources) if acc.enabled_sources else ["BZP", "Google", "GUNB"]
+    except Exception:
+        enabled_sources = ["BZP", "Google", "GUNB"]
+
     return AccountResponse(
         id=acc.id,
         name=acc.name,
         target_cpvs=json.loads(acc.target_cpvs),
         target_keywords=json.loads(acc.target_keywords),
+        enabled_sources=enabled_sources,
         custom_prompt=acc.custom_prompt,
         llm_model=acc.llm_model,
         llm_temperature=acc.llm_temperature,

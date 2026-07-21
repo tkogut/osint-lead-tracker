@@ -44,6 +44,7 @@ class Account(Base):
     # Parametry wyszukiwania (przechowywane jako JSON-serialized strings)
     target_cpvs = Column(Text, nullable=False, default="[]")
     target_keywords = Column(Text, nullable=False, default="[]")
+    enabled_sources = Column(Text, nullable=False, default='["BZP", "Google", "GUNB"]')
     
     # Konfiguracja LLM per konto
     custom_prompt = Column(Text, nullable=True)

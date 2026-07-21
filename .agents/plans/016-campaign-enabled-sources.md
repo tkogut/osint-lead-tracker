@@ -1,7 +1,7 @@
 # PLAN-016: Konfigurowalne Źródła Wyszukiwania w Kampaniach (Campaign Search Sources)
 
-**Status:** PLANNED / PAUSED (Oczekiwanie na nową paczkę tokenów API)  
-**Data planowania:** 2026-07-16  
+**Status:** COMPLETED / DONE  
+**Data realizacji:** 2026-07-21  
 
 ---
 

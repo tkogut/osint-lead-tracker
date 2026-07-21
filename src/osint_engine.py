@@ -601,20 +601,33 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
         today_str, start_str = get_date_limits()
         logger.info("OSINT Account Search START for '%s' (%s do %s)", account.name, start_str, today_str)
 
+        enabled_sources = ["BZP", "Google", "GUNB"]
+        if hasattr(account, "enabled_sources") and account.enabled_sources:
+            try:
+                if isinstance(account.enabled_sources, str):
+                    parsed = json.loads(account.enabled_sources)
+                else:
+                    parsed = account.enabled_sources
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    enabled_sources = parsed
+            except Exception:
+                pass
+
+        results = {}
+
         # 1. BZP API
-        bzp_leads, bzp_status, bzp_hash, bzp_chunks, bzp_queries, bzp_in_tok, bzp_out_tok = self._search_bzp(start_str, today_str, account=account)
+        if "BZP" in enabled_sources:
+            results["BZP"] = self._search_bzp(start_str, today_str, account=account)
 
         # 2. Google Search Grounding
-        google_leads, google_status, google_hash, google_chunks, google_queries, google_in_tok, google_out_tok = self._search_google(start_str, today_str, account=account)
+        if "Google" in enabled_sources:
+            results["Google"] = self._search_google(start_str, today_str, account=account)
 
         # 3. GUNB RWDZ
-        gunb_leads, gunb_status, gunb_hash, gunb_chunks, gunb_queries, gunb_in_tok, gunb_out_tok = self._search_gunb(start_str, today_str, account=account)
+        if "GUNB" in enabled_sources:
+            results["GUNB"] = self._search_gunb(start_str, today_str, account=account)
 
-        return {
-            "BZP": (bzp_leads, bzp_status, bzp_hash, bzp_chunks, bzp_queries, bzp_in_tok, bzp_out_tok),
-            "Google": (google_leads, google_status, google_hash, google_chunks, google_queries, google_in_tok, google_out_tok),
-            "GUNB": (gunb_leads, gunb_status, gunb_hash, gunb_chunks, gunb_queries, gunb_in_tok, gunb_out_tok)
-        }
+        return results
 
     def run_search(self) -> list[dict]:
         """Fallback kompatybilności wstecznej dla starszych skryptów."""

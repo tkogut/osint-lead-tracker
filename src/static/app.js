@@ -540,6 +540,7 @@ document.addEventListener("DOMContentLoaded", () => {
         accountsContainer.innerHTML = accounts.map(acc => {
             const cpvs = acc.target_cpvs.join(", ") || "Brak";
             const keywords = acc.target_keywords.join(", ") || "Brak";
+            const sourcesDisplay = acc.enabled_sources && acc.enabled_sources.length > 0 ? acc.enabled_sources.join(", ") : "BZP, Google, GUNB";
             const statusBadge = acc.is_active 
                 ? `<span class="badge badge-active">Aktywna</span>` 
                 : `<span class="badge badge-inactive">Nieaktywna</span>`;
@@ -564,6 +565,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="detail-row">
                             <span>Słowa kluczowe:</span>
                             <span title="${keywords}">${keywords.length > 25 ? keywords.slice(0, 25) + "..." : keywords}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span>Źródła:</span>
+                            <span>${sourcesDisplay}</span>
                         </div>
                         <div class="detail-row">
                             <span>Odoo Company ID:</span>
@@ -630,6 +635,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.getElementById("acc-max-tokens").value = acc.llm_max_tokens;
                 document.getElementById("acc-cpvs").value = acc.target_cpvs.join(", ");
                 document.getElementById("acc-keywords").value = acc.target_keywords.join(", ");
+                
+                const sources = acc.enabled_sources || ["BZP", "Google", "GUNB"];
+                document.getElementById("src-bzp").checked = sources.includes("BZP");
+                document.getElementById("src-gunb").checked = sources.includes("GUNB");
+                document.getElementById("src-google").checked = sources.includes("Google");
+
                 document.getElementById("acc-company-id").value = acc.odoo_company_id || "";
                 document.getElementById("acc-user-id").value = acc.odoo_user_id !== null ? acc.odoo_user_id : "";
                 document.getElementById("acc-tag-ids").value = acc.odoo_tag_ids.join(", ");
@@ -646,6 +657,9 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         } else {
             modalTitle.textContent = "Dodaj Nową Kampanię";
+            document.getElementById("src-bzp").checked = true;
+            document.getElementById("src-gunb").checked = true;
+            document.getElementById("src-google").checked = true;
             const defaultPromptData = await apiRequest("/api/settings/default-prompt");
             document.getElementById("acc-prompt").value = defaultPromptData ? defaultPromptData.default_prompt : "";
         }
@@ -719,6 +733,17 @@ document.addEventListener("DOMContentLoaded", () => {
         const accountId = accountIdInput.value;
         const cpvs = document.getElementById("acc-cpvs").value.split(",").map(s => s.trim()).filter(Boolean);
         const keywords = document.getElementById("acc-keywords").value.split(",").map(s => s.trim()).filter(Boolean);
+        
+        const enabledSources = [];
+        if (document.getElementById("src-bzp").checked) enabledSources.push("BZP");
+        if (document.getElementById("src-gunb").checked) enabledSources.push("GUNB");
+        if (document.getElementById("src-google").checked) enabledSources.push("Google");
+
+        if (enabledSources.length === 0) {
+            showToast("Wybierz co najmniej jedno źródło wyszukiwania.", "error");
+            return;
+        }
+
         const tags = document.getElementById("acc-tag-ids").value.split(",").map(s => parseInt(s.trim())).filter(n => !isNaN(n));
         
         const companyIdVal = document.getElementById("acc-company-id").value;
@@ -730,6 +755,7 @@ document.addEventListener("DOMContentLoaded", () => {
             name: document.getElementById("acc-name").value,
             target_cpvs: cpvs,
             target_keywords: keywords,
+            enabled_sources: enabledSources,
             custom_prompt: document.getElementById("acc-prompt").value || null,
             llm_model: document.getElementById("acc-model").value,
             llm_temperature: parseFloat(document.getElementById("acc-temperature").value),
