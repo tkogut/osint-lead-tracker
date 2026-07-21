@@ -3,6 +3,16 @@
 
 Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w tym pliku. Format jest oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/) i projekt jest zgodny z [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-07-21
+
+### Added
+- **Hybrydowa Architektura OSINT & Dedykowane Wtyczki (Faza 8 / PLAN-017)**:
+  - **Deduplikacja Tier 0 (Pre-LLM)**: Wdrożono tabelę `visited_urls` w SQLite zapobiegającą ponownemu pobieraniu i przesyłaniu do Gemini odwiedzonych stron (0 niepotrzebnych zapytań HTTP/LLM).
+  - **Sanitacja DOM & Ochrona Tokenów (`DOMSanitizer`)**: Zintegrowano bibliotekę `trafilatura` do czyszczenia surowego HTML z nawigacji, stopek i reklam oraz skracania tekstu przed przekazaniem do Gemini Extractor.
+  - **Dedykowany Skraper Automatyka.pl (`AutomatykaScraper`)**: Pierwsza wtyczka skrapera wspierana przez bibliotekę `curl_cffi` z podszywaniem się pod uścisk dłoni TLS Chrome 124 i obsługą omijania Cloudflare.
+  - **Wzorzec Strategii i Fabryki (`ScraperFactory` + `OSINTEngine`)**: Zapewniono rozszerzalność dla nowych źródeł z 100% zachowaniem sprawności dotychczasowych potoków (BZP API, GUNB RWDZ, Google Search Grounding).
+- **Testy Jednostkowe**: Dodano automatyczne testy dla `DOMSanitizer` oraz deduplikacji Tier 0 w `tests/test_dom_sanitizer.py` i `tests/test_tier0_deduplication.py`.
+
 ## [1.6.1] - 2026-07-21
 
 ### Added

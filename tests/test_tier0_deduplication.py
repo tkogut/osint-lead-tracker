@@ -7,6 +7,7 @@ import asyncio
 import os
 import tempfile
 
+import uuid
 from database import init_db, is_url_visited, mark_url_visited
 
 
@@ -16,7 +17,8 @@ class TestTier0Deduplication(unittest.IsolatedAsyncioTestCase):
         await init_db()
 
     async def test_mark_and_check_visited_url(self):
-        test_url = "https://www.automatyka.pl/zapytania-ofertowe/waga-samochodowa-1001"
+        unique_id = uuid.uuid4().hex[:8]
+        test_url = f"https://www.automatyka.pl/zapytania-ofertowe/waga-samochodowa-{unique_id}"
         account_id = 999
         source = "Automatyka"
 

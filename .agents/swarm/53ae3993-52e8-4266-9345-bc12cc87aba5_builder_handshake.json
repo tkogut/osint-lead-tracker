@@ -3,17 +3,13 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "requirements.txt",
-    "src/models.py",
-    "src/database.py",
-    "src/scrapers/base.py",
-    "src/scrapers/automatyka.py",
-    "src/scrapers/factory.py",
-    "src/osint_engine.py",
-    "tests/test_dom_sanitizer.py",
+    "CHANGELOG.md",
+    "README.md",
+    "src/main.py",
+    "src/static/index.html",
     "tests/test_tier0_deduplication.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-21T15:35:30Z",
-  "notes": "Faza 8 (TSK-031, TSK-032, TSK-033): Wdrożenie VisitedURL, DOMSanitizer, AutomatykaScraper (curl_cffi Chrome impersonate), ScraperFactory i wzorca Strategii w OSINTEngine."
+  "timestamp": "2026-07-21T15:43:22Z",
+  "notes": "bump: version 1.7.0 for Phase 8 Hybrid Scraping Architecture release"
 }
