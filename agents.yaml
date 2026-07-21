@@ -13,7 +13,7 @@ roles:
 
   coordinator:
     name: Coordinator
-    model: Gemini 3.5 Flash (High)
+    model: Gemini 3.5 Flash (Medium)
     description: High-level orchestration, git push, plan management.
 
   builder:

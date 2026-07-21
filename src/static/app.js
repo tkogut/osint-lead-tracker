@@ -306,14 +306,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function checkNotificationGate() {
         try {
-            // Pobieramy ostatnie 5 logów do weryfikacji API statusów
-            const logs = await apiRequest("/api/logs?limit=5");
+            // Pobieramy limit 20 logów, aby mieć pewność, że uwzględnimy wszystkie skonfigurowane źródła
+            const logs = await apiRequest("/api/logs?limit=20");
             if (!logs || logs.length === 0) {
                 updateStatusIndicator(true);
                 return;
             }
-            const last5 = logs.slice(0, 5);
-            const failedScan = last5.find(log => log.response_status_code !== 200);
+            
+            // Wyciągamy tylko najnowszy log dla każdego źródła
+            const latestLogsBySource = {};
+            logs.forEach(log => {
+                if (!(log.source in latestLogsBySource)) {
+                    latestLogsBySource[log.source] = log;
+                }
+            });
+            
+            // Sprawdzamy czy ostatni skan dla któregokolwiek źródła zakończył się błędem
+            const failedScan = Object.values(latestLogsBySource).find(log => log.response_status_code !== 200);
             const banner = document.getElementById("api-failure-banner");
             
             if (failedScan) {
