@@ -1,0 +1,12 @@
+{
+  "conversation_id": "ad356e18-40c4-4733-b89f-af4355a4fe49",
+  "role": "Builder Agent",
+  "status": "SUCCESS",
+  "files_modified": [
+    "src/static/index.html",
+    "src/static/app.js"
+  ],
+  "math_consistency_check": "PASSED",
+  "timestamp": "2026-07-21T16:07:55Z",
+  "notes": "Fix: Expose Automatyka.pl scraper source in Campaign modal UI"
+}

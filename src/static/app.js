@@ -647,6 +647,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.getElementById("src-bzp").checked = Array.isArray(sources) && sources.includes("BZP");
                 document.getElementById("src-gunb").checked = Array.isArray(sources) && sources.includes("GUNB");
                 document.getElementById("src-google").checked = Array.isArray(sources) && sources.includes("Google");
+                document.getElementById("src-automatyka").checked = Array.isArray(sources) && sources.includes("Automatyka");
 
                 document.getElementById("acc-company-id").value = acc.odoo_company_id || "";
                 document.getElementById("acc-user-id").value = acc.odoo_user_id !== null ? acc.odoo_user_id : "";
@@ -667,6 +668,7 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("src-bzp").checked = true;
             document.getElementById("src-gunb").checked = true;
             document.getElementById("src-google").checked = true;
+            document.getElementById("src-automatyka").checked = true;
             const defaultPromptData = await apiRequest("/api/settings/default-prompt");
             document.getElementById("acc-prompt").value = defaultPromptData ? defaultPromptData.default_prompt : "";
         }
@@ -745,6 +747,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (document.getElementById("src-bzp").checked) enabledSources.push("BZP");
         if (document.getElementById("src-gunb").checked) enabledSources.push("GUNB");
         if (document.getElementById("src-google").checked) enabledSources.push("Google");
+        if (document.getElementById("src-automatyka").checked) enabledSources.push("Automatyka");
 
         if (enabledSources.length === 0) {
             showToast("Wybierz co najmniej jedno źródło wyszukiwania.", "error");
