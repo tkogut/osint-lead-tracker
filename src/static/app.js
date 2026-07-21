@@ -624,6 +624,34 @@ document.addEventListener("DOMContentLoaded", () => {
     modalCloseBtn.addEventListener("click", closeAccountModal);
     modalCancelBtn.addEventListener("click", closeAccountModal);
 
+    async function renderSourcesCheckboxes(enabledSources = null) {
+        const container = document.getElementById("search-sources-container");
+        if (!container) return;
+
+        try {
+            const sources = await apiRequest("/api/sources");
+            if (!Array.isArray(sources)) return;
+
+            container.innerHTML = sources.map(source => {
+                const isChecked = enabledSources === null 
+                    ? true 
+                    : (Array.isArray(enabledSources) && enabledSources.includes(source.id));
+                const sanitizedId = (source.id || "").toLowerCase().replace(/[^a-z0-9]/g, "-");
+                return `
+                    <div class="checkbox-option" style="margin-bottom: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="src-${sanitizedId}" value="${source.id}" ${isChecked ? 'checked' : ''}>
+                            <strong>${source.name}</strong>
+                        </label>
+                        <small style="color: var(--text-muted); display: block; margin-left: 24px;">${source.description}</small>
+                    </div>
+                `;
+            }).join("");
+        } catch (err) {
+            console.error("Błąd podczas renderowania źródeł OSINT:", err);
+        }
+    }
+
     async function openAccountModal(accountId = null) {
         accountForm.reset();
         accountIdInput.value = "";
@@ -644,10 +672,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (typeof sources === "string") {
                     try { sources = JSON.parse(sources); } catch(e) { sources = ["BZP", "Google", "GUNB"]; }
                 }
-                const sourceCheckboxes = document.querySelectorAll(".search-sources-group input[type='checkbox']");
-                sourceCheckboxes.forEach(cb => {
-                    cb.checked = Array.isArray(sources) && sources.includes(cb.value);
-                });
+                await renderSourcesCheckboxes(sources);
 
                 document.getElementById("acc-company-id").value = acc.odoo_company_id || "";
                 document.getElementById("acc-user-id").value = acc.odoo_user_id !== null ? acc.odoo_user_id : "";
@@ -665,8 +690,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         } else {
             modalTitle.textContent = "Dodaj Nową Kampanię";
-            const sourceCheckboxes = document.querySelectorAll(".search-sources-group input[type='checkbox']");
-            sourceCheckboxes.forEach(cb => { cb.checked = true; });
+            await renderSourcesCheckboxes(null);
             const defaultPromptData = await apiRequest("/api/settings/default-prompt");
             document.getElementById("acc-prompt").value = defaultPromptData ? defaultPromptData.default_prompt : "";
         }

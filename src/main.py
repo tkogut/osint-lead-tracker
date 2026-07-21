@@ -28,6 +28,7 @@ from config import get_settings
 from database import get_recent_leads, init_db, save_lead, url_exists, AsyncSessionLocal, get_db_setting_sync
 from odoo_integration import get_odoo_client
 from osint_engine import get_engine, get_date_limits, get_system_instruction
+from scrapers.factory import SCRAPER_REGISTRY
 from models import User, Session as UserSession, Account, ResearchLog, Setting, PromptVersion, Lead, RunPerformanceSnapshot
 from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest, SettingUpdate, ChangePasswordRequest
 from auth import verify_password, create_user_session, validate_session_token
@@ -433,6 +434,24 @@ async def health() -> dict:
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
+
+
+@app.get("/api/sources", tags=["System"], summary="Pobiera listę dostępnych źródeł OSINT")
+async def get_available_sources() -> List[dict]:
+    sources = [
+        {"id": "BZP", "name": "e-Zamówienia (BZP API)", "description": "Darmowe. Precyzyjne dla przetargów publicznych.", "is_plugin": False},
+        {"id": "GUNB", "name": "Pozwolenia budowlane (GUNB RWDZ)", "description": "Darmowe. Dobre tylko dla inwestycji budowlanych.", "is_plugin": False},
+        {"id": "Google", "name": "Wyszukiwarka Google (Grounding)", "description": "Bardzo drogie (Tokeny Gemini). Szeroki zakres (przetargi prywatne, zapytania).", "is_plugin": False}
+    ]
+    for source_name in SCRAPER_REGISTRY.keys():
+        if not any(s["id"] == source_name for s in sources):
+            sources.append({
+                "id": source_name,
+                "name": f"{source_name} (Dedykowany Skraper)",
+                "description": "Darmowe. Sanitacja DOM + omijanie Cloudflare via TLS impersonate.",
+                "is_plugin": True
+            })
+    return sources
 
 
 @app.post("/trigger-osint", tags=["OSINT"], summary="Ręczne uruchomienie skanu (X-API-Token / Sesja)")
