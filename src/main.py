@@ -742,6 +742,19 @@ async def change_password(
 
 # ---------------------------------------------------------------------------
 # API Endpoints - Dashboard Accounts (Multi-tenancy CRUD)
+def _parse_enabled_sources(val: Any) -> List[str]:
+    if isinstance(val, list):
+        return val
+    if isinstance(val, str) and val.strip():
+        try:
+            res = json.loads(val)
+            if isinstance(res, list):
+                return res
+        except Exception:
+            pass
+    return ["BZP", "Google", "GUNB"]
+
+
 # ---------------------------------------------------------------------------
 @app.get("/api/accounts", response_model=List[AccountResponse], tags=["Accounts"])
 async def get_accounts(
@@ -753,17 +766,12 @@ async def get_accounts(
     
     resp = []
     for acc in accounts:
-        try:
-            enabled_sources = json.loads(acc.enabled_sources) if acc.enabled_sources else ["BZP", "Google", "GUNB"]
-        except Exception:
-            enabled_sources = ["BZP", "Google", "GUNB"]
-
         resp.append(AccountResponse(
             id=acc.id,
             name=acc.name,
             target_cpvs=json.loads(acc.target_cpvs),
             target_keywords=json.loads(acc.target_keywords),
-            enabled_sources=enabled_sources,
+            enabled_sources=_parse_enabled_sources(acc.enabled_sources),
             custom_prompt=acc.custom_prompt,
             llm_model=acc.llm_model,
             llm_temperature=acc.llm_temperature,
@@ -818,7 +826,7 @@ async def create_account(
         name=new_acc.name,
         target_cpvs=json.loads(new_acc.target_cpvs),
         target_keywords=json.loads(new_acc.target_keywords),
-        enabled_sources=enabled_sources,
+        enabled_sources=_parse_enabled_sources(new_acc.enabled_sources),
         custom_prompt=new_acc.custom_prompt,
         llm_model=new_acc.llm_model,
         llm_temperature=new_acc.llm_temperature,
@@ -874,17 +882,12 @@ async def update_account(
     
     await db.commit()
     
-    try:
-        enabled_sources = json.loads(acc.enabled_sources) if acc.enabled_sources else ["BZP", "Google", "GUNB"]
-    except Exception:
-        enabled_sources = ["BZP", "Google", "GUNB"]
-
     return AccountResponse(
         id=acc.id,
         name=acc.name,
         target_cpvs=json.loads(acc.target_cpvs),
         target_keywords=json.loads(acc.target_keywords),
-        enabled_sources=enabled_sources,
+        enabled_sources=_parse_enabled_sources(acc.enabled_sources),
         custom_prompt=acc.custom_prompt,
         llm_model=acc.llm_model,
         llm_temperature=acc.llm_temperature,

@@ -538,9 +538,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         accountsContainer.innerHTML = accounts.map(acc => {
-            const cpvs = acc.target_cpvs.join(", ") || "Brak";
-            const keywords = acc.target_keywords.join(", ") || "Brak";
-            const sourcesDisplay = acc.enabled_sources && acc.enabled_sources.length > 0 ? acc.enabled_sources.join(", ") : "BZP, Google, GUNB";
+            let sourcesList = acc.enabled_sources;
+            if (typeof sourcesList === "string") {
+                try { sourcesList = JSON.parse(sourcesList); } catch(e) { sourcesList = null; }
+            }
+            const sourcesDisplay = Array.isArray(sourcesList) && sourcesList.length > 0 ? sourcesList.join(", ") : "BZP, Google, GUNB";
             const statusBadge = acc.is_active 
                 ? `<span class="badge badge-active">Aktywna</span>` 
                 : `<span class="badge badge-inactive">Nieaktywna</span>`;
@@ -636,10 +638,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.getElementById("acc-cpvs").value = acc.target_cpvs.join(", ");
                 document.getElementById("acc-keywords").value = acc.target_keywords.join(", ");
                 
-                const sources = acc.enabled_sources || ["BZP", "Google", "GUNB"];
-                document.getElementById("src-bzp").checked = sources.includes("BZP");
-                document.getElementById("src-gunb").checked = sources.includes("GUNB");
-                document.getElementById("src-google").checked = sources.includes("Google");
+                let sources = acc.enabled_sources || ["BZP", "Google", "GUNB"];
+                if (typeof sources === "string") {
+                    try { sources = JSON.parse(sources); } catch(e) { sources = ["BZP", "Google", "GUNB"]; }
+                }
+                document.getElementById("src-bzp").checked = Array.isArray(sources) && sources.includes("BZP");
+                document.getElementById("src-gunb").checked = Array.isArray(sources) && sources.includes("GUNB");
+                document.getElementById("src-google").checked = Array.isArray(sources) && sources.includes("Google");
 
                 document.getElementById("acc-company-id").value = acc.odoo_company_id || "";
                 document.getElementById("acc-user-id").value = acc.odoo_user_id !== null ? acc.odoo_user_id : "";
