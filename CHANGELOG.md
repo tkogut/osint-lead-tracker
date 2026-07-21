@@ -3,7 +3,15 @@
 
 Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w tym pliku. Format jest oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/) i projekt jest zgodny z [SemVer](https://semver.org/spec/v2.0.0.html).
 
----
+## [1.6.1] - 2026-07-21
+
+### Added
+- **Konfigurowalne Źródła Wyszukiwania w Kampaniach (Faza 7 / PLAN-016)**:
+  - Wdrożono możliwość wyboru aktywnych źródeł OSINT (BZP API, Pozwolenia budowlane GUNB RWDZ, Wyszukiwarka Google Grounding) per kampania z walidacją "Zero-Source" w API.
+  - Dodano podpowiedzi kosztowe oraz dynamiczne ukrywanie/wykluczanie nieaktywnych źródeł z logów analitycznych.
+  - Zwiększono domyślne okno skanowania z 3 do 7 dni roboczych z możliwością konfiguracji via `SEARCH_WINDOW_DAYS`.
+- **Fixes**:
+  - Naprawiono odporność na parsowanie źródeł przy zapisie i odczycie w FastAPI i interfejsie JS.
 
 ## [1.6.0] - 2026-07-16
 
