@@ -5,3 +5,5 @@ apscheduler==3.10.4
 aiosqlite==0.20.0
 google-genai==1.16.0
 SQLAlchemy>=2.0.0
+curl-cffi>=0.7.0
+trafilatura>=1.12.0

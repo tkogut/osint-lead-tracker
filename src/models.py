@@ -160,3 +160,18 @@ class RunPerformanceSnapshot(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     account = relationship("Account", back_populates="snapshots")
+
+
+class VisitedURL(Base):
+    """Tabela deduplikacji Tier 0 dla dedykowanych wtyczek skraperów."""
+    __tablename__ = "visited_urls"
+
+    url_hash = Column(String(64), primary_key=True)   # SHA-256 z kanonicznego URL
+    url = Column(String(1000), nullable=False)
+    account_id = Column(Integer, ForeignKey("accounts.id", ondelete="CASCADE"), nullable=False)
+    source = Column(String(50), nullable=False)
+    first_seen_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    last_crawled_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    content_hash = Column(String(64), nullable=True)
+    status = Column(String(20), nullable=False, default="PROCESSED")  # PROCESSED, SKIPPED, FAILED
+

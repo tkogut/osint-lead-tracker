@@ -88,9 +88,14 @@
 
 ---
 
-## [Phase 8: Hybrydowa Architektura OSINT & Modularne Wtyczki] (W trakcie)
-- [ ] **TSK-031 (PLAN-017)**: Tabela `visited_urls` w SQLite & deduplikacja Tier 0 (Pre-LLM) zapobiegająca zbędnym wywołaniom HTTP/Gemini.
-- [ ] **TSK-032 (PLAN-017)**: Abstrakcyjna klasa bazowa `BaseScraper`, czyszczenie DOM `DOMSanitizer` (Trafilatura) oraz wtyczka `AutomatykaScraper` (`curl_cffi` impersonate Chrome).
-- [ ] **TSK-033 (PLAN-017)**: Wzorzec Strategii i Fabryki w `OSINTEngine` z bezwzględnym zachowaniem 100% kompatybilności dla BZP, GUNB i Google Search Grounding.
+## [Phase 8: Hybrydowa Architektura OSINT & Modularne Wtyczki] ✅ DONE — 2026-07-21
+- [x] **TSK-031 (PLAN-017)**: Tabela `visited_urls` w SQLite & deduplikacja Tier 0 (Pre-LLM) zapobiegająca zbędnym wywołaniom HTTP/Gemini.
+- [x] **TSK-032 (PLAN-017)**: Abstrakcyjna klasa bazowa `BaseScraper`, czyszczenie DOM `DOMSanitizer` (Trafilatura) oraz wtyczka `AutomatykaScraper` (`curl_cffi` impersonate Chrome).
+- [x] **TSK-033 (PLAN-017)**: Wzorzec Strategii i Fabryki w `OSINTEngine` z bezwzględnym zachowaniem 100% kompatybilności dla BZP, GUNB i Google Search Grounding.
+
+**Swarm Triad (Hybrid OSINT Engine & Scraper Plugins):**
+- Builder `53ae3993` → `53ae3993-52e8-4266-9345-bc12cc87aba5_builder_handshake.json` ✅ SUCCESS
+- Auditor `53ae3993` → `53ae3993-52e8-4266-9345-bc12cc87aba5_auditor_handshake.json` ✅ SUCCESS
+
 
 

@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import sessionmaker
 
 from config import get_settings
-from models import Base, Lead, Setting, PromptVersion
+from models import Base, Lead, Setting, PromptVersion, VisitedURL
+import hashlib
 
 def get_db_setting_sync(key: str, default: str = "") -> str:
     """Odczytuje ustawienie z bazy danych w sposób synchroniczny (dla potoków tła)."""
@@ -49,11 +50,24 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("DB init OK (SQLAlchemy Async) -> %s", settings.sqlite_path)
 
-    # Idempotent SQLite column migrations (Phase 5)
+    # Idempotent SQLite column migrations (Phase 5 & Phase 8)
     try:
         _db_path = settings.sqlite_path
         _con = _sqlite3.connect(_db_path)
         _cur = _con.cursor()
+        # Create visited_urls table if not exists (Phase 8 Tier 0 deduplication)
+        _cur.execute("""
+            CREATE TABLE IF NOT EXISTS visited_urls (
+                url_hash VARCHAR(64) PRIMARY KEY,
+                url VARCHAR(1000) NOT NULL,
+                account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+                source VARCHAR(50) NOT NULL,
+                first_seen_at DATETIME NOT NULL,
+                last_crawled_at DATETIME NOT NULL,
+                content_hash VARCHAR(64),
+                status VARCHAR(20) NOT NULL DEFAULT 'PROCESSED'
+            )
+        """)
         # Create prompt_versions table if not exists (fallback)
         _cur.execute("""
             CREATE TABLE IF NOT EXISTS prompt_versions (
@@ -105,7 +119,7 @@ async def init_db() -> None:
         _con.commit()
         _con.close()
     except Exception as _e:
-        logger.error("Phase 5 migration error: %s", _e)
+        logger.error("Phase 5/8 migration error: %s", _e)
 
 
 async def url_exists(url: str) -> bool:
@@ -114,6 +128,59 @@ async def url_exists(url: str) -> bool:
         result = await session.execute(select(Lead).filter(Lead.url == url).limit(1))
         lead = result.scalar_one_or_none()
         return lead is not None
+
+
+async def is_url_visited(url: str, account_id: int) -> bool:
+    """Tier 0 Deduplication: Sprawdza czy dany URL dla konkretnego konta został już odwiedzony/przetworzony."""
+    url_hash = hashlib.sha256(url.strip().encode("utf-8")).hexdigest()
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(VisitedURL).filter(
+                VisitedURL.url_hash == url_hash,
+                VisitedURL.account_id == account_id
+            ).limit(1)
+        )
+        visited = result.scalar_one_or_none()
+        return visited is not None
+
+
+async def mark_url_visited(
+    url: str,
+    account_id: int,
+    source: str,
+    content_hash: Optional[str] = None,
+    status: str = "PROCESSED"
+) -> None:
+    """Rejestruje odwiedzony URL w tabeli visited_urls dla deduplikacji Tier 0."""
+    url_hash = hashlib.sha256(url.strip().encode("utf-8")).hexdigest()
+    now = datetime.utcnow()
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(VisitedURL).filter(
+                VisitedURL.url_hash == url_hash,
+                VisitedURL.account_id == account_id
+            ).limit(1)
+        )
+        existing = result.scalar_one_or_none()
+        if existing:
+            existing.last_crawled_at = now
+            if content_hash:
+                existing.content_hash = content_hash
+            existing.status = status
+        else:
+            new_record = VisitedURL(
+                url_hash=url_hash,
+                url=url[:1000],
+                account_id=account_id,
+                source=source,
+                first_seen_at=now,
+                last_crawled_at=now,
+                content_hash=content_hash,
+                status=status
+            )
+            session.add(new_record)
+        await session.commit()
+
 
 
 async def save_lead(lead_dict: dict, odoo_id: Optional[int] = None, prompt_version_id: Optional[int] = None, pending_approval: bool = False) -> int:

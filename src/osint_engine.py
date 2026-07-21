@@ -21,7 +21,9 @@ from google import genai
 from google.genai import types
 
 from config import get_settings
-from database import get_db_setting_sync
+from database import get_db_setting_sync, is_url_visited, mark_url_visited
+from scrapers.factory import get_scraper_for_source, SCRAPER_REGISTRY
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -289,6 +291,154 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
         except Exception as exc:
             logger.error("Błąd podczas weryfikacji ogłoszenia BZP %s: %s", notice.get("noticeNumber"), exc)
             return None
+
+    def _extract_lead_from_raw_text(
+        self,
+        text_content: str,
+        source_url: str,
+        account: Optional[Any] = None
+    ) -> Tuple[Optional[dict], int, int]:
+        """
+        Zleca Gemini wyciągnięcie ustrukturyzowanych danych leada z oczyszczonego surowego tekstu ogłoszenia
+        pobranego przez wtyczkę skrapera (bez zapytań wyszukiwarki / Search Grounding).
+        Zwraca (lead_dict, input_tokens, output_tokens).
+        """
+        if not text_content or len(text_content.strip()) < 50:
+            return None, 0, 0
+
+        custom_prompt = ""
+        if account and account.custom_prompt:
+            custom_prompt = account.custom_prompt + "\n\n"
+
+        prompt = f"""{custom_prompt}Przeanalizuj poniższy tekst ogłoszenia/zapytania ofertowego ze strony: {source_url}
+
+Treść ogłoszenia:
+\"\"\"
+{text_content}
+\"\"\"
+
+Wymagania:
+1. Zdecyduj, czy treść ogłoszenia odpowiada zdefiniowanym wymaganiom i czy reprezentuje wartościowy lead.
+2. Jeśli ogłoszenie NIE spełnia wymagań lub minął termin, zwróć wyłącznie słowo: ODRZUĆ.
+3. Jeśli ogłoszenie spełnia kryteria, zwróć dane leada w formacie JSON o poniższej strukturze:
+{{
+  "tytul": "Tytuł ogłoszenia / zapytania",
+  "typ": "lead",
+  "nazwa_inwestycji": "Nazwa inwestycji",
+  "lokalizacja": "Lokalizacja (miasto, województwo)",
+  "inwestor": "Nazwa zamawiającego / inwestora",
+  "wykonawca": "",
+  "zakres": "Opis zakresu przedmiotu zamówienia",
+  "uzasadnienie": "Dlaczego to ogłoszenie jest wartościowym leadem",
+  "priorytet": "wysoki/sredni/niski",
+  "data": "Data publikacji lub obecna YYYY-MM-DD",
+  "url": "{source_url}"
+}}
+
+Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników markdown."""
+
+        llm_model = "gemini-2.5-flash"
+        llm_temp = 0.1
+        if account:
+            llm_model = account.llm_model
+            llm_temp = account.llm_temperature
+
+        api_key = get_db_setting_sync("GEMINI_API_KEY", self._settings.gemini_api_key)
+        client = genai.Client(api_key=api_key)
+
+        try:
+            response = client.models.generate_content(
+                model=llm_model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=llm_temp,
+                ),
+            )
+
+            input_tokens = 0
+            output_tokens = 0
+            if hasattr(response, 'usage_metadata') and response.usage_metadata:
+                input_tokens = getattr(response.usage_metadata, 'prompt_token_count', 0) or 0
+                output_tokens = getattr(response.usage_metadata, 'candidates_token_count', 0) or 0
+
+            ans = (response.text or "").strip()
+            if ans == "ODRZUĆ" or "ODRZUĆ" in ans[:20]:
+                logger.debug("AI odrzuciło tekst ogłoszenia ze źródła %s", source_url)
+                return None, input_tokens, output_tokens
+
+            clean_json = _strip_markdown_fences(ans)
+            lead_data = json.loads(clean_json)
+            lead_data["url"] = source_url
+            logger.info("AI wyekstrahowało lead z surowego tekstu (%s): %s", source_url, lead_data.get("tytul"))
+            return lead_data, input_tokens, output_tokens
+        except Exception as exc:
+            logger.error("Błąd ekstrakcji leada z tekstu (%s): %s", source_url, exc)
+            return None, 0, 0
+
+    def _search_plugin(
+        self,
+        source_name: str,
+        start_date: str,
+        today_date: str,
+        account: Any
+    ) -> Tuple[List[dict], int, str, int, int, int, int]:
+        """Uruchamia dedykowaną wtyczkę skrapera oraz dokonuje ekstrakcji danych z surowego tekstu via Gemini."""
+        scraper = get_scraper_for_source(source_name)
+        if not scraper:
+            logger.warning("Brak zarejestrowanej wtyczki skrapera dla źródła: %s", source_name)
+            return [], 404, hashlib.sha256(b"not_found").hexdigest(), 0, 0, 0, 0
+
+        logger.info("[%s Plugin] Start skanowania dla konta %s…", source_name, account.name)
+
+        try:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
+                import nest_asyncio
+                nest_asyncio.apply()
+                raw_items = loop.run_until_complete(scraper.fetch_leads(account, start_date, today_date))
+            else:
+                raw_items = asyncio.run(scraper.fetch_leads(account, start_date, today_date))
+        except Exception as exc:
+            logger.error("[%s Plugin] Wyjątek podczas uruchamiania skrapera: %s", source_name, exc, exc_info=True)
+            err_hash = hashlib.sha256(str(exc).encode("utf-8")).hexdigest()
+            return [], 500, err_hash, 0, 0, 0, 0
+
+        leads = []
+        total_input_tokens = 0
+        total_output_tokens = 0
+        combined_payload = ""
+
+        for item in raw_items:
+            url = item.get("url", "").strip()
+            raw_text = item.get("raw_text", "").strip()
+            if not url or not raw_text:
+                continue
+
+            combined_payload += f"{url}:{len(raw_text)}\n"
+            lead, in_tok, out_tok = self._extract_lead_from_raw_text(raw_text, url, account=account)
+            total_input_tokens += in_tok
+            total_output_tokens += out_tok
+
+            if lead:
+                leads.append(lead)
+                if hasattr(account, "id"):
+                    content_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
+                    try:
+                        if loop and loop.is_running():
+                            loop.run_until_complete(mark_url_visited(url, account.id, source_name, content_hash=content_hash, status="PROCESSED"))
+                        else:
+                            asyncio.run(mark_url_visited(url, account.id, source_name, content_hash=content_hash, status="PROCESSED"))
+                    except Exception:
+                        pass
+
+        response_hash = hashlib.sha256(combined_payload.encode("utf-8")).hexdigest() if combined_payload else hashlib.sha256(b"empty").hexdigest()
+        logger.info("[%s Plugin] Ukończono. Znaleziono %d surowych ogłoszeń, wyekstrahowano %d lead(ów)", source_name, len(raw_items), len(leads))
+        return leads, 200, response_hash, 0, 0, total_input_tokens, total_output_tokens
+
 
     def _search_bzp(self, start_date: str, today_date: str, account: Optional[Any] = None) -> Tuple[List[dict], int, str, int, int, int, int]:
         """Przeszukuje bazę e-Zamówień (BZP API)."""
@@ -620,17 +770,16 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
 
         results = {}
 
-        # 1. BZP API
-        if "BZP" in enabled_sources:
-            results["BZP"] = self._search_bzp(start_str, today_str, account=account)
-
-        # 2. Google Search Grounding
-        if "Google" in enabled_sources:
-            results["Google"] = self._search_google(start_str, today_str, account=account)
-
-        # 3. GUNB RWDZ
-        if "GUNB" in enabled_sources:
-            results["GUNB"] = self._search_gunb(start_str, today_str, account=account)
+        for source in enabled_sources:
+            if source == "BZP":
+                results["BZP"] = self._search_bzp(start_str, today_str, account=account)
+            elif source == "Google":
+                results["Google"] = self._search_google(start_str, today_str, account=account)
+            elif source == "GUNB":
+                results["GUNB"] = self._search_gunb(start_str, today_str, account=account)
+            else:
+                # Dedykowane wtyczki skraperów (np. Automatyka)
+                results[source] = self._search_plugin(source, start_str, today_str, account=account)
 
         return results
 
