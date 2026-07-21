@@ -644,10 +644,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (typeof sources === "string") {
                     try { sources = JSON.parse(sources); } catch(e) { sources = ["BZP", "Google", "GUNB"]; }
                 }
-                document.getElementById("src-bzp").checked = Array.isArray(sources) && sources.includes("BZP");
-                document.getElementById("src-gunb").checked = Array.isArray(sources) && sources.includes("GUNB");
-                document.getElementById("src-google").checked = Array.isArray(sources) && sources.includes("Google");
-                document.getElementById("src-automatyka").checked = Array.isArray(sources) && sources.includes("Automatyka");
+                const sourceCheckboxes = document.querySelectorAll(".search-sources-group input[type='checkbox']");
+                sourceCheckboxes.forEach(cb => {
+                    cb.checked = Array.isArray(sources) && sources.includes(cb.value);
+                });
 
                 document.getElementById("acc-company-id").value = acc.odoo_company_id || "";
                 document.getElementById("acc-user-id").value = acc.odoo_user_id !== null ? acc.odoo_user_id : "";
@@ -665,10 +665,8 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         } else {
             modalTitle.textContent = "Dodaj Nową Kampanię";
-            document.getElementById("src-bzp").checked = true;
-            document.getElementById("src-gunb").checked = true;
-            document.getElementById("src-google").checked = true;
-            document.getElementById("src-automatyka").checked = true;
+            const sourceCheckboxes = document.querySelectorAll(".search-sources-group input[type='checkbox']");
+            sourceCheckboxes.forEach(cb => { cb.checked = true; });
             const defaultPromptData = await apiRequest("/api/settings/default-prompt");
             document.getElementById("acc-prompt").value = defaultPromptData ? defaultPromptData.default_prompt : "";
         }
@@ -743,11 +741,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const cpvs = document.getElementById("acc-cpvs").value.split(",").map(s => s.trim()).filter(Boolean);
         const keywords = document.getElementById("acc-keywords").value.split(",").map(s => s.trim()).filter(Boolean);
         
-        const enabledSources = [];
-        if (document.getElementById("src-bzp").checked) enabledSources.push("BZP");
-        if (document.getElementById("src-gunb").checked) enabledSources.push("GUNB");
-        if (document.getElementById("src-google").checked) enabledSources.push("Google");
-        if (document.getElementById("src-automatyka").checked) enabledSources.push("Automatyka");
+        const enabledSources = Array.from(
+            document.querySelectorAll(".search-sources-group input[type='checkbox']:checked")
+        ).map(cb => cb.value);
 
         if (enabledSources.length === 0) {
             showToast("Wybierz co najmniej jedno źródło wyszukiwania.", "error");
