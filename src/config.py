@@ -33,10 +33,11 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/leads.db"
     sqlite_path: str = "./data/leads.db"
 
-    # --- APScheduler ---
+    # --- APScheduler & Pipeline ---
     cron_hour: int = 6
     cron_minute: int = 0
     cron_timezone: str = "Europe/Warsaw"
+    search_window_days: int = 7
 
 
 @lru_cache

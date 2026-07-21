@@ -68,6 +68,12 @@ graph TD
    * Unikalny indeks URL w bazie SQLite uniemożliwia wielokrotne tworzenie tej samej szansy w CRM.
    * Autoryzacja sesyjna panelu oraz tokenowa (`X-API-Token`) dla zewnętrznych wywołań.
    * Wbudowane maskowanie kluczy API i haseł przed wyciekiem w logach i czatach.
+8. **Bezpiecznik Kwarantanny (Circuit Breaker & Single Writer)**:
+   * Limit `MAX_LEADS_PER_RUN` zabezpieczający Odoo CRM przed zatruciem fałszywymi lub zduplikowanymi danymi. Leady z anomaliami przekierowywane są do kwarantanny UI w celu ręcznej weryfikacji.
+   * Asynchroniczna kolejka zapisu SQLite (Single Writer Queue) zapobiegająca błędowi `database is locked`.
+9. **Konfigurowalne Źródła i Okno Czasowe (Faza 7)**:
+   * Przełączniki aktywnych źródeł OSINT (e-Zamówienia BZP, GUNB RWDZ, Wyszukiwarka Google) per kampania.
+   * Rozszerzone okno skanowania `SEARCH_WINDOW_DAYS` (domyślnie 7 dni roboczych).
 
 ---
 
@@ -94,10 +100,11 @@ API_TOKEN="silny-token-zabezpieczajacy-api"
 DATABASE_URL="sqlite:///./data/leads.db"
 SQLITE_PATH="./data/leads.db"
 
-# --- APScheduler ---
+# --- APScheduler & Pipeline ---
 CRON_HOUR=6
 CRON_MINUTE=0
 CRON_TIMEZONE="Europe/Warsaw"
+SEARCH_WINDOW_DAYS=7   # Opcjonalne: Liczba dni roboczych wstecz przy skanowaniu (domyślnie 7)
 ```
 
 > [!NOTE]

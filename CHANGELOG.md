@@ -10,8 +10,9 @@ Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w t
   - Wdrożono możliwość wyboru aktywnych źródeł OSINT (BZP API, Pozwolenia budowlane GUNB RWDZ, Wyszukiwarka Google Grounding) per kampania z walidacją "Zero-Source" w API.
   - Dodano podpowiedzi kosztowe oraz dynamiczne ukrywanie/wykluczanie nieaktywnych źródeł z logów analitycznych.
   - Zwiększono domyślne okno skanowania z 3 do 7 dni roboczych z możliwością konfiguracji via `SEARCH_WINDOW_DAYS`.
-- **Fixes**:
+- **Fixes & Improvements**:
   - Naprawiono odporność na parsowanie źródeł przy zapisie i odczycie w FastAPI i interfejsie JS.
+  - Dodano automatyczną migrację/auto-seeding klucza `SEARCH_WINDOW_DAYS` (wartość domyślna: `7`) w tabeli `settings` bazy danych SQLite przy inicjalizacji serwera.
 
 ## [1.6.0] - 2026-07-16
 
