@@ -100,6 +100,8 @@ async def init_db() -> None:
                     pass  # idempotent
                 else:
                     logger.warning("Migration warning: %s", _oe)
+        # Seed default SEARCH_WINDOW_DAYS if missing
+        _cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('SEARCH_WINDOW_DAYS', '7')")
         _con.commit()
         _con.close()
     except Exception as _e:

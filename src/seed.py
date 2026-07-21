@@ -74,7 +74,8 @@ async def seed_data() -> None:
             "API_TOKEN",
             "CRON_HOUR",
             "CRON_MINUTE",
-            "CRON_TIMEZONE"
+            "CRON_TIMEZONE",
+            "SEARCH_WINDOW_DAYS"
         ]
         
         for key in setting_keys:
@@ -93,6 +94,7 @@ async def seed_data() -> None:
                 elif key == "CRON_HOUR": val = str(settings.cron_hour)
                 elif key == "CRON_MINUTE": val = str(settings.cron_minute)
                 elif key == "CRON_TIMEZONE": val = settings.cron_timezone
+                elif key == "SEARCH_WINDOW_DAYS": val = "7"
 
                 
                 db_setting = Setting(key=key, value=val)
