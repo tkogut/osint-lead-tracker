@@ -108,3 +108,9 @@ Pliki handshake: `.agents/swarm/<conversation_id>_<role>_handshake.json`
 - **Odoo**: Modular structure. XML views + Python logic separation. Quality RGG audits.
 
 Standard v6.0 Swarm | Precision, Economy, and Swarm Speed.
+
+## 8. COORDINATOR SOURCE CODE PROHIBITION (R-ROLE-01) ⛔
+
+**Status: MANDATORY | Priority: CRITICAL | Version: v6.1+**
+
+Coordinator ma kategoryczny zakaz edycji kodu produkcyjnego w `src/`, `api/`. Wymagana delegacja przez `invoke_subagent` → rola Builder. Safety Gate: `scripts/validate-handshakes.py` + `scripts/check_coordinator_role.sh` wykrywają self-signed handshakes i blokują commity. Naruszenie → `GOVERNANCE_VIOLATION`.
