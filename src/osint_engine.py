@@ -26,15 +26,20 @@ from database import get_db_setting_sync
 logger = logging.getLogger(__name__)
 
 
-def get_date_limits() -> tuple[str, str]:
+def get_date_limits(default_days: int = 7) -> tuple[str, str]:
     """
-    Zwraca dzisiejszą datę oraz datę sprzed 3 dni roboczych
+    Zwraca dzisiejszą datę oraz datę sprzed N dni roboczych (domyślnie 7)
     w formacie YYYY-MM-DD (pomijając soboty i niedziele).
     """
+    try:
+        window_days = int(get_db_setting_sync("SEARCH_WINDOW_DAYS", str(default_days)))
+    except Exception:
+        window_days = default_days
+
     today = datetime.now()
     days_to_subtract = 0
     business_days_subtracted = 0
-    while business_days_subtracted < 3:
+    while business_days_subtracted < window_days:
         days_to_subtract += 1
         day = today - timedelta(days=days_to_subtract)
         if day.weekday() < 5:
