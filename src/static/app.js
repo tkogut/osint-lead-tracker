@@ -538,6 +538,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         accountsContainer.innerHTML = accounts.map(acc => {
+            const cpvs = acc.target_cpvs.join(", ") || "Brak";
+            const keywords = acc.target_keywords.join(", ") || "Brak";
             let sourcesList = acc.enabled_sources;
             if (typeof sourcesList === "string") {
                 try { sourcesList = JSON.parse(sourcesList); } catch(e) { sourcesList = null; }
