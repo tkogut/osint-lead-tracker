@@ -19,6 +19,7 @@ Every agent session operates under the Triad model. Switching roles requires a f
 
 1. **The Coordinator (Manager & DevOps Architect)**
    - **Mandate**: High-level orchestration, git push, plan management (`.agents/plans/`).
+   - **Git Operations**: Coordinator wykonuje commity i pushe bezpośrednio z terminala głównego za pomocą smart_commit.sh (bez powoływania kosztownych subagentów).
    - **Constraint**: Forbidden from writing feature code in `/src`. Must delegate all implementation tasks to The Builder.
    - **Tools**: Browser (CDP), Task Boundary, `git`.
 
@@ -100,6 +101,7 @@ Pliki handshake: `.agents/swarm/<conversation_id>_<role>_handshake.json`
 
 - **Auto-Activation**: Caveman mode Ultra+ intensity. Logic-First Speech. Prompt Compaction. Context Caching.
 - **Git Commits**: All commit messages must follow the `caveman-commit` standard (Conventional Commits ≤ 50 chars).
+- **Caveman Prompts**: Coordinator ma obowiązek pisać instrukcje (prompty) do subagentów w skompresowanym formacie Caveman (Ultra+), eliminując narzut tokenów.
 
 ## 7. FRAMEWORK PRESETS [ALPHA-TRACK]
 
