@@ -3,6 +3,14 @@
 
 Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w tym pliku. Format jest oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/) i projekt jest zgodny z [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-07-21
+
+### Added
+- Wprowadzenie dynamicznego pobierania i renderowania źródeł OSINT z rejestru `SCRAPER_REGISTRY` (API `/api/sources`).
+- Dodanie w pełni dynamicznej paginacji w skraperze automatyka.pl kontrolowanej oknem czasowym `SEARCH_WINDOW_DAYS`.
+- Naprawa parametru przekierowań w bibliotece `curl_cffi` sesji skrapera.
+- Integracja testów składniowych Python AST oraz automatycznego audytu kontraktu integracyjnego API-UI w `review_helper.py`.
+
 ## [1.7.0] - 2026-07-21
 
 ### Added
