@@ -45,7 +45,7 @@ class AutomatykaScraper(BaseScraper):
             "Referer": "https://www.automatyka.pl/",
         }
 
-        async with AsyncSession(impersonate="chrome124", headers=headers, follow_redirects=True) as session:
+        async with AsyncSession(impersonate="chrome124", headers=headers) as session:
             try:
                 logger.info("[Automatyka] Pobieranie listy zapytań ofertowych z %s...", self.base_url)
                 resp = await session.get(self.base_url, timeout=15)
