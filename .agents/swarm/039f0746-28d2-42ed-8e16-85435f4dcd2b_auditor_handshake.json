@@ -3,10 +3,9 @@
   "role": "Auditor Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/main.py",
-    "src/static/app.js"
+    "src/main.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-22T09:51:31Z",
-  "notes": "Audyt Plan-023 Dynamic Date Formatting: Przetestowano dynamiczne formatowanie dat w API kont i interfejsie UI dla wszystkich istniejących i nowych kampanii. Brak błędów."
+  "timestamp": "2026-07-22T09:58:17Z",
+  "notes": "Audyt Plan-024 Sandbox AI Extraction Prompt Fix: Przetestowano dodanie otoczki ekstrakcyjnej i czyszczenie znaczników markdown w run_sandbox_test. Błędów brak."
 }

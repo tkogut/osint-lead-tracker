@@ -3,10 +3,9 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/main.py",
-    "src/static/app.js"
+    "src/main.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-22T09:50:39Z",
-  "notes": "Zaimplementowano dynamiczne formatowanie dat w API kont i interfejsie UI dla wszystkich istniejących i nowych kampanii"
+  "timestamp": "2026-07-22T09:57:32Z",
+  "notes": "Poprawiono otoczkę promptu ekstrakcyjnego dla surowego tekstu w Piaskownicy AI"
 }

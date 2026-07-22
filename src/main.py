@@ -1166,13 +1166,41 @@ async def run_sandbox_test(
             config_kwargs["tools"] = [types.Tool(google_search=types.GoogleSearch())]
             if not raw_text:
                 raw_text = "Wykonaj wyszukiwanie z użyciem Google Search."
-        
+            contents_to_send = raw_text
+        else:
+            target_url = req.url or "https://logintrade.pl/zapytanie-ofertowe"
+            contents_to_send = f"""Przeanalizuj poniższe ogłoszenie/zapytanie ofertowe i określ, czy odpowiada ono kryteriom w system_instruction.
+
+Adres URL ogłoszenia: {target_url}
+
+Treść ogłoszenia:
+\"\"\"
+{raw_text}
+\"\"\"
+
+Wymagania:
+1. Zdecyduj, czy treść ogłoszenia odpowiada zdefiniowanym kryteriom kampanii w system_instruction.
+2. Jeśli ogłoszenie spełnia kryteria, zwróć dane leada w formacie JSON:
+{{"leady": [{{"tytul": "Tytuł ogłoszenia", "typ": "lead", "nazwa_inwestycji": "Nazwa zamówienia/inwestycji", "lokalizacja": "Lokalizacja (miasto, województwo)", "inwestor": "Nazwa zamawiającego", "wykonawca": "", "zakres": "Opis zakresu", "uzasadnienie": "Dlaczego to wartościowy lead", "priorytet": "wysoki/sredni/niski", "data": "{today_str}", "url": "{target_url}"}}]}}
+3. Jeśli ogłoszenie NIE spełnia wymagań kampanii lub minął termin, zwróć {{"leady": []}}.
+Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown."""
+
         response = client.models.generate_content(
             model=req.llm_model,
-            contents=raw_text,
+            contents=contents_to_send,
             config=types.GenerateContentConfig(**config_kwargs)
         )
-        return {"success": True, "output": response.text or "", "fetched_text": raw_text if req.url else None}
+        
+        output_text = response.text or ""
+        if output_text.startswith("```json"):
+            output_text = output_text[7:]
+        elif output_text.startswith("```"):
+            output_text = output_text[3:]
+        if output_text.endswith("```"):
+            output_text = output_text[:-3]
+        output_text = output_text.strip()
+        
+        return {"success": True, "output": output_text, "fetched_text": raw_text if req.url else None}
     except Exception as exc:
         logger.error("Sandbox test error: %s", exc)
         return {"success": False, "error": str(exc)}
