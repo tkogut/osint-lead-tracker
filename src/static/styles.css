@@ -799,6 +799,17 @@ input:focus, select:focus, textarea:focus {
     animation: statusPulse 2s infinite;
 }
 
+select {
+    background-color: #121b2d !important;
+    color: var(--text-main) !important;
+    cursor: pointer;
+}
+select option {
+    background-color: #16213e !important;
+    color: #f5f6fa !important;
+    padding: 8px;
+}
+
 .dot-red {
     background-color: var(--error);
     box-shadow: 0 0 8px var(--error);
