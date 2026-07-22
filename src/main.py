@@ -783,15 +783,18 @@ async def get_accounts(
     result = await db.execute(select(Account).order_by(Account.id.asc()))
     accounts = result.scalars().all()
     
+    today_str, start_str = get_date_limits()
+    
     resp = []
     for acc in accounts:
+        formatted_prompt = format_prompt_dates(acc.custom_prompt, today_str, start_str) if acc.custom_prompt else None
         resp.append(AccountResponse(
             id=acc.id,
             name=acc.name,
             target_cpvs=json.loads(acc.target_cpvs),
             target_keywords=json.loads(acc.target_keywords),
             enabled_sources=_parse_enabled_sources(acc.enabled_sources),
-            custom_prompt=acc.custom_prompt,
+            custom_prompt=formatted_prompt,
             llm_model=acc.llm_model,
             llm_temperature=acc.llm_temperature,
             llm_max_tokens=acc.llm_max_tokens,
@@ -840,13 +843,16 @@ async def create_account(
     except Exception:
         enabled_sources = ["BZP", "Google", "GUNB"]
 
+    today_str, start_str = get_date_limits()
+    formatted_prompt = format_prompt_dates(new_acc.custom_prompt, today_str, start_str) if new_acc.custom_prompt else None
+
     return AccountResponse(
         id=new_acc.id,
         name=new_acc.name,
         target_cpvs=json.loads(new_acc.target_cpvs),
         target_keywords=json.loads(new_acc.target_keywords),
         enabled_sources=_parse_enabled_sources(new_acc.enabled_sources),
-        custom_prompt=new_acc.custom_prompt,
+        custom_prompt=formatted_prompt,
         llm_model=new_acc.llm_model,
         llm_temperature=new_acc.llm_temperature,
         llm_max_tokens=new_acc.llm_max_tokens,
@@ -901,13 +907,16 @@ async def update_account(
     
     await db.commit()
     
+    today_str, start_str = get_date_limits()
+    formatted_prompt = format_prompt_dates(acc.custom_prompt, today_str, start_str) if acc.custom_prompt else None
+    
     return AccountResponse(
         id=acc.id,
         name=acc.name,
         target_cpvs=json.loads(acc.target_cpvs),
         target_keywords=json.loads(acc.target_keywords),
         enabled_sources=_parse_enabled_sources(acc.enabled_sources),
-        custom_prompt=acc.custom_prompt,
+        custom_prompt=formatted_prompt,
         llm_model=acc.llm_model,
         llm_temperature=acc.llm_temperature,
         llm_max_tokens=acc.llm_max_tokens,

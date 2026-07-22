@@ -48,6 +48,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const statAutoScales = document.getElementById("stat-auto-scales");
     const statOdooLeads = document.getElementById("stat-odoo-leads");
 
+    // --- Date Formatting Helper ---
+    function formatPromptDates(text) {
+        if (!text) return text;
+        const today = new Date();
+        const start = new Date();
+        start.setDate(today.getDate() - 7);
+        
+        const todayStr = today.toISOString().split('T')[0];
+        const startStr = start.toISOString().split('T')[0];
+        
+        let newText = text.replace(/Dzisiejsza data \(rok \d{4}\) to: \d{4}-\d{2}-\d{2}/g, `Dzisiejsza data (rok ${today.getFullYear()}) to: ${todayStr}`);
+        newText = newText.replace(/od \d{4}-\d{2}-\d{2} do \d{4}-\d{2}-\d{2}/g, `od ${startStr} do ${todayStr}`);
+        return newText;
+    }
+
     // --- Tab Navigation Mapping ---
     const tabMetas = {
         dashboard: { title: "Dashboard", desc: "Przegląd pozyskanych leadów i statystyki" },
@@ -696,17 +711,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.getElementById("acc-active").checked = acc.is_active;
                 
                 if (acc.custom_prompt) {
-                    document.getElementById("acc-prompt").value = acc.custom_prompt;
+                    document.getElementById("acc-prompt").value = formatPromptDates(acc.custom_prompt);
                 } else {
                     const defaultPromptData = await apiRequest("/api/settings/default-prompt");
-                    document.getElementById("acc-prompt").value = defaultPromptData ? defaultPromptData.default_prompt : "";
+                    document.getElementById("acc-prompt").value = defaultPromptData ? formatPromptDates(defaultPromptData.default_prompt) : "";
                 }
             }
         } else {
             modalTitle.textContent = "Dodaj Nową Kampanię";
             await renderSourcesCheckboxes(null);
             const defaultPromptData = await apiRequest("/api/settings/default-prompt");
-            document.getElementById("acc-prompt").value = defaultPromptData ? defaultPromptData.default_prompt : "";
+            document.getElementById("acc-prompt").value = defaultPromptData ? formatPromptDates(defaultPromptData.default_prompt) : "";
         }
 
         // Load prompt version history
@@ -897,16 +912,16 @@ document.addEventListener("DOMContentLoaded", () => {
             const promptArea = document.getElementById("sandbox-prompt");
             if (!accId) {
                 const defaultPromptData = await apiRequest("/api/settings/default-prompt");
-                promptArea.value = defaultPromptData ? defaultPromptData.default_prompt : "";
+                promptArea.value = defaultPromptData ? formatPromptDates(defaultPromptData.default_prompt) : "";
                 return;
             }
             const acc = accountsList.find(a => a.id === parseInt(accId));
             if (acc) {
                 if (acc.custom_prompt) {
-                    promptArea.value = acc.custom_prompt;
+                    promptArea.value = formatPromptDates(acc.custom_prompt);
                 } else {
                     const defaultPromptData = await apiRequest("/api/settings/default-prompt");
-                    promptArea.value = defaultPromptData ? defaultPromptData.default_prompt : "";
+                    promptArea.value = defaultPromptData ? formatPromptDates(defaultPromptData.default_prompt) : "";
                 }
             }
         });
