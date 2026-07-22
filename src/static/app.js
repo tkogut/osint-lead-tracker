@@ -450,6 +450,7 @@ document.addEventListener("DOMContentLoaded", () => {
             accountsList = accounts;
             renderAccounts(accounts);
             populateCampaignFilter(accounts);
+            populateSandboxCampaigns(accounts);
         } catch (e) {
             accountsContainer.innerHTML = `<div class="loading-state text-error">Nie udało się załadować kont.</div>`;
         }
@@ -838,6 +839,73 @@ document.addEventListener("DOMContentLoaded", () => {
     sandboxTemp.addEventListener("input", (e) => {
         sandboxTempval.textContent = e.target.value;
     });
+    
+    function populateSandboxCampaigns(accounts) {
+        const select = document.getElementById("sandbox-campaign-select");
+        if (!select) return;
+        select.innerHTML = '<option value="">Wybierz kampanię (opcjonalnie)</option>';
+        accounts.filter(a => a.is_active).forEach(acc => {
+            const opt = document.createElement("option");
+            opt.value = acc.id;
+            opt.textContent = acc.name;
+            select.appendChild(opt);
+        });
+    }
+
+    const sandboxCampaignSelect = document.getElementById("sandbox-campaign-select");
+    if (sandboxCampaignSelect) {
+        sandboxCampaignSelect.addEventListener("change", async (e) => {
+            const accId = e.target.value;
+            const promptArea = document.getElementById("sandbox-prompt");
+            if (!accId) {
+                const defaultPromptData = await apiRequest("/api/settings/default-prompt");
+                promptArea.value = defaultPromptData ? defaultPromptData.default_prompt : "";
+                return;
+            }
+            const acc = accountsList.find(a => a.id === parseInt(accId));
+            if (acc) {
+                if (acc.custom_prompt) {
+                    promptArea.value = acc.custom_prompt;
+                } else {
+                    const defaultPromptData = await apiRequest("/api/settings/default-prompt");
+                    promptArea.value = defaultPromptData ? defaultPromptData.default_prompt : "";
+                }
+            }
+        });
+    }
+
+    const sandboxFetchBtn = document.getElementById("sandbox-fetch-btn");
+    if (sandboxFetchBtn) {
+        sandboxFetchBtn.addEventListener("click", async () => {
+            const urlInput = document.getElementById("sandbox-url").value;
+            if (!urlInput) {
+                showToast("Podaj URL do pobrania.", "error");
+                return;
+            }
+            const textArea = document.getElementById("sandbox-text");
+            const originalHtml = sandboxFetchBtn.innerHTML;
+            sandboxFetchBtn.disabled = true;
+            sandboxFetchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            try {
+                const res = await apiRequest("/api/sandbox/fetch-url", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url: urlInput })
+                });
+                if (res && res.success) {
+                    textArea.value = res.clean_text;
+                    showToast("Treść pobrana i wyczyszczona z HTML.");
+                } else {
+                    showToast(`Błąd pobierania: ${res.error || "Nieznany"}`, "error");
+                }
+            } catch (err) {
+                showToast(`Błąd: ${err.message}`, "error");
+            } finally {
+                sandboxFetchBtn.disabled = false;
+                sandboxFetchBtn.innerHTML = originalHtml;
+            }
+        });
+    }
 
     sandboxForm.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -849,7 +917,8 @@ document.addEventListener("DOMContentLoaded", () => {
         sandboxOutput.textContent = "Wysyłanie danych do Gemini...";
 
         const payload = {
-            raw_text: document.getElementById("sandbox-text").value,
+            raw_text: document.getElementById("sandbox-text").value || null,
+            url: document.getElementById("sandbox-url").value || null,
             prompt: document.getElementById("sandbox-prompt").value,
             llm_model: document.getElementById("sandbox-model").value,
             llm_temperature: parseFloat(sandboxTemp.value),
@@ -865,6 +934,9 @@ document.addEventListener("DOMContentLoaded", () => {
             
             if (res && res.success) {
                 sandboxOutput.textContent = res.output;
+                if (res.fetched_text && !document.getElementById("sandbox-text").value) {
+                    document.getElementById("sandbox-text").value = res.fetched_text;
+                }
             } else {
                 sandboxOutput.textContent = `Błąd: ${res.error || "Nieznany błąd."}`;
             }

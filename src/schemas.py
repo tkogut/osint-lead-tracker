@@ -64,11 +64,17 @@ class AccountResponse(BaseModel):
 
 class SandboxRequest(BaseModel):
     """Żądanie uruchomienia testu w piaskownicy (Sandbox)."""
-    raw_text: str
+    raw_text: Optional[str] = None
+    url: Optional[str] = None
     prompt: str
     llm_model: str = "gemini-2.5-flash"
     llm_temperature: float = 0.1
     llm_max_tokens: int = 4096
+
+
+class SandboxFetchUrlRequest(BaseModel):
+    """Żądanie pobrania i czyszczenia URL do testu."""
+    url: str
 
 
 class SettingUpdate(BaseModel):

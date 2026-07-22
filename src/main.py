@@ -30,7 +30,7 @@ from odoo_integration import get_odoo_client
 from osint_engine import get_engine, get_date_limits, get_system_instruction
 from scrapers.factory import SCRAPER_REGISTRY
 from models import User, Session as UserSession, Account, ResearchLog, Setting, PromptVersion, Lead, RunPerformanceSnapshot
-from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest, SettingUpdate, ChangePasswordRequest
+from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest, SandboxFetchUrlRequest, SettingUpdate, ChangePasswordRequest
 from auth import verify_password, create_user_session, validate_session_token
 
 # ---------------------------------------------------------------------------
@@ -1085,6 +1085,25 @@ async def get_research_logs(
 # ---------------------------------------------------------------------------
 # API Endpoints - LLM Sandbox
 # ---------------------------------------------------------------------------
+@app.post("/api/sandbox/fetch-url", tags=["Sandbox"])
+async def sandbox_fetch_url(
+    req: SandboxFetchUrlRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    from curl_cffi.requests import AsyncSession as CffiAsyncSession
+    from scrapers.base import DOMSanitizer
+    try:
+        async with CffiAsyncSession(impersonate="chrome124") as cffi_session:
+            resp = await cffi_session.get(req.url, timeout=15)
+            if resp.status_code != 200:
+                return {"success": False, "error": f"HTTP {resp.status_code}"}
+            clean_text = DOMSanitizer.clean(resp.text, max_chars=6000)
+            return {"success": True, "clean_text": clean_text}
+    except Exception as exc:
+        logger.error("Sandbox fetch url error: %s", exc)
+        return {"success": False, "error": str(exc)}
+
+
 @app.post("/api/sandbox/test", tags=["Sandbox"])
 async def run_sandbox_test(
     req: SandboxRequest,
@@ -1103,19 +1122,36 @@ async def run_sandbox_test(
     except Exception:
         pass
 
+    raw_text = req.raw_text
+    if req.url and not raw_text:
+        from curl_cffi.requests import AsyncSession as CffiAsyncSession
+        from scrapers.base import DOMSanitizer
+        try:
+            async with CffiAsyncSession(impersonate="chrome124") as cffi_session:
+                resp = await cffi_session.get(req.url, timeout=15)
+                if resp.status_code == 200:
+                    raw_text = DOMSanitizer.clean(resp.text, max_chars=6000)
+                else:
+                    return {"success": False, "error": f"Błąd pobierania: HTTP {resp.status_code}"}
+        except Exception as exc:
+            return {"success": False, "error": f"Błąd pobierania URL: {exc}"}
+            
+    if not raw_text:
+        return {"success": False, "error": "Brak tekstu źródłowego i brak poprawnego URL."}
+
     try:
         client = genai.Client(api_key=api_key)
         
         response = client.models.generate_content(
             model=req.llm_model,
-            contents=req.raw_text,
+            contents=raw_text,
             config=types.GenerateContentConfig(
                 system_instruction=req.prompt,
                 temperature=req.llm_temperature,
                 max_output_tokens=req.llm_max_tokens,
             )
         )
-        return {"success": True, "output": response.text or ""}
+        return {"success": True, "output": response.text or "", "fetched_text": raw_text if req.url else None}
     except Exception as exc:
         logger.error("Sandbox test error: %s", exc)
         return {"success": False, "error": str(exc)}
