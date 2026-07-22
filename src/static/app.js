@@ -219,6 +219,7 @@ document.addEventListener("DOMContentLoaded", () => {
             loadAnalyticsKPIs();
             loadAnalyticsTimeline();
             checkNotificationGate();
+            populateSandboxSources();
         } catch (e) {
             leadsTableBody.innerHTML = `<tr><td colspan="8" class="loading-state text-error">Błąd ładowania danych: ${e.message}</td></tr>`;
         }
@@ -542,6 +543,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderAccounts(accounts) {
+        populateSandboxCampaigns(accountsList);
         if (accounts.length === 0) {
             accountsContainer.innerHTML = `<div class="loading-state">Brak aktywnych kampanii. Dodaj pierwszą klikając „Dodaj Kampanię”.</div>`;
             return;
@@ -852,6 +854,29 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    async function populateSandboxSources() {
+        const select = document.getElementById("sandbox-source-select");
+        if (!select) return;
+        try {
+            const sources = await apiRequest("/api/sources");
+            if (Array.isArray(sources)) {
+                select.innerHTML = '';
+                sources.forEach(src => {
+                    const opt = document.createElement("option");
+                    opt.value = src.id;
+                    opt.textContent = src.name;
+                    select.appendChild(opt);
+                });
+                const defOpt = document.createElement("option");
+                defOpt.value = "DOMSanitizer";
+                defOpt.textContent = "Domyślny scraper";
+                select.appendChild(defOpt);
+            }
+        } catch (err) {
+            console.error("Failed to load sandbox sources", err);
+        }
+    }
+
     const sandboxCampaignSelect = document.getElementById("sandbox-campaign-select");
     if (sandboxCampaignSelect) {
         sandboxCampaignSelect.addEventListener("change", async (e) => {
@@ -887,10 +912,11 @@ document.addEventListener("DOMContentLoaded", () => {
             sandboxFetchBtn.disabled = true;
             sandboxFetchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             try {
+                const sourceSelect = document.getElementById("sandbox-source-select");
                 const res = await apiRequest("/api/sandbox/fetch-url", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ url: urlInput })
+                    body: JSON.stringify({ url: urlInput, source: sourceSelect ? sourceSelect.value : "DOMSanitizer" })
                 });
                 if (res && res.success) {
                     textArea.value = res.clean_text;
@@ -922,7 +948,8 @@ document.addEventListener("DOMContentLoaded", () => {
             prompt: document.getElementById("sandbox-prompt").value,
             llm_model: document.getElementById("sandbox-model").value,
             llm_temperature: parseFloat(sandboxTemp.value),
-            llm_max_tokens: 4096
+            llm_max_tokens: 4096,
+            source: document.getElementById("sandbox-source-select") ? document.getElementById("sandbox-source-select").value : "DOMSanitizer"
         };
 
         try {

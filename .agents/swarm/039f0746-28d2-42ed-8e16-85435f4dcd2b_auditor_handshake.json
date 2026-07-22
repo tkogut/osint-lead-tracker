@@ -9,6 +9,6 @@
     "src/static/app.js"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-22T09:11:05Z",
-  "notes": "Audyt Plan-019 Sandbox URL Scraper Test: Przetestowano schematy Pydantic, endpoint fetch-url oraz integrację frontend-backend. Błędów brakuje."
+  "timestamp": "2026-07-22T09:21:29Z",
+  "notes": "Audyt Plan-020 Sandbox Search Source Selection: Przetestowano schematy Pydantic, wybór źródła wyszukiwania (Google, BZP, GUNB, scrapery), automatyczne zasilanie listy kampanii oraz spójność frontend-backend."
 }

@@ -70,11 +70,13 @@ class SandboxRequest(BaseModel):
     llm_model: str = "gemini-2.5-flash"
     llm_temperature: float = 0.1
     llm_max_tokens: int = 4096
+    source: Optional[str] = "DOMSanitizer"
 
 
 class SandboxFetchUrlRequest(BaseModel):
     """Żądanie pobrania i czyszczenia URL do testu."""
     url: str
+    source: Optional[str] = "DOMSanitizer"
 
 
 class SettingUpdate(BaseModel):

@@ -1093,6 +1093,8 @@ async def sandbox_fetch_url(
     from curl_cffi.requests import AsyncSession as CffiAsyncSession
     from scrapers.base import DOMSanitizer
     try:
+        source_name = req.source or "DOMSanitizer"
+        # BZP, SCRAPER_REGISTRY default logic with CffiAsyncSession
         async with CffiAsyncSession(impersonate="chrome124") as cffi_session:
             resp = await cffi_session.get(req.url, timeout=15)
             if resp.status_code != 200:
@@ -1136,20 +1138,27 @@ async def run_sandbox_test(
         except Exception as exc:
             return {"success": False, "error": f"Błąd pobierania URL: {exc}"}
             
-    if not raw_text:
+    if not raw_text and req.source != "Google":
         return {"success": False, "error": "Brak tekstu źródłowego i brak poprawnego URL."}
 
     try:
         client = genai.Client(api_key=api_key)
         
+        config_kwargs = {
+            "system_instruction": req.prompt,
+            "temperature": req.llm_temperature,
+            "max_output_tokens": req.llm_max_tokens,
+        }
+        
+        if req.source == "Google":
+            config_kwargs["tools"] = [types.Tool(google_search=types.GoogleSearch())]
+            if not raw_text:
+                raw_text = "Wykonaj wyszukiwanie z użyciem Google Search."
+        
         response = client.models.generate_content(
             model=req.llm_model,
             contents=raw_text,
-            config=types.GenerateContentConfig(
-                system_instruction=req.prompt,
-                temperature=req.llm_temperature,
-                max_output_tokens=req.llm_max_tokens,
-            )
+            config=types.GenerateContentConfig(**config_kwargs)
         )
         return {"success": True, "output": response.text or "", "fetched_text": raw_text if req.url else None}
     except Exception as exc:

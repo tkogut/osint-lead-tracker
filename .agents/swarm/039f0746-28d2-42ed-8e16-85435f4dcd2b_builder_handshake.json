@@ -9,6 +9,6 @@
     "src/static/app.js"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-22T09:09:54Z",
-  "notes": "Wdrożono rozbudowę Piaskownicy AI o testowanie URL i scraperów"
+  "timestamp": "2026-07-22T09:20:26Z",
+  "notes": "Wdrożono wybór źródła wyszukiwania i poprawkę ładowania kampanii w Piaskownicy AI"
 }
