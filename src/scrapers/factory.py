@@ -5,9 +5,11 @@ factory.py — Fabryka i rejestr wtyczek skraperów.
 from typing import Dict, Type, Optional
 from scrapers.base import BaseScraper
 from scrapers.automatyka import AutomatykaScraper
+from scrapers.logintrade import LogintradeScraper
 
 SCRAPER_REGISTRY: Dict[str, Type[BaseScraper]] = {
     "Automatyka": AutomatykaScraper,
+    "Logintrade": LogintradeScraper,
 }
 
 
