@@ -126,6 +126,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.classList.remove("centered-layout");
         userDisplayName.textContent = currentUser.username;
         loadDashboardData();
+        loadSandboxData();
         checkNotificationGate();
     }
 
@@ -190,6 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Load tab specific data
             if (targetTab === "dashboard") loadDashboardData();
             if (targetTab === "accounts") loadAccountsData();
+            if (targetTab === "sandbox") loadSandboxData();
             if (targetTab === "logs") loadLogsData();
             if (targetTab === "settings") loadSettingsData();
         });
@@ -842,6 +844,17 @@ document.addEventListener("DOMContentLoaded", () => {
         sandboxTempval.textContent = e.target.value;
     });
     
+    async function loadSandboxData() {
+        try {
+            const accounts = await apiRequest("/api/accounts");
+            accountsList = accounts;
+            populateSandboxCampaigns(accountsList);
+            await populateSandboxSources();
+        } catch (e) {
+            console.error("Błąd ładowania danych piaskownicy:", e);
+        }
+    }
+
     function populateSandboxCampaigns(accounts) {
         const select = document.getElementById("sandbox-campaign-select");
         if (!select) return;

@@ -3,12 +3,9 @@
   "role": "Auditor Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/schemas.py",
-    "src/main.py",
-    "src/static/index.html",
     "src/static/app.js"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-22T09:21:29Z",
-  "notes": "Audyt Plan-020 Sandbox Search Source Selection: Przetestowano schematy Pydantic, wybór źródła wyszukiwania (Google, BZP, GUNB, scrapery), automatyczne zasilanie listy kampanii oraz spójność frontend-backend."
+  "timestamp": "2026-07-22T09:25:38Z",
+  "notes": "Audyt Plan-021 Sandbox UI Initialization Fix: Przetestowano asynchroniczne pobieranie kampanii i źródeł przy przełączaniu zakładek. Brak błędów."
 }
