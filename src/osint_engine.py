@@ -65,6 +65,28 @@ def clean_html(raw_html: str) -> str:
     return text.strip()
 
 
+def format_prompt_dates(prompt_text: str, today_str: str, start_str: str) -> str:
+    """Dynamically replaces hardcoded old date strings in system prompts."""
+    if not prompt_text:
+        return prompt_text
+    
+    # "Dzisiejsza data (rok 2026) to: YYYY-MM-DD" -> with current today_str
+    prompt_text = re.sub(
+        r"Dzisiejsza data \(rok \d{4}\) to: \d{4}-\d{2}-\d{2}",
+        f"Dzisiejsza data (rok {today_str[:4]}) to: {today_str}",
+        prompt_text
+    )
+    
+    # "od YYYY-MM-DD do YYYY-MM-DD" -> with start_str..today_str
+    prompt_text = re.sub(
+        r"od \d{4}-\d{2}-\d{2} do \d{4}-\d{2}-\d{2}",
+        f"od {start_str} do {today_str}",
+        prompt_text
+    )
+    
+    return prompt_text
+
+
 def get_system_instruction(today_str: str, start_str: str) -> str:
     return f"""Jesteś asystentem OSINT / lead research do wykrywania nowych inwestycji i postępowań, w których jedną ze składowych może być:
 
@@ -203,7 +225,9 @@ class OSINTEngine:
 
         custom_prompt = ""
         if account and account.custom_prompt:
-            custom_prompt = account.custom_prompt + "\n\n"
+            today_str, start_str = get_date_limits()
+            formatted_prompt = format_prompt_dates(account.custom_prompt, today_str, start_str)
+            custom_prompt = formatted_prompt + "\n\n"
 
         if account and account.custom_prompt:
             # Custom campaigns prompt
@@ -308,7 +332,9 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
 
         custom_prompt = ""
         if account and account.custom_prompt:
-            custom_prompt = account.custom_prompt + "\n\n"
+            today_str, start_str = get_date_limits()
+            formatted_prompt = format_prompt_dates(account.custom_prompt, today_str, start_str)
+            custom_prompt = formatted_prompt + "\n\n"
 
         prompt = f"""{custom_prompt}Przeanalizuj poniższy tekst ogłoszenia/zapytania ofertowego ze strony: {source_url}
 
@@ -509,7 +535,7 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
             llm_temp = account.llm_temperature
             llm_max_tokens = account.llm_max_tokens
             if account.custom_prompt:
-                instruction = account.custom_prompt
+                instruction = format_prompt_dates(account.custom_prompt, today_date, start_date)
 
         keywords_str = "wagach samochodowych"
         if account:

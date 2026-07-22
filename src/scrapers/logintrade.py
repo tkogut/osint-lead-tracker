@@ -73,12 +73,18 @@ class LogintradeScraper(BaseScraper):
                         logger.error("[Logintrade] Wykryto blokade Cloudflare / Captcha na stronie %d!", page)
                         continue
 
-                    found_links = set(re.findall(r'href=["\'](/zapytania-ofertowe/[^"\']+|/przetargi/[^"\']+)["\']', html))
+                    found_links = set(re.findall(r'href=["\']([^"\']*(?:zapytania-ofertowe|przetargi|zapytania_email)[^"\']*)["\']', html))
                     detail_urls = []
                     for link in found_links:
-                        if link in ("/zapytania-ofertowe", "/zapytania-ofertowe/", "/przetargi", "/przetargi/"):
+                        if link.endswith("/zapytania-ofertowe") or link.endswith("/zapytania-ofertowe/") or link.endswith("/przetargi") or link.endswith("/przetargi/") or link.endswith("/zapytania_email") or link.endswith("/zapytania_email/"):
                             continue
-                        full_url = urllib.parse.urljoin("https://logintrade.pl", link)
+                        if link.startswith("http"):
+                            if "logintrade.net" in link or "logintrade.pl" in link:
+                                full_url = link
+                            else:
+                                continue
+                        else:
+                            full_url = urllib.parse.urljoin(url, link)
                         detail_urls.append(full_url)
 
                     if not detail_urls:

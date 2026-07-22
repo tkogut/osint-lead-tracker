@@ -27,7 +27,7 @@ from sqlalchemy.exc import IntegrityError
 from config import get_settings
 from database import get_recent_leads, init_db, save_lead, url_exists, AsyncSessionLocal, get_db_setting_sync
 from odoo_integration import get_odoo_client
-from osint_engine import get_engine, get_date_limits, get_system_instruction
+from osint_engine import get_engine, get_date_limits, get_system_instruction, format_prompt_dates
 from scrapers.factory import SCRAPER_REGISTRY
 from models import User, Session as UserSession, Account, ResearchLog, Setting, PromptVersion, Lead, RunPerformanceSnapshot
 from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest, SandboxFetchUrlRequest, SettingUpdate, ChangePasswordRequest
@@ -1144,8 +1144,11 @@ async def run_sandbox_test(
     try:
         client = genai.Client(api_key=api_key)
         
+        today_str, start_str = get_date_limits()
+        formatted_prompt = format_prompt_dates(req.prompt, today_str, start_str)
+        
         config_kwargs = {
-            "system_instruction": req.prompt,
+            "system_instruction": formatted_prompt,
             "temperature": req.llm_temperature,
             "max_output_tokens": req.llm_max_tokens,
         }
