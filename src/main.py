@@ -411,7 +411,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.10",
+    version="1.7.11",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -431,7 +431,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.10",
+        "version": "1.7.11",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
@@ -959,8 +959,8 @@ async def get_settings_list(
     safe_settings = []
     for r in rows:
         val = r.value or ""
-        if any(sec in r.key for sec in ["KEY", "PASSWORD", "PASS", "TOKEN"]) and len(val) > 6:
-            val = val[:3] + "..." + val[-3:]
+        if any(sec in r.key for sec in ["KEY", "PASSWORD", "PASS", "TOKEN"]):
+            val = "******" if val else ""
         safe_settings.append({"key": r.key, "value": val})
     return safe_settings
 
@@ -976,7 +976,7 @@ async def update_setting(
     if not item:
         raise HTTPException(status_code=404, detail="Ustawienie nie istnieje.")
     
-    if req.value.startswith("...") or "..." in req.value:
+    if req.value == "******" or req.value.startswith("...") or "..." in req.value:
         # Maskowana wartość oznacza brak zmian ze strony użytkownika - ignorujemy bez błędu
         return {"success": True}
 

@@ -1268,7 +1268,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const val = input.value;
             
             // Jeśli użytkownik nie edytował zamaskowanego pola, pomijamy
-            if (val.startsWith("...") || val.endsWith("...") || val.includes("...")) {
+            if (val === "******" || val.startsWith("...") || val.endsWith("...") || val.includes("...")) {
                 continue;
             }
             
