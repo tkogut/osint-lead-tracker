@@ -98,6 +98,9 @@ BARDZO WAŻNE (Zakres czasowy i status):
 1. Dzisiejsza data (rok 2026) to: {today_str}.
 2. Szukamy wyłącznie postępowań opublikowanych w zakresie dat od {start_str} do {today_str}.
 3. MASZ ABSOLUTNY ZAKAZ dodawania postępowań, których termin składania ofert już minął, lub które zostały już rozstrzygnięte/unieważnione. Interesują nas wyłącznie AKTYWNE, trwające postępowania. Zawsze sprawdź status i termin składania ofert w treści strony. Kategorycznie odrzuć wyniki, w których przetarg jest oznaczony jako "rozstrzygnięty", "wybrano wykonawcę", "unieważniony", "po terminie".
+4. Status i termin dla skraperów: Jeśli w surowej treści ogłoszenia brak podanego dokładnego terminu składania ofert, ale data opublikowania/wygenerowania mieści się w wyznaczonym oknie czasowym (od {start_str} do {today_str}), załóż że ogłoszenie jest AKTYWNE (trwające) i nie odrzucaj go z powodu braku jawnego terminu.
+
+Ekstrakcja Inwestora: Jeśli nazwa zamawiającego nie występuje bezpośrednio w nagłówku, WYCIĄGNIJ ją z kontekstu treści (np. nazwa zakładu produkcyjnego, fabryki, inwestora, kompleksu, oddziału spółki, np. Zakład Produkcyjny 'Pomorze' i 'Mazowsze').
 
 Zasada formułowania zapytań do wyszukiwarki:
 Gdy wywołujesz wyszukiwarkę Google, używaj prostych słów kluczowych (np. "budowa wagi samochodowej przetarg", "waga samochodowa zapytanie ofertowe"). 
@@ -330,9 +333,9 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
         if not text_content or len(text_content.strip()) < 50:
             return None, 0, 0
 
+        today_str, start_str = get_date_limits()
         custom_prompt = ""
         if account and account.custom_prompt:
-            today_str, start_str = get_date_limits()
             formatted_prompt = format_prompt_dates(account.custom_prompt, today_str, start_str)
             custom_prompt = formatted_prompt + "\n\n"
 
@@ -346,7 +349,9 @@ Treść ogłoszenia:
 Wymagania:
 1. Zdecyduj, czy treść ogłoszenia odpowiada zdefiniowanym wymaganiom i czy reprezentuje wartościowy lead.
 2. Jeśli ogłoszenie NIE spełnia wymagań lub minął termin, zwróć wyłącznie słowo: ODRZUĆ.
-3. Jeśli ogłoszenie spełnia kryteria, zwróć dane leada w formacie JSON o poniższej strukturze:
+3. Status i termin dla skraperów: Jeśli w surowej treści ogłoszenia brak podanego dokładnego terminu składania ofert, ale data opublikowania/wygenerowania mieści się w wyznaczonym oknie czasowym (od {start_str} do {today_str}), załóż że ogłoszenie jest AKTYWNE (trwające) i nie odrzucaj go z powodu braku jawnego terminu.
+4. Ekstrakcja Inwestora: Jeśli nazwa zamawiającego nie występuje bezpośrednio w nagłówku, WYCIĄGNIJ ją z kontekstu treści (np. nazwa zakładu produkcyjnego, fabryki, inwestora, kompleksu, oddziału spółki, np. Zakład Produkcyjny 'Pomorze' i 'Mazowsze').
+5. Jeśli ogłoszenie spełnia kryteria, zwróć dane leada w formacie JSON o poniższej strukturze:
 {{
   "tytul": "Tytuł ogłoszenia / zapytania",
   "typ": "lead",

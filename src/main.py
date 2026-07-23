@@ -1180,9 +1180,11 @@ Treść ogłoszenia:
 
 Wymagania:
 1. Zdecyduj, czy treść ogłoszenia odpowiada zdefiniowanym kryteriom kampanii w system_instruction.
-2. Jeśli ogłoszenie spełnia kryteria, zwróć dane leada w formacie JSON:
+2. Status i termin dla skraperów: Jeśli w surowej treści ogłoszenia brak podanego dokładnego terminu składania ofert, ale data opublikowania/wygenerowania mieści się w wyznaczonym oknie czasowym (od {start_str} do {today_str}), załóż że ogłoszenie jest AKTYWNE (trwające) i nie odrzucaj go z powodu braku jawnego terminu.
+3. Ekstrakcja Inwestora: Jeśli nazwa zamawiającego nie występuje bezpośrednio w nagłówku, WYCIĄGNIJ ją z kontekstu treści (np. nazwa zakładu produkcyjnego, fabryki, inwestora, kompleksu, oddziału spółki, np. Zakład Produkcyjny 'Pomorze' i 'Mazowsze').
+4. Jeśli ogłoszenie spełnia kryteria, zwróć dane leada w formacie JSON:
 {{"leady": [{{"tytul": "Tytuł ogłoszenia", "typ": "lead", "nazwa_inwestycji": "Nazwa zamówienia/inwestycji", "lokalizacja": "Lokalizacja (miasto, województwo)", "inwestor": "Nazwa zamawiającego", "wykonawca": "", "zakres": "Opis zakresu", "uzasadnienie": "Dlaczego to wartościowy lead", "priorytet": "wysoki/sredni/niski", "data": "{today_str}", "url": "{target_url}"}}]}}
-3. Jeśli ogłoszenie NIE spełnia wymagań kampanii lub minął termin, zwróć {{"leady": []}}.
+5. Jeśli ogłoszenie NIE spełnia wymagań kampanii lub minął termin, zwróć {{"leady": []}}.
 Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown."""
 
         response = client.models.generate_content(
