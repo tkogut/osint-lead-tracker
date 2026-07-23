@@ -46,6 +46,11 @@ fi
 # Default commit message if none provided
 MESSAGE="${1:-chore: update code}"
 
+# Automatic patch version bump (v1.7.x)
+if [ -f "$PROJECT_ROOT/scripts/bump_patch_version.py" ]; then
+    python3 "$PROJECT_ROOT/scripts/bump_patch_version.py" "$MESSAGE"
+fi
+
 # Add all changes
 git add .
 
