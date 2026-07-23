@@ -33,6 +33,7 @@ from scrapers.factory import SCRAPER_REGISTRY
 from models import User, Session as UserSession, Account, ResearchLog, Setting, PromptVersion, Lead, RunPerformanceSnapshot
 from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest, SandboxFetchUrlRequest, SettingUpdate, ChangePasswordRequest
 from auth import verify_password, create_user_session, validate_session_token
+from seed import seed_data
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -356,6 +357,7 @@ async def sync_lead_statuses() -> dict:
 async def lifespan(app: FastAPI):
     # --- startup ---
     await init_db()
+    await seed_data()
 
     # Odczytujemy konfigurację crona z bazy (lub fallback do config)
     cron_hour = int(get_db_setting_sync("CRON_HOUR", str(settings.cron_hour)))
@@ -411,7 +413,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.12",
+    version="1.7.13",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -431,7 +433,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.12",
+        "version": "1.7.13",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
@@ -954,14 +956,33 @@ async def get_settings_list(
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db)
 ):
+    known_keys = [
+        "GEMINI_API_KEY",
+        "ODOO_URL",
+        "ODOO_DB",
+        "ODOO_USER",
+        "ODOO_API_KEY",
+        "API_TOKEN",
+        "CRON_HOUR",
+        "CRON_MINUTE",
+        "CRON_TIMEZONE",
+        "SEARCH_WINDOW_DAYS",
+        "SCRAPER_AUTOMATYKA_USER",
+        "SCRAPER_AUTOMATYKA_PASS",
+        "SCRAPER_LOGINTRADE_USER",
+        "SCRAPER_LOGINTRADE_PASS",
+    ]
     result = await db.execute(select(Setting).order_by(Setting.key.asc()))
     rows = result.scalars().all()
+    db_settings = {r.key: r.value for r in rows}
+    
+    all_keys = sorted(set(known_keys) | set(db_settings.keys()))
     safe_settings = []
-    for r in rows:
-        val = r.value or ""
-        if any(sec in r.key for sec in ["KEY", "PASSWORD", "PASS", "TOKEN"]):
+    for key in all_keys:
+        val = db_settings.get(key, "") or ""
+        if any(sec in key for sec in ["KEY", "PASSWORD", "PASS", "TOKEN"]):
             val = "******" if val else ""
-        safe_settings.append({"key": r.key, "value": val})
+        safe_settings.append({"key": key, "value": val})
     return safe_settings
 
 
@@ -971,16 +992,18 @@ async def update_setting(
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(select(Setting).filter(Setting.key == req.key).limit(1))
-    item = result.scalar_one_or_none()
-    if not item:
-        raise HTTPException(status_code=404, detail="Ustawienie nie istnieje.")
-    
     if req.value == "******" or req.value.startswith("...") or "..." in req.value:
         # Maskowana wartość oznacza brak zmian ze strony użytkownika - ignorujemy bez błędu
         return {"success": True}
 
-    item.value = req.value
+    result = await db.execute(select(Setting).filter(Setting.key == req.key).limit(1))
+    item = result.scalar_one_or_none()
+    if not item:
+        item = Setting(key=req.key, value=req.value)
+        db.add(item)
+    else:
+        item.value = req.value
+
     await db.commit()
     return {"success": True}
 
