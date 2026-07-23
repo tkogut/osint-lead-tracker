@@ -1226,9 +1226,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderSettings(settings) {
-        settingsFieldsContainer.innerHTML = settings.map(s => {
+        const scraperKeys = [
+            "SCRAPER_AUTOMATYKA_USER",
+            "SCRAPER_AUTOMATYKA_PASS",
+            "SCRAPER_LOGINTRADE_USER",
+            "SCRAPER_LOGINTRADE_PASS"
+        ];
+
+        const genericSettings = settings.filter(s => !scraperKeys.includes(s.key));
+        settingsFieldsContainer.innerHTML = genericSettings.map(s => {
             let type = "text";
-            if (s.key.includes("KEY") || s.key.includes("PASSWORD") || s.key.includes("TOKEN")) {
+            if (s.key.includes("KEY") || s.key.includes("PASSWORD") || s.key.includes("TOKEN") || s.key.includes("PASS")) {
                 type = "password";
             }
             
@@ -1239,20 +1247,28 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
             `;
         }).join("");
+
+        scraperKeys.forEach(key => {
+            const inputEl = document.getElementById(`setting-${key}`);
+            if (inputEl) {
+                const setting = settings.find(s => s.key === key);
+                inputEl.value = setting ? setting.value : "";
+            }
+        });
     }
 
     settingsForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         
-        const inputs = settingsFieldsContainer.querySelectorAll("input");
+        const inputs = settingsForm.querySelectorAll("input[data-key]");
         let savedCount = 0;
         
         for (const input of inputs) {
             const key = input.dataset.key;
             const val = input.value;
             
-            // Jeśli użytkownik nie edytował zamaskowanego pola (zaczyna się od kropki), pomijamy
-            if (val.startsWith("...") || val.endsWith("...")) {
+            // Jeśli użytkownik nie edytował zamaskowanego pola, pomijamy
+            if (val.startsWith("...") || val.endsWith("...") || val.includes("...")) {
                 continue;
             }
             

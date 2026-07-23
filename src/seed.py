@@ -75,7 +75,11 @@ async def seed_data() -> None:
             "CRON_HOUR",
             "CRON_MINUTE",
             "CRON_TIMEZONE",
-            "SEARCH_WINDOW_DAYS"
+            "SEARCH_WINDOW_DAYS",
+            "SCRAPER_AUTOMATYKA_USER",
+            "SCRAPER_AUTOMATYKA_PASS",
+            "SCRAPER_LOGINTRADE_USER",
+            "SCRAPER_LOGINTRADE_PASS"
         ]
         
         for key in setting_keys:

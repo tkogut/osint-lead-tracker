@@ -3,10 +3,13 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
+    "src/seed.py",
     "src/main.py",
-    "src/osint_engine.py"
+    "src/static/index.html",
+    "src/static/app.js",
+    "src/scrapers/automatyka.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-23T08:31:31Z",
-  "notes": "Wdrożono 100% uniwersalne reguły ekstrakcji ze stron zbiorczych bez zaszytych marek czy produktów"
+  "timestamp": "2026-07-23T14:17:15Z",
+  "notes": "Wdrożono modułowy system logowania do scraperów (Automatyka.pl / Logintrade) z ekstrakcją danych ogłaszającego"
 }

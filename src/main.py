@@ -411,7 +411,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.9",
+    version="1.7.10",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -431,7 +431,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.9",
+        "version": "1.7.10",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
@@ -959,7 +959,7 @@ async def get_settings_list(
     safe_settings = []
     for r in rows:
         val = r.value or ""
-        if any(sec in r.key for sec in ["KEY", "PASSWORD", "TOKEN"]) and len(val) > 6:
+        if any(sec in r.key for sec in ["KEY", "PASSWORD", "PASS", "TOKEN"]) and len(val) > 6:
             val = val[:3] + "..." + val[-3:]
         safe_settings.append({"key": r.key, "value": val})
     return safe_settings
@@ -1104,12 +1104,32 @@ async def sandbox_fetch_url(
     from scrapers.base import DOMSanitizer
     try:
         source_name = req.source or "DOMSanitizer"
-        # BZP, SCRAPER_REGISTRY default logic with CffiAsyncSession
         async with CffiAsyncSession(impersonate="chrome124") as cffi_session:
+            if "automatyka.pl" in req.url:
+                user = get_db_setting_sync("SCRAPER_AUTOMATYKA_USER", "")
+                pwd = get_db_setting_sync("SCRAPER_AUTOMATYKA_PASS", "")
+                if user and pwd:
+                    try:
+                        await cffi_session.post(
+                            "https://www.xtech.pl/zaloguj",
+                            json={"LoginName": user, "Password": pwd, "Step": 1, "ServiceId": 3},
+                            timeout=15
+                        )
+                    except Exception as l_err:
+                        logger.warning("Sandbox login to xtech failed: %s", l_err)
+
             resp = await cffi_session.get(req.url, timeout=15)
             if resp.status_code != 200:
                 return {"success": False, "error": f"HTTP {resp.status_code}"}
-            clean_text = DOMSanitizer.clean(resp.text, max_chars=6000)
+            
+            detail_html = resp.text
+            clean_text = DOMSanitizer.clean(detail_html, max_chars=6000)
+            if "automatyka.pl" in req.url:
+                from scrapers.automatyka import extract_advertiser_info
+                contact_header = extract_advertiser_info(detail_html)
+                if contact_header:
+                    clean_text = contact_header + clean_text
+
             return {"success": True, "clean_text": clean_text}
     except Exception as exc:
         logger.error("Sandbox fetch url error: %s", exc)
@@ -1140,9 +1160,27 @@ async def run_sandbox_test(
         from scrapers.base import DOMSanitizer
         try:
             async with CffiAsyncSession(impersonate="chrome124") as cffi_session:
+                if "automatyka.pl" in req.url:
+                    user = get_db_setting_sync("SCRAPER_AUTOMATYKA_USER", "")
+                    pwd = get_db_setting_sync("SCRAPER_AUTOMATYKA_PASS", "")
+                    if user and pwd:
+                        try:
+                            await cffi_session.post(
+                                "https://www.xtech.pl/zaloguj",
+                                json={"LoginName": user, "Password": pwd, "Step": 1, "ServiceId": 3},
+                                timeout=15
+                            )
+                        except Exception:
+                            pass
                 resp = await cffi_session.get(req.url, timeout=15)
                 if resp.status_code == 200:
-                    raw_text = DOMSanitizer.clean(resp.text, max_chars=6000)
+                    detail_html = resp.text
+                    raw_text = DOMSanitizer.clean(detail_html, max_chars=6000)
+                    if "automatyka.pl" in req.url:
+                        from scrapers.automatyka import extract_advertiser_info
+                        contact_header = extract_advertiser_info(detail_html)
+                        if contact_header:
+                            raw_text = contact_header + raw_text
                 else:
                     return {"success": False, "error": f"Błąd pobierania: HTTP {resp.status_code}"}
         except Exception as exc:

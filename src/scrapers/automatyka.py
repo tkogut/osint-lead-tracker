@@ -1,5 +1,5 @@
 """
-automatyka.py — Wtyczka skrapera dla portalu automatyka.pl z omijaniem Cloudflare via curl_cffi.
+automatyka.py — Wtyczka skrapera dla portalu automatyka.pl z omijaniem Cloudflare via curl_cffi i autoryzacją xtech.pl.
 """
 
 import asyncio
@@ -12,9 +12,74 @@ from typing import List, Dict, Any
 
 from curl_cffi.requests import AsyncSession
 from scrapers.base import BaseScraper, DOMSanitizer
-from database import is_url_visited, mark_url_visited
+from database import is_url_visited, mark_url_visited, get_db_setting_sync
 
 logger = logging.getLogger(__name__)
+
+
+def extract_advertiser_info(html_content: str) -> str:
+    """
+    Wyciąga sekcję 'Dane ogłaszającego' (Nazwa firmy, Osoba kontaktowa, Adres e-mail, Nr telefonu, Adres do kontaktu)
+    z surowego HTML portalu Automatyka.pl / Xtech.pl.
+    """
+    extracted_lines = []
+
+    block_match = re.search(
+        r'(?:Dane\s+ogłaszającego|Dane\s+kontaktowe|Kontakt\s+do\s+ogłoszeniodawcy)(.*?)(?:</section>|</aside>|<div\s+class="[^"]*description[^"]*">|<h\d|$)',
+        html_content,
+        flags=re.DOTALL | re.IGNORECASE
+    )
+    search_scope = block_match.group(1) if block_match else html_content
+
+    # Nazwa firmy
+    firm_m = re.search(r'(?:Nazwa\s+firmy|Firma|Firma/Instytucja)[^:]*:\s*(?:<[^>]+>\s*)*([^<\r\n]+)', search_scope, re.IGNORECASE)
+    if firm_m:
+        firm = firm_m.group(1).strip()
+        if firm:
+            extracted_lines.append(f"Nazwa firmy: {firm}")
+
+    # Osoba kontaktowa
+    cp_m = re.search(r'(?:Osoba\s+kontaktowa|Kontakt|Osoba\s+do\s+kontaktu)[^:]*:\s*(?:<[^>]+>\s*)*([^<\r\n]+)', search_scope, re.IGNORECASE)
+    if cp_m:
+        cp = cp_m.group(1).strip()
+        if cp:
+            extracted_lines.append(f"Osoba kontaktowa: {cp}")
+
+    # Adres e-mail
+    email_m = re.search(r'(?:Adres\s+e-mail|E-mail|Email)[^:]*:\s*(?:<[^>]+>\s*)*([\w\.-]+@[\w\.-]+\.\w+)', search_scope, re.IGNORECASE)
+    if email_m:
+        em = email_m.group(1).strip()
+        if em:
+            extracted_lines.append(f"Adres e-mail: {em}")
+    else:
+        all_emails = re.findall(r'[\w\.-]+@[\w\.-]+\.\w+', search_scope)
+        for e in all_emails:
+            if not any(d in e.lower() for d in ["automatyka.pl", "xtech.pl", "example.com", "schema.org"]):
+                extracted_lines.append(f"Adres e-mail: {e.strip()}")
+                break
+
+    # Nr telefonu
+    phone_m = re.search(r'(?:Nr\s+telefonu|Telefon|Tel\.?)[^:]*:\s*(?:<[^>]+>\s*)*([\+\d\s\-\(\)]{7,})', search_scope, re.IGNORECASE)
+    if phone_m:
+        ph = phone_m.group(1).strip()
+        if ph:
+            extracted_lines.append(f"Nr telefonu: {ph}")
+
+    # Adres do kontaktu
+    addr_m = re.search(r'(?:Adres\s+do\s+kontaktu|Adres)[^:]*:\s*(?:<[^>]+>\s*)*([^<\r\n]+)', search_scope, re.IGNORECASE)
+    if addr_m:
+        addr = addr_m.group(1).strip()
+        if addr:
+            extracted_lines.append(f"Adres do kontaktu: {addr}")
+
+    if extracted_lines:
+        return "=== DANE OGŁASZAJĄCEGO ===\n" + "\n".join(extracted_lines) + "\n===========================\n\n"
+    elif block_match:
+        clean_block = re.sub(r'<[^>]+>', ' ', block_match.group(1))
+        clean_block = " ".join(clean_block.strip().split())
+        if len(clean_block) > 5:
+            return f"=== DANE OGŁASZAJĄCEGO ===\n{clean_block}\n===========================\n\n"
+    return ""
 
 
 class AutomatykaScraper(BaseScraper):
@@ -51,6 +116,9 @@ class AutomatykaScraper(BaseScraper):
             except Exception:
                 pass
 
+        user = get_db_setting_sync("SCRAPER_AUTOMATYKA_USER", "")
+        pwd = get_db_setting_sync("SCRAPER_AUTOMATYKA_PASS", "")
+
         headers = {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
             "Accept-Language": "pl,en-US;q=0.7,en;q=0.3",
@@ -58,6 +126,18 @@ class AutomatykaScraper(BaseScraper):
         }
 
         async with AsyncSession(impersonate="chrome124", headers=headers) as session:
+            if user and pwd:
+                try:
+                    logger.info("[Automatyka] Autoryzacja w xtech.pl dla użytkownika: %s", user)
+                    login_resp = await session.post(
+                        "https://www.xtech.pl/zaloguj",
+                        json={"LoginName": user, "Password": pwd, "Step": 1, "ServiceId": 3},
+                        timeout=15
+                    )
+                    logger.info("[Automatyka] Status autoryzacji w xtech.pl: %s", login_resp.status_code)
+                except Exception as login_err:
+                    logger.error("[Automatyka] Błąd logowania do xtech.pl: %s", login_err)
+
             for page in range(1, 11):
                 url = self.base_url if page == 1 else f"{self.base_url}?page={page}"
                 try:
@@ -132,7 +212,10 @@ class AutomatykaScraper(BaseScraper):
                                 except Exception as parse_pub_err:
                                     logger.warning("[Automatyka] Błąd parsowania wyciągniętej daty %s: %s", pub_date_str, parse_pub_err)
 
+                            contact_header = extract_advertiser_info(detail_html)
                             clean_text = DOMSanitizer.clean(detail_html, max_chars=6000)
+                            if contact_header:
+                                clean_text = contact_header + clean_text
 
                             if len(clean_text) < 50:
                                 logger.warning("[Automatyka] Odrzucono zbyt krótki tekst po sanitacji DOM: %s", detail_url)
