@@ -84,6 +84,7 @@ class SandboxFetchUrlRequest(BaseModel):
     """Żądanie pobrania i czyszczenia URL do testu."""
     url: str
     source: Optional[str] = "DOMSanitizer"
+    scraper: Optional[str] = "Auto"
 
 
 class SettingUpdate(BaseModel):

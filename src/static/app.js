@@ -941,10 +941,15 @@ document.addEventListener("DOMContentLoaded", () => {
             sandboxFetchBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
             try {
                 const sourceSelect = document.getElementById("sandbox-source-select");
+                const scraperSelect = document.getElementById("sandbox-scraper-context");
                 const res = await apiRequest("/api/sandbox/fetch-url", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ url: urlInput, source: sourceSelect ? sourceSelect.value : "DOMSanitizer" })
+                    body: JSON.stringify({
+                        url: urlInput,
+                        source: sourceSelect ? sourceSelect.value : "DOMSanitizer",
+                        scraper: scraperSelect ? scraperSelect.value : "Auto"
+                    })
                 });
                 if (res && res.success) {
                     textArea.value = res.clean_text;

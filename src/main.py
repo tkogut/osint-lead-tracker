@@ -413,7 +413,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.14",
+    version="1.7.15",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -433,7 +433,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.14",
+        "version": "1.7.15",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
@@ -1232,10 +1232,17 @@ async def sandbox_fetch_url(
 ) -> dict:
     from curl_cffi.requests import AsyncSession as CffiAsyncSession
     from scrapers.base import DOMSanitizer
+    import re
     try:
         source_name = req.source or "DOMSanitizer"
+        
+        if req.scraper == "Auto":
+            context = "Automatyka" if ("automatyka.pl" in req.url or "xtech.pl" in req.url) else "Logintrade" if ("logintrade.pl" in req.url or "logintrade.net" in req.url) else "None"
+        else:
+            context = req.scraper
+
         async with CffiAsyncSession(impersonate="chrome124") as cffi_session:
-            if "automatyka.pl" in req.url:
+            if context == "Automatyka":
                 user = get_db_setting_sync("SCRAPER_AUTOMATYKA_USER", "")
                 pwd = get_db_setting_sync("SCRAPER_AUTOMATYKA_PASS", "")
                 if user and pwd:
@@ -1247,6 +1254,25 @@ async def sandbox_fetch_url(
                         )
                     except Exception as l_err:
                         logger.warning("Sandbox login to xtech failed: %s", l_err)
+            elif context == "Logintrade":
+                user = get_db_setting_sync("SCRAPER_LOGINTRADE_USER", "")
+                pwd = get_db_setting_sync("SCRAPER_LOGINTRADE_PASS", "")
+                if user and pwd:
+                    try:
+                        sso_resp = await cffi_session.get("https://platformazakupowa.logintrade.pl/sso-login", timeout=15)
+                        _token = ""
+                        if sso_resp.status_code == 200:
+                            token_match = re.search(r'name="_token"\s+value="([^"]+)"', sso_resp.text)
+                            if token_match:
+                                _token = token_match.group(1)
+                        
+                        await cffi_session.post(
+                            "https://platformazakupowa.logintrade.pl/sso-login?backUrl=https://platformazakupowa.logintrade.pl/",
+                            data={"username": user, "password": pwd, "_token": _token, "save": ""},
+                            timeout=15
+                        )
+                    except Exception as l_err:
+                        logger.warning("Sandbox login to logintrade failed: %s", l_err)
 
             resp = await cffi_session.get(req.url, timeout=15)
             if resp.status_code != 200:
@@ -1254,7 +1280,7 @@ async def sandbox_fetch_url(
             
             detail_html = resp.text
             clean_text = DOMSanitizer.clean(detail_html, max_chars=6000)
-            if "automatyka.pl" in req.url:
+            if context == "Automatyka":
                 from scrapers.automatyka import extract_advertiser_info
                 contact_header = extract_advertiser_info(detail_html)
                 if contact_header:

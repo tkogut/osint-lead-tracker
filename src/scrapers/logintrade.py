@@ -12,7 +12,7 @@ from typing import List, Dict, Any
 
 from curl_cffi.requests import AsyncSession
 from scrapers.base import BaseScraper, DOMSanitizer
-from database import is_url_visited, mark_url_visited
+from database import is_url_visited, mark_url_visited, get_db_setting_sync
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,29 @@ class LogintradeScraper(BaseScraper):
             "Referer": "https://logintrade.pl/",
         }
 
+        user = get_db_setting_sync("SCRAPER_LOGINTRADE_USER", "")
+        pwd = get_db_setting_sync("SCRAPER_LOGINTRADE_PASS", "")
+
         async with AsyncSession(impersonate="chrome124", headers=headers) as session:
+            if user and pwd:
+                try:
+                    logger.info("[Logintrade] Autoryzacja w platformazakupowa.logintrade.pl dla użytkownika: %s", user)
+                    sso_resp = await session.get("https://platformazakupowa.logintrade.pl/sso-login", timeout=15)
+                    _token = ""
+                    if sso_resp.status_code == 200:
+                        token_match = re.search(r'name="_token"\s+value="([^"]+)"', sso_resp.text)
+                        if token_match:
+                            _token = token_match.group(1)
+                    
+                    login_resp = await session.post(
+                        "https://platformazakupowa.logintrade.pl/sso-login?backUrl=https://platformazakupowa.logintrade.pl/",
+                        data={"username": user, "password": pwd, "_token": _token, "save": ""},
+                        timeout=15
+                    )
+                    logger.info("[Logintrade] Status autoryzacji: %s", login_resp.status_code)
+                except Exception as login_err:
+                    logger.error("[Logintrade] Błąd logowania do Logintrade: %s", login_err)
+
             for page in range(1, 11):
                 url = self.base_url if page == 1 else f"{self.base_url}?page={page}"
                 try:
