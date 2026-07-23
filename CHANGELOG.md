@@ -2,6 +2,11 @@
 > **OSINT Lead Tracker**
 
 Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w tym pliku. Format jest oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/) i projekt jest zgodny z [SemVer](https://semver.org/spec/v2.0.0.html).
+## [1.7.12] - 2026-07-23
+
+### Added
+- feat: hard enforce dual handshake (builder + auditor) in smart_commit (plan 033)
+
 ## [1.7.11] - 2026-07-23
 
 ### Added

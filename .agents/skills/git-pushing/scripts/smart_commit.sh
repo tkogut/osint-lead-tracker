@@ -23,13 +23,14 @@ if [ "$ROLE" = "coordinator" ] || [ "$ROLE" = "gem" ]; then
             exit 1
         fi
 
-        if ! python3 "$VALIDATE_SCRIPT" --require-roles builder > /tmp/handshake_check.log 2>&1; then
-            echo "❌ [Handshake Gate] BRAK lub NIEPOPRAWNY handshake od Buildera!"
+        if ! python3 "$VALIDATE_SCRIPT" --require-roles builder,auditor > /tmp/handshake_check.log 2>&1; then
+            echo "❌ [Handshake Gate] BRAK lub NIEPOPRAWNY handshake (wymagani: Builder i Auditor)!"
             echo "   Szczegóły:"
             cat /tmp/handshake_check.log | sed 's/^/   /'
             echo ""
-            echo "   Rozwiązanie: Builder musi uruchomić:"
+            echo "   Rozwiązanie: Builder i Auditor muszą wygenerować handshake:"
             echo "   python3 scripts/generate-handshake.py --role builder --conversation-id <UUID> --status SUCCESS ..."
+            echo "   python3 scripts/generate-handshake.py --role auditor --conversation-id <UUID> --status SUCCESS ..."
             echo ""
             echo "   Pominięcie (awaryjnie): SKIP_HANDSHAKE=1 bash smart_commit.sh \"msg\""
             exit 1

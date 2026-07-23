@@ -19,7 +19,7 @@ Every agent session operates under the Triad model. Switching roles requires a f
 
 1. **The Coordinator (Manager & DevOps Architect)**
    - **Mandate**: High-level orchestration, git push, plan management (`.agents/plans/`).
-   - **Git Operations**: Coordinator wykonuje commity i pushe bezpośrednio z terminala głównego za pomocą smart_commit.sh (bez powoływania kosztownych subagentów).
+   - **Git Operations**: Coordinator wykonuje commity i pushe bezpośrednio z terminala głównego za pomocą `smart_commit.sh` (zabezpieczone wymogiem podwójnego handshake'u Buildera i Auditora).
    - **Constraint**: Forbidden from writing feature code in `/src`. Must delegate all implementation tasks to The Builder.
    - **Tools**: Browser (CDP), Task Boundary, `git`.
 
@@ -31,7 +31,7 @@ Every agent session operates under the Triad model. Switching roles requires a f
 3. **The Auditor (QA & Security Specialist)**
    - **Mandate**: Mathematical consistency, Z-Index audits, security reviews.
    - **Constraint**: Read-only access to source code. Issues reports to `GEMINI.md` (or session logs).
-   - **Handshake Role**: Provides the final "Math-Consistency" check before marking tasks complete.
+   - **Handshake Role**: Provides the final "Math-Consistency" check before marking tasks complete. Mandatory dual-handshake with Builder for all git pushes.
 
 ---
 
@@ -63,8 +63,8 @@ Every skill in `.agents/skills/` must contain:
 
 ## 5. THE HANDSHAKE (Execution Lock)
 
-No task is marked `[x] COMPLETE` without the following confirmation:
-> "Handshake Verified: Plan-Alignment and Math-Consistency checked. Ready for Coordinator Push."
+No task is marked `[x] COMPLETE` and no commit is allowed without dual handshake confirmation (Builder + Auditor):
+> "Handshake Verified: Plan-Alignment and Math-Consistency checked by both Builder and Auditor. Ready for Coordinator Push."
 
 ### 5.1 Handshake Protocol — Egzekucja
 
@@ -79,9 +79,20 @@ python3 scripts/generate-handshake.py \
     --notes "Opis wykonanej pracy"
 ```
 
-**Coordinator** — push jest automatycznie zablokowany przez `smart_commit.sh`, dopóki Builder nie złoży handshake:
+**Auditor** — po przeprowadzeniu audytu uruchamia:
 ```bash
-# Zwykły push (wymaga handshake Buildera):
+python3 scripts/generate-handshake.py \
+    --role auditor \
+    --conversation-id <UUID_SESJI> \
+    --status SUCCESS \
+    --files "src/main.py,src/static/app.js,..." \
+    --math-check PASSED \
+    --notes "Wynik weryfikacji i audytu"
+```
+
+**Coordinator** — push jest automatycznie zablokowany przez `smart_commit.sh`, dopóki OBOWIĄZKOWO Builder ORAZ Auditor nie złożą handshake:
+```bash
+# Zwykły push (wymaga handshake Buildera oraz Auditora):
 bash .agents/skills/git-pushing/scripts/smart_commit.sh "feat: opis"
 
 # Awaryjne pominięcie (tylko hotfix prod):
