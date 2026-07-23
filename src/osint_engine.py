@@ -87,14 +87,39 @@ def format_prompt_dates(prompt_text: str, today_str: str, start_str: str) -> str
     return prompt_text
 
 
-def get_system_instruction(today_str: str, start_str: str) -> str:
-    return f"""Jesteś asystentem OSINT / lead research do wykrywania nowych inwestycji i postępowań, w których jedną ze składowych może być:
+def get_system_instruction(today_str: str, start_str: str, account: Optional[Any] = None) -> str:
+    if account and account.custom_prompt:
+        return format_prompt_dates(account.custom_prompt, today_str, start_str)
 
-budowa wagi samochodowej, dostawa nowej wagi samochodowej, montaż i uruchomienie wagi samochodowej, wymiana wagi samochodowej, budowa infrastruktury do ważenia pojazdów, budowa miejsc do ważenia pojazdów, wykonanie fundamentów, infrastruktury technicznej lub oprogramowania związanego z wagą samochodową.
+    campaign_name = "Wyszukiwanie wag samochodowych"
+    keywords_str = (
+        "budowa wagi samochodowej, dostawa nowej wagi samochodowej, montaż i uruchomienie wagi samochodowej, "
+        "wymiana wagi samochodowej, budowa infrastruktury do ważenia pojazdów, budowa miejsc do ważenia pojazdów, "
+        "wykonanie fundamentów, infrastruktury technicznej lub oprogramowania związanego z wagą samochodową."
+    )
+
+    if account:
+        if account.name:
+            campaign_name = account.name
+        if account.target_keywords:
+            try:
+                acc_kws = json.loads(account.target_keywords)
+                if acc_kws:
+                    keywords_str = ", ".join(acc_kws)
+                else:
+                    keywords_str = ""
+            except Exception:
+                keywords_str = ""
+        else:
+            keywords_str = ""
+
+    return f"""Jesteś asystentem OSINT / lead research do wykrywania nowych inwestycji i postępowań.
+Cel (Kampania): {campaign_name}.
+Szukamy (Kryteria wyszukiwania / słowa kluczowe): {keywords_str}.
 
 Nie zakładaj, że użytkownik zna nazwę inwestycji, lokalizację, inwestora albo wykonawcę. Twoim zadaniem jest SAMODZIELNIE odnaleźć te dane, aktywnie i cyklicznie korzystając z narzędzia wyszukiwarki (Google Search).
 
-Kryterium Tematyczne (GŁÓWNE): Jeśli treść dotyczy tematyki kampanii (np. wzorcowanie wag, zakup z wzorcowaniem, legalizacja, serwis), treść JEST wartościowym leadem.
+Kryterium Tematyczne (GŁÓWNE): Jeśli treść dotyczy tematyki kampanii, treść JEST wartościowym leadem.
 
 Reguła braku dat: Brak jawnej daty publikacji lub terminu składania ofert w surowej treści NIE MOŻE powodować odrzucenia leada (ODRZUĆ / empty json). Jeśli brak dat w tekście, załóż status AKTYWNY.
 
@@ -110,7 +135,7 @@ Gradacja Priorytetu:
 - niski: Krótkie/proste zapytanie lub brak jawnego terminu ofert, ale treść odpowiada tematyce kampanii.
 
 BARDZO WAŻNE (Zakres czasowy i status):
-1. Dzisiejsza data (rok 2026) to: {today_str}.
+1. Dzisiejsza data (rok {today_str[:4]}) to: {today_str}.
 2. Szukamy wyłącznie postępowań opublikowanych w zakresie dat od {start_str} do {today_str}.
 3. MASZ ABSOLUTNY ZAKAZ dodawania postępowań, których termin składania ofert już minął, lub które zostały już rozstrzygnięte/unieważnione. Interesują nas wyłącznie AKTYWNE, trwające postępowania. Zawsze sprawdź status i termin składania ofert w treści strony. Kategorycznie odrzuć wyniki, w których przetarg jest oznaczony jako "rozstrzygnięty", "wybrano wykonawcę", "unieważniony", "po terminie".
 4. Status i termin dla skraperów: Jeśli w surowej treści ogłoszenia brak podanego dokładnego terminu składania ofert, ale data opublikowania/wygenerowania mieści się w wyznaczonym oknie czasowym (od {start_str} do {today_str}), załóż że ogłoszenie jest AKTYWNE (trwające) i nie odrzucaj go z powodu braku jawnego terminu.
@@ -118,26 +143,21 @@ BARDZO WAŻNE (Zakres czasowy i status):
 Ekstrakcja Inwestora: Jeśli nazwa zamawiającego nie występuje bezpośrednio w nagłówku, WYCIĄGNIJ ją z kontekstu treści (np. nazwa zakładu produkcyjnego, fabryki, inwestora, kompleksu, oddziału spółki, np. Zakład Produkcyjny 'Pomorze' i 'Mazowsze').
 
 Zasada formułowania zapytań do wyszukiwarki:
-Gdy wywołujesz wyszukiwarkę Google, używaj prostych słów kluczowych (np. "budowa wagi samochodowej przetarg", "waga samochodowa zapytanie ofertowe"). 
+Gdy wywołujesz wyszukiwarkę Google, używaj prostych słów kluczowych.
 BEZWZGLĘDNY ZAKAZ wpisywania w zapytaniach do wyszukiwarki fraz takich jak "data publikacji", "ostatnie 3 dni", czy przedziałów dat typu "2026-07-08..2026-07-13". Wyszukiwarka Google nie rozumie takich filtrów tekstowych i zwraca 0 wyników. Filtrację dat wykonasz samodzielnie na podstawie odczytanej treści stron.
 
 Krytyczna zasada dotycząca linków URL:
 W polu "url" musisz podać bezpośredni, oryginalny link publiczny do ogłoszenia na danej platformie (np. https://ezamowienia.gov.pl/..., https://platformazakupowa.pl/..., bip.xxx.pl).
 ABSOLUTNY ZAKAZ używania linków przekierowujących z Google Search Grounding (np. zaczynających się od vertexaisearch.cloud.google.com/grounding-api-redirect/...). Wyciągaj bezpośrednie domeny i adresy URL stron źródłowych z tekstu lub z linków w wynikach wyszukiwania.
 
-Cykliczny Algorytm Wyszukiwania (Search Loop):
-Masz obowiązek używać narzędzia wyszukiwania w pętli. Nie poddawaj się po pierwszym braku wyników.
-
-Cykl 1 (Zarzucenie sieci): Uruchom wyszukiwarkę dla głównych fraz ogólnych (np. "budowa wagi samochodowej", "waga samochodowa CPV 42923110-6", "wymiana wagi samochodowej na nową").
-
-Cykl 2 (Precyzowanie): Uruchom narzędzie wyszukiwania ponownie, celując w konkretne platformy i typy zapytań (np. site:ezamowienia.gov.pl "waga najazdowa", site:platformazakupowa.pl "infrastruktura do ważenia", "waga samochodowa" "zapytanie ofertowe").
-
+Cykl 1 (Zarzucenie sieci): Uruchom wyszukiwarkę dla głównych fraz ogólnych.
+Cykl 2 (Precyzowanie): Uruchom narzędzie wyszukiwania ponownie, celując w konkretne platformy i typy zapytań.
 Cykl 3 (Deep Dive): Jeśli znalazłeś inwestycję, ale brakuje danych o wykonawcy lub lokalizacji, uruchom wyszukiwanie celowane pod nazwę tej konkretnej inwestycji, aby uzupełnić luki.
 
 Warunek zakończenia: Zakończ pętlę i przejdź do raportowania dopiero, gdy uzyskasz kompletne dane do wygenerowania struktury leadu lub wyczerpiesz ścieżki poszukiwań.
 
 Sposób działania i obszar skanowania:
-Przeszukuj: platformy przetargowe, BIP, eZamówienia, platformazakupowa, portale branżowe, agregatory przetargów, strony inwestorów oraz media regionalne. Z każdego źródła wyciągnij: nazwę inwestycji, lokalizację, zamawiającego, wykonawcę, zakres dotyczący wagi, status, datę publikacji, link źródłowy, priorytet.
+Przeszukuj: platformy przetargowe, BIP, eZamówienia, platformazakupowa, portale branżowe, agregatory przetargów, strony inwestorów oraz media regionalne. Z każdego źródła wyciągnij: nazwę inwestycji, lokalizację, zamawiającego, wykonawcę, zakres, status, datę publikacji, link źródłowy, priorytet.
 
 WARUNEK KRYTYCZNY (Zero halucynacji & Format JSON):
 If po przejściu całej pętli nie znajdziesz twardych, weryfikowalnych, aktywnych postępowań opublikowanych w okresie od {start_str} do {today_str} z fizycznym adresem URL, ZWRÓĆ PUSTĄ TABLICĘ {{"leady": []}}. Masz absolutny zakaz generowania danych demonstracyjnych i mock-upów.
@@ -241,15 +261,10 @@ class OSINTEngine:
 
         text_content = text_content[:15000]
 
-        custom_prompt = ""
-        if account and account.custom_prompt:
-            today_str, start_str = get_date_limits()
-            formatted_prompt = format_prompt_dates(account.custom_prompt, today_str, start_str)
-            custom_prompt = formatted_prompt + "\n\n"
+        today_str, start_str = get_date_limits()
+        system_instruction = get_system_instruction(today_str, start_str, account)
 
-        if account and account.custom_prompt:
-            # Custom campaigns prompt
-            prompt = f"""{custom_prompt}Przeanalizuj poniższe ogłoszenie o zamówieniu publicznym i określ, czy odpowiada ono powyższym wymaganiom.
+        prompt = f"""Przeanalizuj poniższe ogłoszenie o zamówieniu publicznym i określ, czy odpowiada ono wymaganiom kampanii zdefiniowanym w system_instruction.
 
 Szczegóły ogłoszenia:
 - Tytuł: {notice.get('orderObject')}
@@ -263,37 +278,17 @@ Treść ogłoszenia:
 \"\"\"
 
 Wymagania:
-1. Zdecyduj, czy ogłoszenie jest wartościowym leadem zgodnie ze zdefiniowanymi powyżej kryteriami kampanii.
+1. Zdecyduj, czy ogłoszenie jest wartościowym leadem zgodnie z kryteriami kampanii zdefiniowanymi w system_instruction.
 2. Jeśli ogłoszenie NIE spełnia kryteriów kampanii, zwróć wyłącznie słowo: ODRZUĆ.
-3. Jeśli ogłoszenie spełnia kryteria, zwróć dane leada w formacie JSON zgodnym ze strukturą opisaną powyżej.
-Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników markdown."""
-        else:
-            # Default prompt for car scales (Wagi Samochodowe)
-            prompt = f"""Przeanalizuj poniższe ogłoszenie o zamówieniu publicznym i określ, czy dotyczy ono wagi samochodowej (wag samochodowych / najazdowych / stanowisk do ważenia pojazdów) lub odpowiada zdefiniowanym wymaganiom.
-
-Szczegóły ogłoszenia:
-- Tytuł: {notice.get('orderObject')}
-- Organizacja: {notice.get('organizationName')} ({notice.get('organizationCity')})
-- CPV: {notice.get('cpvCode')}
-- Numer: {notice.get('noticeNumber')}
-
-Treść ogłoszenia:
-\"\"\"
-{text_content}
-\"\"\"
-
-Wymagania:
-1. Zdecyduj, czy w przedmiocie zamówienia pojawia się konieczność dostawy, zakupu, montażu, modernizacji, fundamentów lub legalizacji wagi samochodowej (dla pojazdów ciężarowych/dostawczych).
-2. Jeśli ogłoszenie NIE dotyczy wagi samochodowej, zwróć wyłącznie słowo: ODRZUĆ.
-3. Jeśli dotyczy wagi samochodowej, zwróć dane leada w formacie JSON o poniższej strukturze:
+3. Jeśli ogłoszenie spełnia kryteria, zwróć dane leada w formacie JSON o poniższej strukturze:
 {{
-  "tytul": "Tytuł ogłoszenia",
+  "tytul": "Tytuł ogłoszenia / zapytania",
   "typ": "lead",
-  "nazwa_inwestycji": "Nazwa inwestycji/zamówienia",
-  "lokalizacja": "Miasto, województwo, adres",
-  "inwestor": "Nazwa zamawiającego",
+  "nazwa_inwestycji": "Nazwa inwestycji",
+  "lokalizacja": "Lokalizacja (miasto, województwo)",
+  "inwestor": "Nazwa zamawiającego / inwestora",
   "wykonawca": "",
-  "zakres": "Krótki opis zakresu dotyczący wagi samochodowej (np. dostawa wagi najazdowej 60t, wykonanie fundamentu)",
+  "zakres": "Opis zakresu przedmiotu zamówienia",
   "uzasadnienie": "Dlaczego to ogłoszenie jest wartościowym leadem",
   "priorytet": "wysoki/sredni/niski",
   "data": "Data publikacji w formacie YYYY-MM-DD",
@@ -318,6 +313,7 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
                 model=llm_model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
                     temperature=llm_temp,
                 ),
             )
@@ -349,12 +345,9 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
             return None, 0, 0
 
         today_str, start_str = get_date_limits()
-        custom_prompt = ""
-        if account and account.custom_prompt:
-            formatted_prompt = format_prompt_dates(account.custom_prompt, today_str, start_str)
-            custom_prompt = formatted_prompt + "\n\n"
+        system_instruction = get_system_instruction(today_str, start_str, account)
 
-        prompt = f"""{custom_prompt}Przeanalizuj poniższy tekst ogłoszenia/zapytania ofertowego ze strony: {source_url}
+        prompt = f"""Przeanalizuj poniższy tekst ogłoszenia/zapytania ofertowego ze strony: {source_url}
 
 Treść ogłoszenia:
 \"\"\"
@@ -362,7 +355,7 @@ Treść ogłoszenia:
 \"\"\"
 
 Wymagania:
-1. Kryterium Tematyczne (GŁÓWNE): Jeśli treść dotyczy tematyki kampanii (np. wzorcowanie wag, zakup z wzorcowaniem, legalizacja, serwis), treść JEST wartościowym leadem.
+1. Kryterium Tematyczne (GŁÓWNE): Jeśli treść dotyczy tematyki kampanii zdefiniowanej w system_instruction, treść JEST wartościowym leadem.
 2. OBSŁUGA STRON ZBIORCZYCH I WIELOKROTNYCH ZAPYTAŃ:
    - Przekazana treść może stanowić stronę zbiorczą, zestawienie kategorialne lub agregator zapytań zawierający wiele różnych produktów lub usług.
    - Przeszukaj cały tekst i WYEKSTRAHUJ WSZYSTKIE POJEDYNCZE OGŁOSZENIA/ZAPYTANIA, których treść ściśle odpowiada wymaganiom kampanii zdefiniowanym w system_instruction.
@@ -406,6 +399,7 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
                 model=llm_model,
                 contents=prompt,
                 config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
                     temperature=llm_temp,
                 ),
             )
@@ -446,6 +440,7 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
         except Exception as exc:
             logger.error("Błąd ekstrakcji leada z tekstu (%s): %s", source_url, exc)
             return None, 0, 0
+
 
     def _search_plugin(
         self,
@@ -577,14 +572,12 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
         llm_model = "gemini-2.5-flash"
         llm_temp = 0.1
         llm_max_tokens = 8192
-        instruction = get_system_instruction(today_date, start_date)
+        instruction = get_system_instruction(today_date, start_date, account=account)
 
         if account:
             llm_model = account.llm_model
             llm_temp = account.llm_temperature
             llm_max_tokens = account.llm_max_tokens
-            if account.custom_prompt:
-                instruction = format_prompt_dates(account.custom_prompt, today_date, start_date)
 
         keywords_str = "wagach samochodowych"
         if account:

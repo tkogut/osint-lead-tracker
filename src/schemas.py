@@ -78,6 +78,8 @@ class SandboxRequest(BaseModel):
     llm_temperature: float = 0.1
     llm_max_tokens: int = 4096
     source: Optional[str] = "DOMSanitizer"
+    scraper: Optional[str] = "Auto"
+
 
 
 class SandboxFetchUrlRequest(BaseModel):

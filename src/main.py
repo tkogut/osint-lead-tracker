@@ -413,7 +413,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.16",
+    version="1.7.17",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -433,7 +433,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.16",
+        "version": "1.7.17",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
@@ -1225,6 +1225,21 @@ async def get_research_logs(
 # ---------------------------------------------------------------------------
 # API Endpoints - LLM Sandbox
 # ---------------------------------------------------------------------------
+def rewrite_automatyka_url(url: str) -> str:
+    """
+    Rewrites automatyka.pl URLs containing 'topId=([0-9]+)' to
+    'https://www.automatyka.pl/firm-profilepl/offerrequestpl/viewrfqpl/{ID}'.
+    """
+    if not url:
+        return url
+    import re
+    match = re.search(r"topId=(\d+)", url)
+    if match and "automatyka.pl" in url:
+        top_id = match.group(1)
+        return f"https://www.automatyka.pl/firm-profilepl/offerrequestpl/viewrfqpl/{top_id}"
+    return url
+
+
 @app.post("/api/sandbox/fetch-url", tags=["Sandbox"])
 async def sandbox_fetch_url(
     req: SandboxFetchUrlRequest,
@@ -1235,9 +1250,10 @@ async def sandbox_fetch_url(
     import re
     try:
         source_name = req.source or "DOMSanitizer"
+        url = rewrite_automatyka_url(req.url)
         
         if req.scraper == "Auto":
-            context = "Automatyka" if ("automatyka.pl" in req.url or "xtech.pl" in req.url) else "Logintrade" if ("logintrade.pl" in req.url or "logintrade.net" in req.url) else "None"
+            context = "Automatyka" if ("automatyka.pl" in url or "xtech.pl" in url) else "Logintrade" if ("logintrade.pl" in url or "logintrade.net" in url) else "None"
         else:
             context = req.scraper
 
@@ -1274,7 +1290,7 @@ async def sandbox_fetch_url(
                     except Exception as l_err:
                         logger.warning("Sandbox login to logintrade failed: %s", l_err)
 
-            resp = await cffi_session.get(req.url, timeout=15)
+            resp = await cffi_session.get(url, timeout=15)
             if resp.status_code != 200:
                 return {"success": False, "error": f"HTTP {resp.status_code}"}
             
@@ -1311,12 +1327,20 @@ async def run_sandbox_test(
         pass
 
     raw_text = req.raw_text
-    if req.url and not raw_text:
+    url = rewrite_automatyka_url(req.url) if req.url else None
+
+    if url and not raw_text:
         from curl_cffi.requests import AsyncSession as CffiAsyncSession
         from scrapers.base import DOMSanitizer
+        import re
         try:
+            if req.scraper == "Auto":
+                context = "Automatyka" if ("automatyka.pl" in url or "xtech.pl" in url) else "Logintrade" if ("logintrade.pl" in url or "logintrade.net" in url) else "None"
+            else:
+                context = req.scraper
+
             async with CffiAsyncSession(impersonate="chrome124") as cffi_session:
-                if "automatyka.pl" in req.url:
+                if context == "Automatyka":
                     user = get_db_setting_sync("SCRAPER_AUTOMATYKA_USER", "")
                     pwd = get_db_setting_sync("SCRAPER_AUTOMATYKA_PASS", "")
                     if user and pwd:
@@ -1326,13 +1350,33 @@ async def run_sandbox_test(
                                 json={"LoginName": user, "Password": pwd, "Step": 1, "ServiceId": 3},
                                 timeout=15
                             )
-                        except Exception:
-                            pass
-                resp = await cffi_session.get(req.url, timeout=15)
+                        except Exception as l_err:
+                            logger.warning("Sandbox login to xtech failed: %s", l_err)
+                elif context == "Logintrade":
+                    user = get_db_setting_sync("SCRAPER_LOGINTRADE_USER", "")
+                    pwd = get_db_setting_sync("SCRAPER_LOGINTRADE_PASS", "")
+                    if user and pwd:
+                        try:
+                            sso_resp = await cffi_session.get("https://platformazakupowa.logintrade.pl/sso-login", timeout=15)
+                            _token = ""
+                            if sso_resp.status_code == 200:
+                                token_match = re.search(r'name="_token"\s+value="([^"]+)"', sso_resp.text)
+                                if token_match:
+                                    _token = token_match.group(1)
+                            
+                            await cffi_session.post(
+                                "https://platformazakupowa.logintrade.pl/sso-login?backUrl=https://platformazakupowa.logintrade.pl/",
+                                data={"username": user, "password": pwd, "_token": _token, "save": ""},
+                                timeout=15
+                            )
+                        except Exception as l_err:
+                            logger.warning("Sandbox login to logintrade failed: %s", l_err)
+
+                resp = await cffi_session.get(url, timeout=15)
                 if resp.status_code == 200:
                     detail_html = resp.text
                     raw_text = DOMSanitizer.clean(detail_html, max_chars=6000)
-                    if "automatyka.pl" in req.url:
+                    if context == "Automatyka":
                         from scrapers.automatyka import extract_advertiser_info
                         contact_header = extract_advertiser_info(detail_html)
                         if contact_header:
@@ -1363,7 +1407,7 @@ async def run_sandbox_test(
                 raw_text = "Wykonaj wyszukiwanie z użyciem Google Search."
             contents_to_send = raw_text
         else:
-            target_url = req.url or "https://logintrade.pl/zapytanie-ofertowe"
+            target_url = url or "https://logintrade.pl/zapytanie-ofertowe"
             contents_to_send = f"""Przeanalizuj poniższe ogłoszenie/zapytanie ofertowe i określ, czy odpowiada ono kryteriom w system_instruction.
 
 Adres URL ogłoszenia: {target_url}
@@ -1433,6 +1477,7 @@ Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown."""
     except Exception as exc:
         logger.error("Sandbox test error: %s", exc)
         return {"success": False, "error": str(exc)}
+
 
 
 # ---------------------------------------------------------------------------
