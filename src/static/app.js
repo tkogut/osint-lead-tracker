@@ -1292,10 +1292,14 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
         }
 
-        const automUser = settingsMap["SCRAPER_AUTOMATYKA_USER"] || "";
-        const automPass = settingsMap["SCRAPER_AUTOMATYKA_PASS"] || "";
-        const loginUser = settingsMap["SCRAPER_LOGINTRADE_USER"] || "";
-        const loginPass = settingsMap["SCRAPER_LOGINTRADE_PASS"] || "";
+        // If value is masked ("******"), render as empty so user knows they must re-enter credentials
+        const unmask = (v) => (v === "******" || !v) ? "" : v;
+        const automUser = unmask(settingsMap["SCRAPER_AUTOMATYKA_USER"]);
+        const automPass = unmask(settingsMap["SCRAPER_AUTOMATYKA_PASS"]);
+        const automHasSaved = settingsMap["SCRAPER_AUTOMATYKA_PASS"] === "******";
+        const loginUser = unmask(settingsMap["SCRAPER_LOGINTRADE_USER"]);
+        const loginPass = unmask(settingsMap["SCRAPER_LOGINTRADE_PASS"]);
+        const loginHasSaved = settingsMap["SCRAPER_LOGINTRADE_PASS"] === "******";
 
         const scrapersHtml = `
             <div class="settings-layout glass-card" style="margin-top: 24px;">
@@ -1311,11 +1315,11 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="setting-SCRAPER_AUTOMATYKA_USER">Użytkownik / Email (Automatyka.pl)</label>
-                                <input type="text" id="setting-SCRAPER_AUTOMATYKA_USER" data-key="SCRAPER_AUTOMATYKA_USER" value="${automUser}" placeholder="np. login@firma.pl">
+                                <input type="text" id="setting-SCRAPER_AUTOMATYKA_USER" data-key="SCRAPER_AUTOMATYKA_USER" data-sensitive="true" value="${automUser}" placeholder="${automUser ? automUser : 'np. login@firma.pl'}">
                             </div>
                             <div class="form-group">
-                                <label for="setting-SCRAPER_AUTOMATYKA_PASS">Hasło (Automatyka.pl)</label>
-                                <input type="password" id="setting-SCRAPER_AUTOMATYKA_PASS" data-key="SCRAPER_AUTOMATYKA_PASS" value="${automPass}" placeholder="••••••••">
+                                <label for="setting-SCRAPER_AUTOMATYKA_PASS">Hasło (Automatyka.pl) ${automHasSaved ? '<span style="color: #4ade80; font-size: 0.75rem; margin-left: 8px;"><i class="fa-solid fa-check-circle"></i> zapisane</span>' : ''}</label>
+                                <input type="password" id="setting-SCRAPER_AUTOMATYKA_PASS" data-key="SCRAPER_AUTOMATYKA_PASS" data-sensitive="true" value="" placeholder="${automHasSaved ? '(pozostaw puste, aby nie zmieniać)' : 'Wpisz hasło'}">
                             </div>
                         </div>
                         <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
@@ -1333,11 +1337,11 @@ document.addEventListener("DOMContentLoaded", () => {
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="setting-SCRAPER_LOGINTRADE_USER">Użytkownik / Email (Logintrade.pl)</label>
-                                <input type="text" id="setting-SCRAPER_LOGINTRADE_USER" data-key="SCRAPER_LOGINTRADE_USER" value="${loginUser}" placeholder="np. login@firma.pl">
+                                <input type="text" id="setting-SCRAPER_LOGINTRADE_USER" data-key="SCRAPER_LOGINTRADE_USER" data-sensitive="true" value="${loginUser}" placeholder="${loginUser ? loginUser : 'np. login@firma.pl'}">
                             </div>
                             <div class="form-group">
-                                <label for="setting-SCRAPER_LOGINTRADE_PASS">Hasło (Logintrade.pl)</label>
-                                <input type="password" id="setting-SCRAPER_LOGINTRADE_PASS" data-key="SCRAPER_LOGINTRADE_PASS" value="${loginPass}" placeholder="••••••••">
+                                <label for="setting-SCRAPER_LOGINTRADE_PASS">Hasło (Logintrade.pl) ${loginHasSaved ? '<span style="color: #4ade80; font-size: 0.75rem; margin-left: 8px;"><i class="fa-solid fa-check-circle"></i> zapisane</span>' : ''}</label>
+                                <input type="password" id="setting-SCRAPER_LOGINTRADE_PASS" data-key="SCRAPER_LOGINTRADE_PASS" data-sensitive="true" value="" placeholder="${loginHasSaved ? '(pozostaw puste, aby nie zmieniać)' : 'Wpisz hasło'}">
                             </div>
                         </div>
                         <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
@@ -1400,8 +1404,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const key = input.dataset.key;
             const val = input.value;
             
-            // Jeśli użytkownik nie edytował zamaskowanego pola, pomijamy
-            if (val === "******" || val.startsWith("...") || val.endsWith("...") || val.includes("...")) {
+            // Pola "sensitive" (hasła) renderowane są jako puste gdy hasło już zapisane.
+            // Jeśli użytkownik nie wpisał nowej wartości (pole puste) → pomijamy (nie nadpisujemy).
+            if (input.dataset.sensitive === "true" && val === "") {
+                continue;
+            }
+            
+            // Standardowe maskowane pola (wyświetlają ******) → pomijamy jeśli nie zmienione
+            if (val === "******" || val.startsWith("...") || val.endsWith("...")) {
                 continue;
             }
             
