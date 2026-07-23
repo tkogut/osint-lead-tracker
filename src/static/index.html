@@ -47,7 +47,7 @@
                 <i class="fa-solid fa-scale-balanced logo-icon"></i>
                 <div>
                     <h1>MIW Group</h1>
-                    <span>OSINT v1.7.4</span>
+                    <span>OSINT v1.7.5</span>
                 </div>
             </div>
             
@@ -328,6 +328,26 @@
                             <h3><i class="fa-solid fa-laptop-code"></i> Wynik AI</h3>
                             <div class="sandbox-output-wrapper">
                                 <pre id="sandbox-output" class="output-pre">Wynik analizy ukaże się tutaj po kliknięciu „Uruchom Test AI”...</pre>
+                            </div>
+
+                            <!-- Podgląd Egzekucji LLM (Debug Terminal) -->
+                            <div class="sandbox-debug-terminal">
+                                <div class="debug-terminal-header">
+                                    <h4><i class="fa-solid fa-terminal"></i> Podgląd Egzekucji LLM (Debug Terminal)</h4>
+                                    <div id="sandbox-debug-metrics" class="debug-metrics-badge">
+                                        <span id="sandbox-metric-tokens-in"><i class="fa-solid fa-arrow-down"></i> In: 0 tok</span>
+                                        <span id="sandbox-metric-tokens-out"><i class="fa-solid fa-arrow-up"></i> Out: 0 tok</span>
+                                        <span id="sandbox-metric-latency"><i class="fa-solid fa-clock"></i> Czas: 0ms</span>
+                                    </div>
+                                </div>
+                                <div class="debug-tabs">
+                                    <button type="button" class="debug-tab-btn active" data-debug-tab="raw_response">Surowa Odpowiedź LLM</button>
+                                    <button type="button" class="debug-tab-btn" data-debug-tab="system_instruction">Wysłany Prompt Systemowy</button>
+                                    <button type="button" class="debug-tab-btn" data-debug-tab="contents_sent">Wysłany Input</button>
+                                </div>
+                                <div class="debug-content-wrapper">
+                                    <pre id="sandbox-debug-content" class="debug-content-pre">Brak danych egzekucji. Uruchom test, aby zobaczyć ślad wykonania.</pre>
+                                </div>
                             </div>
                         </div>
                     </div>

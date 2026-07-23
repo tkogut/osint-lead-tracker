@@ -10,6 +10,7 @@ import logging
 import sqlite3
 import os
 import hashlib
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Annotated, Any, List, Optional
@@ -410,7 +411,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.4",
+    version="1.7.5",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -430,7 +431,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.4",
+        "version": "1.7.5",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
@@ -1187,13 +1188,16 @@ Wymagania:
 5. Jeśli ogłoszenie NIE spełnia wymagań kampanii lub minął termin, zwróć {{"leady": []}}.
 Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown."""
 
+        start_time = time.perf_counter()
         response = client.models.generate_content(
             model=req.llm_model,
             contents=contents_to_send,
             config=types.GenerateContentConfig(**config_kwargs)
         )
+        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
         
-        output_text = response.text or ""
+        raw_response_text = response.text or ""
+        output_text = raw_response_text
         if output_text.startswith("```json"):
             output_text = output_text[7:]
         elif output_text.startswith("```"):
@@ -1201,8 +1205,28 @@ Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown."""
         if output_text.endswith("```"):
             output_text = output_text[:-3]
         output_text = output_text.strip()
-        
-        return {"success": True, "output": output_text, "fetched_text": raw_text if req.url else None}
+
+        input_tokens = 0
+        output_tokens = 0
+        if hasattr(response, 'usage_metadata') and response.usage_metadata:
+            input_tokens = getattr(response.usage_metadata, 'prompt_token_count', getattr(response.usage_metadata, 'input_token_count', 0)) or 0
+            output_tokens = getattr(response.usage_metadata, 'candidates_token_count', getattr(response.usage_metadata, 'output_token_count', 0)) or 0
+
+        debug_info = {
+            "system_instruction": formatted_prompt,
+            "contents_sent": contents_to_send,
+            "raw_response": raw_response_text,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "latency_ms": latency_ms,
+        }
+
+        return {
+            "success": True,
+            "output": output_text,
+            "fetched_text": raw_text if req.url else None,
+            "debug_info": debug_info,
+        }
     except Exception as exc:
         logger.error("Sandbox test error: %s", exc)
         return {"success": False, "error": str(exc)}

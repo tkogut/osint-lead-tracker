@@ -961,6 +961,47 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // --- Sandbox Debug Terminal State & Handlers ---
+    let currentDebugInfo = null;
+    let activeDebugTab = "raw_response";
+
+    function updateDebugTerminalContent() {
+        const debugContentEl = document.getElementById("sandbox-debug-content");
+        if (!debugContentEl) return;
+
+        if (!currentDebugInfo) {
+            debugContentEl.textContent = "Brak danych egzekucji. Uruchom test, aby zobaczyć ślad wykonania.";
+            return;
+        }
+
+        const val = currentDebugInfo[activeDebugTab];
+        if (val !== undefined && val !== null) {
+            debugContentEl.textContent = typeof val === "object" ? JSON.stringify(val, null, 2) : String(val);
+        } else {
+            debugContentEl.textContent = "Brak danych dla wybranej zakładki.";
+        }
+    }
+
+    function renderDebugMetrics(debugInfo) {
+        const tokensInEl = document.getElementById("sandbox-metric-tokens-in");
+        const tokensOutEl = document.getElementById("sandbox-metric-tokens-out");
+        const latencyEl = document.getElementById("sandbox-metric-latency");
+
+        if (tokensInEl) tokensInEl.innerHTML = `<i class="fa-solid fa-arrow-down"></i> In: ${debugInfo.input_tokens || 0} tok`;
+        if (tokensOutEl) tokensOutEl.innerHTML = `<i class="fa-solid fa-arrow-up"></i> Out: ${debugInfo.output_tokens || 0} tok`;
+        if (latencyEl) latencyEl.innerHTML = `<i class="fa-solid fa-clock"></i> Czas: ${debugInfo.latency_ms || 0}ms`;
+    }
+
+    const debugTabBtns = document.querySelectorAll(".debug-tab-btn");
+    debugTabBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            debugTabBtns.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            activeDebugTab = btn.getAttribute("data-debug-tab");
+            updateDebugTerminalContent();
+        });
+    });
+
     sandboxForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         
@@ -991,6 +1032,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 sandboxOutput.textContent = res.output;
                 if (res.fetched_text && !document.getElementById("sandbox-text").value) {
                     document.getElementById("sandbox-text").value = res.fetched_text;
+                }
+                if (res.debug_info) {
+                    currentDebugInfo = res.debug_info;
+                    renderDebugMetrics(currentDebugInfo);
+                    updateDebugTerminalContent();
                 }
             } else {
                 sandboxOutput.textContent = `Błąd: ${res.error || "Nieznany błąd."}`;
