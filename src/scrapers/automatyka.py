@@ -29,7 +29,9 @@ def extract_advertiser_info(html_content: str) -> str:
         html_content,
         flags=re.DOTALL | re.IGNORECASE
     )
-    search_scope = block_match.group(1) if block_match else html_content
+    if not block_match:
+        return ""
+    search_scope = block_match.group(1)
 
     # Nazwa firmy
     firm_m = re.search(r'(?:Nazwa\s+firmy|Firma|Firma/Instytucja)[^:]*:\s*(?:<[^>]+>\s*)*([^<\r\n]+)', search_scope, re.IGNORECASE)
