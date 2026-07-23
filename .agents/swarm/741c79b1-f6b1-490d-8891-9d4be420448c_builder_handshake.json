@@ -3,11 +3,9 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/static/index.html",
-    "src/static/app.js",
-    "scripts/bump_patch_version.py"
+    "src/scrapers/base.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-23T06:50:39Z",
-  "notes": "Wdrożono cache-busting dla plików JS/CSS oraz dynamiczne delegowanie zdarzeń terminala debugowania"
+  "timestamp": "2026-07-23T10:05:00Z",
+  "notes": "Wdrożono automatyczne czyszczenie systemowych stopek Logintrade w DOMSanitizer"
 }

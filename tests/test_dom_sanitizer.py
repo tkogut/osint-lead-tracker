@@ -42,6 +42,27 @@ class TestDOMSanitizer(unittest.TestCase):
         clean_text = DOMSanitizer.clean(long_html, max_chars=100)
         self.assertLessEqual(len(clean_text), 100)
 
+    def test_clean_logintrade_boilerplate(self):
+        sample_html = """
+        <html>
+        <body>
+            <p>Treść zapytania o wagę samochodową 60t.</p>
+            <div>Enquiry is out of date.</div>
+            <div>Time to make an offer is up...</div>
+            <div>The Purchasing Platform Terms of Use are available in the registration panel.</div>
+            <div>Registering in our company suppliers base, receiving enquiries and making sales offers are free of charge.</div>
+            <div>To browse enquiries from a given company, you must be registered in their suppliers database.</div>
+        </body>
+        </html>
+        """
+        clean_text = DOMSanitizer.clean(sample_html)
+        self.assertIn("Treść zapytania o wagę samochodową 60t.", clean_text)
+        self.assertNotIn("Enquiry is out of date", clean_text)
+        self.assertNotIn("Time to make an offer is up", clean_text)
+        self.assertNotIn("Purchasing Platform Terms of Use", clean_text)
+        self.assertNotIn("Registering in our company suppliers base", clean_text)
+        self.assertNotIn("To browse enquiries from a given company", clean_text)
+
 
 if __name__ == "__main__":
     unittest.main()
