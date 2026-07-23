@@ -98,6 +98,12 @@ Kryterium Tematyczne (GŁÓWNE): Jeśli treść dotyczy tematyki kampanii (np. w
 
 Reguła braku dat: Brak jawnej daty publikacji lub terminu składania ofert w surowej treści NIE MOŻE powodować odrzucenia leada (ODRZUĆ / empty json). Jeśli brak dat w tekście, załóż status AKTYWNY.
 
+OBSŁUGA STRON ZBIORCZYCH I WIELOKROTNYCH ZAPYTAŃ:
+1. Przekazana treść może stanowić stronę zbiorczą, zestawienie kategorialne lub agregator zapytań zawierający wiele różnych produktów lub usług.
+2. Przeszukaj cały tekst i WYEKSTRAHUJ WSZYSTKIE POJEDYNCZE OGŁOSZENIA/ZAPYTANIA, których treść ściśle odpowiada wymaganiom kampanii zdefiniowanym w system_instruction.
+3. Ignoruj wszelkie inne wpisy, produkty i ogłoszenia w tekście, które NIE ODPOWIADAJĄ kryteriom kampanii.
+4. Zwróć każdy pasujący lead w strukturze JSON. Jeśli żaden wpis w tekście nie odpowiada wymaganiom kampanii, zwróć tablicę {{"leady": []}}.
+
 Gradacja Priorytetu:
 - wysoki: Pełne dane (jawna data ofert, inwestor, szczegółowy zakres).
 - sredni: Jasny zakres i kontakt, drobne braki.
@@ -357,14 +363,19 @@ Treść ogłoszenia:
 
 Wymagania:
 1. Kryterium Tematyczne (GŁÓWNE): Jeśli treść dotyczy tematyki kampanii (np. wzorcowanie wag, zakup z wzorcowaniem, legalizacja, serwis), treść JEST wartościowym leadem.
-2. Reguła braku dat: Brak jawnej daty publikacji lub terminu składania ofert w surowej treści NIE MOŻE powodować odrzucenia leada (ODRZUĆ / empty json). Jeśli brak dat w tekście, załóż status AKTYWNY.
-3. Gradacja Priorytetu:
+2. OBSŁUGA STRON ZBIORCZYCH I WIELOKROTNYCH ZAPYTAŃ:
+   - Przekazana treść może stanowić stronę zbiorczą, zestawienie kategorialne lub agregator zapytań zawierający wiele różnych produktów lub usług.
+   - Przeszukaj cały tekst i WYEKSTRAHUJ WSZYSTKIE POJEDYNCZE OGŁOSZENIA/ZAPYTANIA, których treść ściśle odpowiada wymaganiom kampanii zdefiniowanym w system_instruction.
+   - Ignoruj wszelkie inne wpisy, produkty i ogłoszenia w tekście, które NIE ODPOWIADAJĄ kryteriom kampanii.
+   - Zwróć każdy pasujący lead w strukturze JSON. Jeśli żaden wpis w tekście nie odpowiada wymaganiom kampanii, zwróć tablicę {{"leady": []}}.
+3. Reguła braku dat: Brak jawnej daty publikacji lub terminu składania ofert w surowej treści NIE MOŻE powodować odrzucenia leada (ODRZUĆ / empty json). Jeśli brak dat w tekście, załóż status AKTYWNY.
+4. Gradacja Priorytetu:
    - wysoki: Pełne dane (jawna data ofert, inwestor, szczegółowy zakres).
    - sredni: Jasny zakres i kontakt, drobne braki.
    - niski: Krótkie/proste zapytanie lub brak jawnego terminu ofert, ale treść odpowiada tematyce kampanii.
-4. Ekstrakcja Inwestora: Jeśli nazwa zamawiającego nie występuje bezpośrednio w nagłówku, WYCIĄGNIJ ją z kontekstu treści (np. nazwa zakładu produkcyjnego, fabryki, inwestora, kompleksu, oddziału spółki, np. Zakład Produkcyjny 'Pomorze' i 'Mazowsze').
-5. Jeśli ogłoszenie NIE spełnia wymagań tematycznych kampanii lub minął jawnie podany termin, zwróć wyłącznie słowo: ODRZUĆ.
-6. Jeśli ogłoszenie spełnia kryteria, zwróć dane leada w formacie JSON o poniższej strukturze:
+5. Ekstrakcja Inwestora: Jeśli nazwa zamawiającego nie występuje bezpośrednio w nagłówku, WYCIĄGNIJ ją z kontekstu treści (np. nazwa zakładu produkcyjnego, fabryki, inwestora, kompleksu, oddziału spółki, np. Zakład Produkcyjny 'Pomorze' i 'Mazowsze').
+6. Jeśli treść NIE zawiera żadnego zapytania spełniającego wymagania tematyczne kampanii lub minął jawnie podany termin, zwróć wyłącznie słowo: ODRZUĆ.
+7. Jeśli ogłoszenie spełnia kryteria, zwróć dane wszystkich dopasowanych leadów w formacie JSON w strukturze {{"leady": [...]}} z elementami o poniższej strukturze:
 {{
   "tytul": "Tytuł ogłoszenia / zapytania",
   "typ": "lead",
@@ -411,10 +422,27 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
                 return None, input_tokens, output_tokens
 
             clean_json = _strip_markdown_fences(ans)
-            lead_data = json.loads(clean_json)
-            lead_data["url"] = source_url
-            logger.info("AI wyekstrahowało lead z surowego tekstu (%s): %s", source_url, lead_data.get("tytul"))
-            return lead_data, input_tokens, output_tokens
+            payload = json.loads(clean_json)
+            extracted = []
+            if isinstance(payload, dict):
+                if "leady" in payload and isinstance(payload["leady"], list):
+                    extracted = payload["leady"]
+                else:
+                    extracted = [payload]
+            elif isinstance(payload, list):
+                extracted = payload
+
+            valid_leads = []
+            for item in extracted:
+                if isinstance(item, dict):
+                    item["url"] = source_url
+                    valid_leads.append(item)
+
+            if not valid_leads:
+                return None, input_tokens, output_tokens
+
+            logger.info("AI wyekstrahowało %d lead(ów) z surowego tekstu (%s)", len(valid_leads), source_url)
+            return valid_leads, input_tokens, output_tokens
         except Exception as exc:
             logger.error("Błąd ekstrakcji leada z tekstu (%s): %s", source_url, exc)
             return None, 0, 0
@@ -468,7 +496,10 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
             total_output_tokens += out_tok
 
             if lead:
-                leads.append(lead)
+                if isinstance(lead, list):
+                    leads.extend(lead)
+                else:
+                    leads.append(lead)
                 if hasattr(account, "id"):
                     content_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
                     try:

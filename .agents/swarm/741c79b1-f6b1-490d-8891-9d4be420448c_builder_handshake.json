@@ -7,6 +7,6 @@
     "src/osint_engine.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-23T08:14:58Z",
-  "notes": "Wdrożono globalne reguły kwalifikacji leadów bez jawnych dat oraz gradację priorytetu"
+  "timestamp": "2026-07-23T08:31:31Z",
+  "notes": "Wdrożono 100% uniwersalne reguły ekstrakcji ze stron zbiorczych bez zaszytych marek czy produktów"
 }

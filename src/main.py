@@ -411,7 +411,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.8",
+    version="1.7.9",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -431,7 +431,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.8",
+        "version": "1.7.9",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
@@ -1181,15 +1181,20 @@ Treść ogłoszenia:
 
 Wymagania:
 1. Kryterium Tematyczne (GŁÓWNE): Jeśli treść dotyczy tematyki kampanii (np. wzorcowanie wag, zakup z wzorcowaniem, legalizacja, serwis), treść JEST wartościowym leadem.
-2. Reguła braku dat: Brak jawnej daty publikacji lub terminu składania ofert w surowej treści NIE MOŻE powodować odrzucenia leada (ODRZUĆ / empty json). Jeśli brak dat w tekście, załóż status AKTYWNY.
-3. Gradacja Priorytetu:
+2. OBSŁUGA STRON ZBIORCZYCH I WIELOKROTNYCH ZAPYTAŃ:
+   - Przekazana treść może stanowić stronę zbiorczą, zestawienie kategorialne lub agregator zapytań zawierający wiele różnych produktów lub usług.
+   - Przeszukaj cały tekst i WYEKSTRAHUJ WSZYSTKIE POJEDYNCZE OGŁOSZENIA/ZAPYTANIA, których treść ściśle odpowiada wymaganiom kampanii zdefiniowanym w system_instruction.
+   - Ignoruj wszelkie inne wpisy, produkty i ogłoszenia w tekście, które NIE ODPOWIADAJĄ kryteriom kampanii.
+   - Zwróć każdy pasujący lead w strukturze JSON. Jeśli żaden wpis w tekście nie odpowiada wymaganiom kampanii, zwróć tablicę {{"leady": []}}.
+3. Reguła braku dat: Brak jawnej daty publikacji lub terminu składania ofert w surowej treści NIE MOŻE powodować odrzucenia leada (ODRZUĆ / empty json). Jeśli brak dat w tekście, załóż status AKTYWNY.
+4. Gradacja Priorytetu:
    - wysoki: Pełne dane (jawna data ofert, inwestor, szczegółowy zakres).
    - sredni: Jasny zakres i kontakt, drobne braki.
    - niski: Krótkie/proste zapytanie lub brak jawnego terminu ofert, ale treść odpowiada tematyce kampanii.
-4. Ekstrakcja Inwestora: Jeśli nazwa zamawiającego nie występuje bezpośrednio w nagłówku, WYCIĄGNIJ ją z kontekstu treści (np. nazwa zakładu produkcyjnego, fabryki, inwestora, kompleksu, oddziału spółki, np. Zakład Produkcyjny 'Pomorze' i 'Mazowsze').
-5. Jeśli ogłoszenie spełnia kryteria, zwróć dane leada w formacie JSON:
-{{"leady": [{{"tytul": "Tytuł ogłoszenia", "typ": "lead", "nazwa_inwestycji": "Nazwa zamówienia/inwestycji", "lokalizacja": "Lokalizacja (miasto, województwo)", "inwestor": "Nazwa zamawiającego", "wykonawca": "", "zakres": "Opis zakresu", "uzasadnienie": "Dlaczego to wartościowy lead", "priorytet": "wysoki/sredni/niski", "data": "{today_str}", "url": "{target_url}"}}]}}
-6. Jeśli ogłoszenie NIE spełnia wymagań kampanii lub jawnie minął termin, zwróć {{"leady": []}}.
+5. Ekstrakcja Inwestora: Jeśli nazwa zamawiającego nie występuje bezpośrednio w nagłówku, WYCIĄGNIJ ją z kontekstu treści (np. nazwa zakładu produkcyjnego, fabryki, inwestora, kompleksu, oddziału spółki, np. Zakład Produkcyjny 'Pomorze' i 'Mazowsze').
+6. Jeśli w przekazanej treści znajdują się zapytania spełniające kryteria, zwróć wszystkie dopasowane leady w formacie JSON w strukturze {{"leady": [...]}}:
+{{"leady": [{{"tytul": "Tytuł ogłoszenia / zapytania", "typ": "lead", "nazwa_inwestycji": "Nazwa zamówienia/inwestycji", "lokalizacja": "Lokalizacja (miasto, województwo)", "inwestor": "Nazwa zamawiającego", "wykonawca": "", "zakres": "Opis zakresu", "uzasadnienie": "Dlaczego to wartościowy lead", "priorytet": "wysoki/sredni/niski", "data": "{today_str}", "url": "{target_url}"}}]}}
+7. Jeśli treść NIE zawiera żadnych zapytań spełniających wymagania kampanii lub jawnie minął termin, zwróć {{"leady": []}}.
 Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown."""
 
         start_time = time.perf_counter()
