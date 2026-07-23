@@ -3,9 +3,10 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/scrapers/base.py"
+    "src/main.py",
+    "src/osint_engine.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-23T10:05:00Z",
-  "notes": "Wdrożono automatyczne czyszczenie systemowych stopek Logintrade w DOMSanitizer"
+  "timestamp": "2026-07-23T08:14:58Z",
+  "notes": "Wdrożono globalne reguły kwalifikacji leadów bez jawnych dat oraz gradację priorytetu"
 }

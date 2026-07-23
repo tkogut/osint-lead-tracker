@@ -94,6 +94,15 @@ budowa wagi samochodowej, dostawa nowej wagi samochodowej, montaż i uruchomieni
 
 Nie zakładaj, że użytkownik zna nazwę inwestycji, lokalizację, inwestora albo wykonawcę. Twoim zadaniem jest SAMODZIELNIE odnaleźć te dane, aktywnie i cyklicznie korzystając z narzędzia wyszukiwarki (Google Search).
 
+Kryterium Tematyczne (GŁÓWNE): Jeśli treść dotyczy tematyki kampanii (np. wzorcowanie wag, zakup z wzorcowaniem, legalizacja, serwis), treść JEST wartościowym leadem.
+
+Reguła braku dat: Brak jawnej daty publikacji lub terminu składania ofert w surowej treści NIE MOŻE powodować odrzucenia leada (ODRZUĆ / empty json). Jeśli brak dat w tekście, załóż status AKTYWNY.
+
+Gradacja Priorytetu:
+- wysoki: Pełne dane (jawna data ofert, inwestor, szczegółowy zakres).
+- sredni: Jasny zakres i kontakt, drobne braki.
+- niski: Krótkie/proste zapytanie lub brak jawnego terminu ofert, ale treść odpowiada tematyce kampanii.
+
 BARDZO WAŻNE (Zakres czasowy i status):
 1. Dzisiejsza data (rok 2026) to: {today_str}.
 2. Szukamy wyłącznie postępowań opublikowanych w zakresie dat od {start_str} do {today_str}.
@@ -347,11 +356,15 @@ Treść ogłoszenia:
 \"\"\"
 
 Wymagania:
-1. Zdecyduj, czy treść ogłoszenia odpowiada zdefiniowanym wymaganiom i czy reprezentuje wartościowy lead.
-2. Jeśli ogłoszenie NIE spełnia wymagań lub minął termin, zwróć wyłącznie słowo: ODRZUĆ.
-3. Status i termin dla skraperów: Jeśli w surowej treści ogłoszenia brak podanego dokładnego terminu składania ofert, ale data opublikowania/wygenerowania mieści się w wyznaczonym oknie czasowym (od {start_str} do {today_str}), załóż że ogłoszenie jest AKTYWNE (trwające) i nie odrzucaj go z powodu braku jawnego terminu.
+1. Kryterium Tematyczne (GŁÓWNE): Jeśli treść dotyczy tematyki kampanii (np. wzorcowanie wag, zakup z wzorcowaniem, legalizacja, serwis), treść JEST wartościowym leadem.
+2. Reguła braku dat: Brak jawnej daty publikacji lub terminu składania ofert w surowej treści NIE MOŻE powodować odrzucenia leada (ODRZUĆ / empty json). Jeśli brak dat w tekście, załóż status AKTYWNY.
+3. Gradacja Priorytetu:
+   - wysoki: Pełne dane (jawna data ofert, inwestor, szczegółowy zakres).
+   - sredni: Jasny zakres i kontakt, drobne braki.
+   - niski: Krótkie/proste zapytanie lub brak jawnego terminu ofert, ale treść odpowiada tematyce kampanii.
 4. Ekstrakcja Inwestora: Jeśli nazwa zamawiającego nie występuje bezpośrednio w nagłówku, WYCIĄGNIJ ją z kontekstu treści (np. nazwa zakładu produkcyjnego, fabryki, inwestora, kompleksu, oddziału spółki, np. Zakład Produkcyjny 'Pomorze' i 'Mazowsze').
-5. Jeśli ogłoszenie spełnia kryteria, zwróć dane leada w formacie JSON o poniższej strukturze:
+5. Jeśli ogłoszenie NIE spełnia wymagań tematycznych kampanii lub minął jawnie podany termin, zwróć wyłącznie słowo: ODRZUĆ.
+6. Jeśli ogłoszenie spełnia kryteria, zwróć dane leada w formacie JSON o poniższej strukturze:
 {{
   "tytul": "Tytuł ogłoszenia / zapytania",
   "typ": "lead",
