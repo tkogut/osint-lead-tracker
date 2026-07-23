@@ -11,7 +11,7 @@
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Premium Stylesheet -->
-    <link rel="stylesheet" href="/static/styles.css?v=1.7.13">
+    <link rel="stylesheet" href="/static/styles.css?v=1.7.14">
 </head>
 <body>
 
@@ -47,7 +47,7 @@
                 <i class="fa-solid fa-scale-balanced logo-icon"></i>
                 <div>
                     <h1>MIW Group</h1>
-                    <span>OSINT v1.7.13</span>
+                    <span>OSINT v1.7.14</span>
                 </div>
             </div>
             
@@ -409,46 +409,14 @@
 
                 <!-- TAB: SETTINGS -->
                 <section id="tab-settings" class="tab-pane">
-                    <div class="settings-layout glass-card">
-                        <h3><i class="fa-solid fa-sliders"></i> Globalne Ustawienia (.env)</h3>
-                        <p class="settings-hint">Wartości kluczy API oraz parametry globalne są ładowane bezpośrednio z konfiguracji systemowej.</p>
-                        <form id="settings-form">
-                            <div id="settings-fields-container">
-                                <!-- Loaded dynamically -->
-                            </div>
-
-                            <div class="settings-card-section" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.1);">
-                                <h3><i class="fa-solid fa-lock"></i> 🔐 Dostęp i Logowanie do Scraperów (Dedykowane Źródła)</h3>
-                                <p class="settings-hint">Dane dostępowe wymagane do autoryzowanego pobierania ogłoszeń i pełnych danych kontaktowych.</p>
-
-                                <h4 style="margin-top: 16px; font-size: 0.95rem; color: var(--color-accent);"><i class="fa-solid fa-industry"></i> Automatyka.pl / Xtech</h4>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="setting-SCRAPER_AUTOMATYKA_USER">Użytkownik / Email (Automatyka.pl)</label>
-                                        <input type="text" id="setting-SCRAPER_AUTOMATYKA_USER" data-key="SCRAPER_AUTOMATYKA_USER" placeholder="np. login@firma.pl">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="setting-SCRAPER_AUTOMATYKA_PASS">Hasło (Automatyka.pl)</label>
-                                        <input type="password" id="setting-SCRAPER_AUTOMATYKA_PASS" data-key="SCRAPER_AUTOMATYKA_PASS" placeholder="••••••••">
-                                    </div>
-                                </div>
-
-                                <h4 style="margin-top: 16px; font-size: 0.95rem; color: var(--color-accent);"><i class="fa-solid fa-handshake"></i> Logintrade.pl</h4>
-                                <div class="form-row">
-                                    <div class="form-group">
-                                        <label for="setting-SCRAPER_LOGINTRADE_USER">Użytkownik / Email (Logintrade.pl)</label>
-                                        <input type="text" id="setting-SCRAPER_LOGINTRADE_USER" data-key="SCRAPER_LOGINTRADE_USER" placeholder="np. login@firma.pl">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="setting-SCRAPER_LOGINTRADE_PASS">Hasło (Logintrade.pl)</label>
-                                        <input type="password" id="setting-SCRAPER_LOGINTRADE_PASS" data-key="SCRAPER_LOGINTRADE_PASS" placeholder="••••••••">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button type="submit" class="btn-primary" style="margin-top: 20px;"><i class="fa-solid fa-save"></i> Zapisz Zmiany</button>
-                        </form>
-                    </div>
+                    <form id="settings-form">
+                        <div id="settings-sections-container">
+                            <!-- Loaded dynamically -->
+                        </div>
+                        <div class="glass-card" style="padding: 24px; margin-top: 24px; display: flex; justify-content: flex-end;">
+                            <button type="submit" class="btn-primary" style="margin-top: 0; padding: 12px 32px;"><i class="fa-solid fa-save"></i> Zapisz Wszystkie Ustawienia</button>
+                        </div>
+                    </form>
                     
                     <div class="settings-layout glass-card" style="margin-top: 24px; padding: 24px;">
                         <h3><i class="fa-solid fa-key"></i> Zmień Hasło Administratora</h3>
@@ -637,6 +605,6 @@
     <!-- Notification Toast -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/app.js?v=1.7.13"></script>
+    <script src="/static/app.js?v=1.7.14"></script>
 </body>
 </html>

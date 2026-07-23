@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const leadsTableBody = document.getElementById("leads-table-body");
     const accountsContainer = document.getElementById("accounts-container");
     const logsTableBody = document.getElementById("logs-table-body");
-    const settingsFieldsContainer = document.getElementById("settings-fields-container");
+    const settingsFieldsContainer = document.getElementById("settings-sections-container");
     const settingsForm = document.getElementById("settings-form");
 
     // Sandbox specific elements
@@ -1226,35 +1226,163 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderSettings(settings) {
-        const scraperKeys = [
-            "SCRAPER_AUTOMATYKA_USER",
-            "SCRAPER_AUTOMATYKA_PASS",
-            "SCRAPER_LOGINTRADE_USER",
-            "SCRAPER_LOGINTRADE_PASS"
+        const settingsMap = {};
+        settings.forEach(s => {
+            settingsMap[s.key] = s.value;
+        });
+
+        const categoriesData = [
+            {
+                id: "ai",
+                title: "Sztuczna Inteligencja (AI)",
+                icon: "fa-brain",
+                keys: ["GEMINI_API_KEY"],
+                hint: "Konfiguracja połączenia z modelami LLM Google Gemini."
+            },
+            {
+                id: "odoo",
+                title: "Integracja z Odoo CRM",
+                icon: "fa-briefcase",
+                keys: ["ODOO_URL", "ODOO_DB", "ODOO_USER", "ODOO_API_KEY"],
+                hint: "Połączenie z systemem ERP/CRM Odoo do synchronizacji zakwalifikowanych leadów."
+            },
+            {
+                id: "scheduler",
+                title: "Harmonogram i Cykle",
+                icon: "fa-clock",
+                keys: ["CRON_HOUR", "CRON_MINUTE", "CRON_TIMEZONE", "SEARCH_WINDOW_DAYS"],
+                hint: "Ustawienia automatycznego skanowania i okna czasowego."
+            },
+            {
+                id: "security",
+                title: "Bezpieczeństwo i API",
+                icon: "fa-shield-halved",
+                keys: ["API_TOKEN"],
+                hint: "Uwierzytelnianie i klucze autoryzacyjne dla API."
+            }
         ];
 
-        const genericSettings = settings.filter(s => !scraperKeys.includes(s.key));
-        settingsFieldsContainer.innerHTML = genericSettings.map(s => {
-            let type = "text";
-            if (s.key.includes("KEY") || s.key.includes("PASSWORD") || s.key.includes("TOKEN") || s.key.includes("PASS")) {
-                type = "password";
-            }
-            
+        function renderField(key, value) {
+            const labelMap = {
+                "GEMINI_API_KEY": "Klucz API Gemini (Google Cloud)",
+                "ODOO_URL": "Adres URL serwera Odoo",
+                "ODOO_DB": "Nazwa bazy danych Odoo",
+                "ODOO_USER": "Login / Email użytkownika Odoo",
+                "ODOO_API_KEY": "Klucz API / Hasło użytkownika Odoo",
+                "CRON_HOUR": "Godzina uruchamiania CRON (0-23)",
+                "CRON_MINUTE": "Minuta uruchamiania CRON (0-59)",
+                "CRON_TIMEZONE": "Strefa czasowa CRON (np. Europe/Warsaw)",
+                "SEARCH_WINDOW_DAYS": "Okno wyszukiwania wstecz (dni)",
+                "API_TOKEN": "Klucz autoryzacyjny API Dashboard",
+            };
+
+            const label = labelMap[key] || key;
+            const type = (key.includes("KEY") || key.includes("PASSWORD") || key.includes("TOKEN") || key.includes("PASS")) ? "password" : "text";
+
             return `
                 <div class="form-group">
-                    <label for="setting-${s.key}"><code>${s.key}</code></label>
-                    <input type="${type}" id="setting-${s.key}" data-key="${s.key}" value="${s.value}" placeholder="Podaj nową wartość dla ${s.key}">
+                    <label for="setting-${key}"><code>${key}</code> — ${label}</label>
+                    <input type="${type}" id="setting-${key}" data-key="${key}" value="${value || ''}" placeholder="Podaj wartość dla ${key}">
                 </div>
             `;
-        }).join("");
+        }
 
-        scraperKeys.forEach(key => {
-            const inputEl = document.getElementById(`setting-${key}`);
-            if (inputEl) {
-                const setting = settings.find(s => s.key === key);
-                inputEl.value = setting ? setting.value : "";
-            }
+        const automUser = settingsMap["SCRAPER_AUTOMATYKA_USER"] || "";
+        const automPass = settingsMap["SCRAPER_AUTOMATYKA_PASS"] || "";
+        const loginUser = settingsMap["SCRAPER_LOGINTRADE_USER"] || "";
+        const loginPass = settingsMap["SCRAPER_LOGINTRADE_PASS"] || "";
+
+        const scrapersHtml = `
+            <div class="settings-layout glass-card" style="margin-top: 24px;">
+                <h3 style="margin-bottom: 8px;"><i class="fa-solid fa-user-lock"></i> Dostęp i Logowanie do Scraperów</h3>
+                <p class="settings-hint">Dane dostępowe wymagane do autoryzowanego pobierania ogłoszeń i danych kontaktowych z portali.</p>
+
+                <div style="display: flex; flex-direction: column; gap: 24px; margin-top: 20px;">
+                    <!-- Automatyka -->
+                    <div style="border: 1px solid rgba(255, 255, 255, 0.08); padding: 20px; border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
+                        <h4 style="margin-top: 0; margin-bottom: 12px; color: var(--color-accent); font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-industry"></i> Automatyka.pl / Xtech.pl
+                        </h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="setting-SCRAPER_AUTOMATYKA_USER">Użytkownik / Email (Automatyka.pl)</label>
+                                <input type="text" id="setting-SCRAPER_AUTOMATYKA_USER" data-key="SCRAPER_AUTOMATYKA_USER" value="${automUser}" placeholder="np. login@firma.pl">
+                            </div>
+                            <div class="form-group">
+                                <label for="setting-SCRAPER_AUTOMATYKA_PASS">Hasło (Automatyka.pl)</label>
+                                <input type="password" id="setting-SCRAPER_AUTOMATYKA_PASS" data-key="SCRAPER_AUTOMATYKA_PASS" value="${automPass}" placeholder="••••••••">
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
+                            <button type="button" class="btn-secondary btn-test-auth" data-scraper="Automatyka" style="padding: 8px 16px; font-size: 0.85rem; border-radius: 6px;">
+                                <i class="fa-solid fa-vial"></i> Testuj Połączenie
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Logintrade -->
+                    <div style="border: 1px solid rgba(255, 255, 255, 0.08); padding: 20px; border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
+                        <h4 style="margin-top: 0; margin-bottom: 12px; color: var(--color-accent); font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-handshake"></i> Logintrade.pl
+                        </h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="setting-SCRAPER_LOGINTRADE_USER">Użytkownik / Email (Logintrade.pl)</label>
+                                <input type="text" id="setting-SCRAPER_LOGINTRADE_USER" data-key="SCRAPER_LOGINTRADE_USER" value="${loginUser}" placeholder="np. login@firma.pl">
+                            </div>
+                            <div class="form-group">
+                                <label for="setting-SCRAPER_LOGINTRADE_PASS">Hasło (Logintrade.pl)</label>
+                                <input type="password" id="setting-SCRAPER_LOGINTRADE_PASS" data-key="SCRAPER_LOGINTRADE_PASS" value="${loginPass}" placeholder="••••••••">
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
+                            <button type="button" class="btn-secondary btn-test-auth" data-scraper="Logintrade" style="padding: 8px 16px; font-size: 0.85rem; border-radius: 6px;">
+                                <i class="fa-solid fa-vial"></i> Testuj Połączenie
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        let htmlParts = categoriesData.map(cat => {
+            const fieldsHtml = cat.keys.map(k => renderField(k, settingsMap[k])).join("");
+            return `
+                <div class="settings-layout glass-card" style="margin-top: 24px;">
+                    <h3><i class="fa-solid ${cat.icon}"></i> ${cat.title}</h3>
+                    <p class="settings-hint">${cat.hint}</p>
+                    <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px;">
+                        ${fieldsHtml}
+                    </div>
+                </div>
+            `;
         });
+
+        htmlParts.push(scrapersHtml);
+
+        const categorizedKeys = new Set();
+        categoriesData.forEach(cat => cat.keys.forEach(k => categorizedKeys.add(k)));
+        categorizedKeys.add("SCRAPER_AUTOMATYKA_USER");
+        categorizedKeys.add("SCRAPER_AUTOMATYKA_PASS");
+        categorizedKeys.add("SCRAPER_LOGINTRADE_USER");
+        categorizedKeys.add("SCRAPER_LOGINTRADE_PASS");
+
+        const otherSettings = settings.filter(s => !categorizedKeys.has(s.key));
+        if (otherSettings.length > 0) {
+            const otherFieldsHtml = otherSettings.map(s => renderField(s.key, s.value)).join("");
+            const otherHtml = `
+                <div class="settings-layout glass-card" style="margin-top: 24px;">
+                    <h3><i class="fa-solid fa-sliders"></i> Pozostałe Ustawienia</h3>
+                    <p class="settings-hint">Inne globalne parametry systemu.</p>
+                    <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px;">
+                        ${otherFieldsHtml}
+                    </div>
+                </div>
+            `;
+            htmlParts.push(otherHtml);
+        }
+
+        settingsFieldsContainer.innerHTML = htmlParts.join("");
     }
 
     settingsForm.addEventListener("submit", async (e) => {
@@ -1289,6 +1417,49 @@ document.addEventListener("DOMContentLoaded", () => {
             showToast("Brak zmian do zapisu.", "warning");
         }
     });
+
+    // Obsługa testowania połączenia ze scraperami
+    settingsForm.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".btn-test-auth");
+        if (!btn) return;
+
+        e.preventDefault();
+
+        const scraper = btn.dataset.scraper; // "Automatyka" lub "Logintrade"
+        const scraperUpper = scraper.toUpperCase();
+
+        const usernameInput = document.getElementById(`setting-SCRAPER_${scraperUpper}_USER`);
+        const passwordInput = document.getElementById(`setting-SCRAPER_${scraperUpper}_PASS`);
+
+        const username = usernameInput ? usernameInput.value : "";
+        const password = passwordInput ? passwordInput.value : "";
+
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Sprawdzanie...`;
+
+        try {
+            const res = await apiRequest("/api/settings/verify-credentials", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    scraper: scraper,
+                    username: username,
+                    password: password
+                })
+            });
+
+            if (res && res.success) {
+                showToast(`Autoryzacja dla ${scraper} powiodła się!`, "success");
+            }
+        } catch (err) {
+            // apiRequest automatycznie wyświetla błąd jako toast
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    });
+
 
     // --- Trigger OSINT Scan ---
     triggerScanBtn.addEventListener("click", async () => {

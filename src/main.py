@@ -31,7 +31,7 @@ from odoo_integration import get_odoo_client
 from osint_engine import get_engine, get_date_limits, get_system_instruction, format_prompt_dates
 from scrapers.factory import SCRAPER_REGISTRY
 from models import User, Session as UserSession, Account, ResearchLog, Setting, PromptVersion, Lead, RunPerformanceSnapshot
-from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest, SandboxFetchUrlRequest, SettingUpdate, ChangePasswordRequest
+from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest, SandboxFetchUrlRequest, SettingUpdate, ChangePasswordRequest, VerifyCredentialsRequest
 from auth import verify_password, create_user_session, validate_session_token
 from seed import seed_data
 
@@ -413,7 +413,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.13",
+    version="1.7.14",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -433,7 +433,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.13",
+        "version": "1.7.14",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
@@ -1006,6 +1006,113 @@ async def update_setting(
 
     await db.commit()
     return {"success": True}
+
+
+@app.post("/api/settings/verify-credentials", tags=["Settings"])
+async def verify_credentials(
+    req: VerifyCredentialsRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db)
+):
+    from curl_cffi.requests import AsyncSession as CffiAsyncSession
+
+    username = req.username
+    password = req.password
+    scraper = req.scraper
+
+    if not username or username == "******":
+        db_key = f"SCRAPER_{scraper.upper()}_USER"
+        result = await db.execute(select(Setting).filter(Setting.key == db_key).limit(1))
+        item = result.scalar_one_or_none()
+        username = item.value if item else ""
+
+    if not password or password == "******":
+        db_key = f"SCRAPER_{scraper.upper()}_PASS"
+        result = await db.execute(select(Setting).filter(Setting.key == db_key).limit(1))
+        item = result.scalar_one_or_none()
+        password = item.value if item else ""
+
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Brak danych logowania (nazwa użytkownika lub hasło).")
+
+    if scraper == "Automatyka":
+        try:
+            async with CffiAsyncSession(impersonate="chrome124") as session:
+                resp = await session.post(
+                    "https://www.xtech.pl/zaloguj",
+                    json={
+                        "LoginName": username,
+                        "Password": password,
+                        "Step": 1,
+                        "ServiceId": 3
+                    },
+                    timeout=15
+                )
+                if resp.status_code != 200:
+                    raise HTTPException(status_code=400, detail=f"Błąd połączenia z xtech.pl (HTTP {resp.status_code}).")
+
+                try:
+                    data = resp.json()
+                except Exception:
+                    data = {}
+
+                error_id = data.get("errorId")
+                if error_id == "wrongLoginName":
+                    raise HTTPException(status_code=400, detail="Błędny e-mail / nazwa użytkownika.")
+                elif error_id == "wrongPassword":
+                    raise HTTPException(status_code=400, detail="Błędne hasło.")
+                elif error_id:
+                    raise HTTPException(status_code=400, detail=f"Błąd logowania: {error_id}")
+
+                return {"success": True}
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Błąd połączenia: {str(e)}")
+
+    elif scraper == "Logintrade":
+        try:
+            async with CffiAsyncSession(impersonate="chrome124") as session:
+                get_url = "https://platformazakupowa.logintrade.pl/sso-login"
+                resp_get = await session.get(get_url, timeout=15)
+                if resp_get.status_code != 200:
+                    raise HTTPException(status_code=400, detail=f"Błąd połączenia z platformazakupowa.logintrade.pl (HTTP {resp_get.status_code}).")
+
+                import re
+                match = re.search(r'name="_token"\s+value="([^"]+)"', resp_get.text)
+                if not match:
+                    match = re.search(r'value="([^"]+)"\s+name="_token"', resp_get.text)
+
+                if not match:
+                    raise HTTPException(status_code=400, detail="Nie udało się pobrać tokenu CSRF ze strony logowania.")
+
+                token = match.group(1)
+
+                post_url = "https://platformazakupowa.logintrade.pl/sso-login?backUrl=https://platformazakupowa.logintrade.pl/"
+                resp_post = await session.post(
+                    post_url,
+                    data={
+                        "username": username,
+                        "password": password,
+                        "_token": token,
+                        "save": ""
+                    },
+                    timeout=15
+                )
+                if resp_post.status_code != 200:
+                    raise HTTPException(status_code=400, detail=f"Błąd logowania (HTTP {resp_post.status_code}).")
+
+                if "invalid" in resp_post.text.lower():
+                    raise HTTPException(status_code=400, detail="Błędny e-mail lub hasło logowania.")
+
+                return {"success": True}
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Błąd połączenia: {str(e)}")
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Nieznany skraper: {scraper}")
 
 
 @app.get("/api/settings/default-prompt", tags=["Settings"])

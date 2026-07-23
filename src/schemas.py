@@ -12,6 +12,13 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class VerifyCredentialsRequest(BaseModel):
+    scraper: str
+    username: str
+    password: str
+
+
+
 class AccountCreate(BaseModel):
     """Dane potrzebne do utworzenia nowego konta/kampanii."""
     name: str = Field(..., min_length=1, max_length=255)
