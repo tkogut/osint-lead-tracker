@@ -992,14 +992,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (latencyEl) latencyEl.innerHTML = `<i class="fa-solid fa-clock"></i> Czas: ${debugInfo.latency_ms || 0}ms`;
     }
 
-    const debugTabBtns = document.querySelectorAll(".debug-tab-btn");
-    debugTabBtns.forEach(btn => {
-        btn.addEventListener("click", () => {
-            debugTabBtns.forEach(b => b.classList.remove("active"));
+    document.addEventListener("click", (e) => {
+        const btn = e.target.closest(".debug-tab-btn");
+        if (btn) {
+            document.querySelectorAll(".debug-tab-btn").forEach(b => b.classList.remove("active"));
             btn.classList.add("active");
             activeDebugTab = btn.getAttribute("data-debug-tab");
             updateDebugTerminalContent();
-        });
+        }
     });
 
     sandboxForm.addEventListener("submit", async (e) => {

@@ -3,11 +3,11 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/main.py",
     "src/static/index.html",
-    "src/static/app.js"
+    "src/static/app.js",
+    "scripts/bump_patch_version.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-23T06:47:13Z",
-  "notes": "Wdrożono interaktywny terminal debugowania LLM w Piaskownica AI"
+  "timestamp": "2026-07-23T06:50:39Z",
+  "notes": "Wdrożono cache-busting dla plików JS/CSS oraz dynamiczne delegowanie zdarzeń terminala debugowania"
 }

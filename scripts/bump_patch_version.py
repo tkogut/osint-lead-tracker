@@ -60,6 +60,16 @@ def bump_version():
             f'OSINT v{new_version}',
             html_content
         )
+        new_html_content = re.sub(
+            r'styles\.css\?v=' + re.escape(old_version),
+            f'styles.css?v={new_version}',
+            new_html_content
+        )
+        new_html_content = re.sub(
+            r'app\.js\?v=' + re.escape(old_version),
+            f'app.js?v={new_version}',
+            new_html_content
+        )
         INDEX_HTML_PATH.write_text(new_html_content, encoding="utf-8")
 
     # 3. Update README.md
