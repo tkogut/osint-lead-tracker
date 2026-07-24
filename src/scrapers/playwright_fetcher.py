@@ -1,62 +1,61 @@
 import asyncio
 import logging
 import re
-from curl_cffi.requests import AsyncSession as CffiAsyncSession
 from playwright.async_api import async_playwright
 
 logger = logging.getLogger("osint.playwright")
 
 async def fetch_with_playwright(url: str, user: str = "", pwd: str = "") -> str:
     """
-    Fetches the URL using Playwright Chromium headless, performing multi-step login on xtech.pl
-    if credentials are provided, duplicating cookies for .automatyka.pl, and returning HTML content.
+    Fetches the URL using Playwright Chromium headless. If credentials are provided,
+    performs multi-step login directly on automatyka.pl/zaloguj (which redirects to xtech.pl),
+    extracts the active cookies, duplicates them for .automatyka.pl, and returns the notice content.
     """
     logger.info("Starting Playwright fetch for: %s", url)
-    cookies_for_playwright = []
     
-    # Optional login step via HTTP first to extract auth cookies
-    if user and pwd:
-        try:
-            logger.info("Logging in to xtech.pl JSON API to grab session cookies...")
-            async with CffiAsyncSession(impersonate="chrome124") as s:
-                r = await s.post(
-                    "https://www.xtech.pl/zaloguj",
-                    json={"LoginName": user, "Password": pwd, "Step": 1, "ServiceId": 3},
-                    timeout=15
-                )
-                if r.status_code == 200:
-                    for cookie in s.cookies.jar:
-                        domain = cookie.domain if cookie.domain else ".xtech.pl"
-                        # Replicate for both domains
-                        cookies_for_playwright.append({
-                            "name": cookie.name,
-                            "value": cookie.value,
-                            "domain": ".xtech.pl",
-                            "path": "/",
-                        })
-                        cookies_for_playwright.append({
-                            "name": cookie.name,
-                            "value": cookie.value,
-                            "domain": ".automatyka.pl",
-                            "path": "/",
-                        })
-                    logger.info("Successfully fetched %d session cookies", len(cookies_for_playwright))
-        except Exception as e:
-            logger.warning("Optional pre-login cookie grab failed: %s", e)
-
     async with async_playwright() as p:
         browser = await p.chromium.launch(
             headless=True,
             args=["--no-sandbox", "--disable-dev-shm-usage"]
         )
         ctx = await browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
         )
-        if cookies_for_playwright:
-            await ctx.add_cookies(cookies_for_playwright)
-            
         page = await ctx.new_page()
+        
         try:
+            if user and pwd:
+                logger.info("Navigating to login page...")
+                await page.goto("https://www.automatyka.pl/zaloguj", wait_until="load", timeout=25000)
+                
+                await page.wait_for_selector("#LoginName", timeout=10000)
+                await page.fill("#LoginName", user)
+                logger.info("Filled LoginName, clicking DALEJ (#next)...")
+                await page.click("#next")
+                
+                await page.wait_for_selector("#Password", timeout=10000)
+                await page.fill("#Password", pwd)
+                logger.info("Filled Password, clicking ZALOGUJ (#submit)...")
+                await page.click("#submit")
+                
+                await page.wait_for_load_state("networkidle", timeout=20000)
+                logger.info("Login process completed. Current URL: %s", page.url)
+                
+                # Extract and duplicate cookies
+                xtech_cookies = await ctx.cookies()
+                logger.info("Found %d cookies in session", len(xtech_cookies))
+                
+                duplicated_cookies = []
+                for c in xtech_cookies:
+                    duplicated_cookies.append(c)
+                    if "xtech.pl" in c["domain"]:
+                        new_c = c.copy()
+                        new_c["domain"] = c["domain"].replace("xtech.pl", "automatyka.pl")
+                        duplicated_cookies.append(new_c)
+                        
+                await ctx.add_cookies(duplicated_cookies)
+                logger.info("Injected duplicated cookies. Total cookies: %d", len(await ctx.cookies()))
+
             logger.info("Navigating to target URL: %s", url)
             await page.goto(url, wait_until="load", timeout=30000)
             # Wait for dynamic AJAX content to load

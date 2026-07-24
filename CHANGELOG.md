@@ -2,6 +2,11 @@
 > **OSINT Lead Tracker**
 
 Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w tym pliku. Format jest oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/) i projekt jest zgodny z [SemVer](https://semver.org/spec/v2.0.0.html).
+## [1.7.21] - 2026-07-24
+
+### Added
+- fix: change Playwright fetcher to login via browser UI
+
 ## [1.7.20] - 2026-07-24
 
 ### Added
