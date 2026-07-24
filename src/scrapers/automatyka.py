@@ -13,6 +13,7 @@ from typing import List, Dict, Any
 from curl_cffi.requests import AsyncSession
 from scrapers.base import BaseScraper, DOMSanitizer
 from database import is_url_visited, mark_url_visited, get_db_setting_sync
+from scrapers.playwright_fetcher import fetch_with_playwright
 
 logger = logging.getLogger(__name__)
 
@@ -188,12 +189,7 @@ class AutomatykaScraper(BaseScraper):
                         await asyncio.sleep(random.uniform(0.8, 2.2))
 
                         try:
-                            detail_resp = await session.get(detail_url, timeout=15)
-                            if detail_resp.status_code != 200:
-                                logger.warning("[Automatyka] Błąd pobierania szczegółów %s: %s", detail_url, detail_resp.status_code)
-                                continue
-
-                            detail_html = detail_resp.text
+                            detail_html = await fetch_with_playwright(detail_url, user, pwd)
 
                             # Wyciągnij datę publikacji za pomocą regex
                             pub_date_str = None

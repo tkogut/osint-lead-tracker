@@ -7,3 +7,4 @@ google-genai==1.16.0
 SQLAlchemy>=2.0.0
 curl-cffi>=0.7.0
 trafilatura>=1.12.0
+playwright>=1.44
