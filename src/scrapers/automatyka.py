@@ -162,6 +162,9 @@ class AutomatykaScraper(BaseScraper):
                     for link in found_links:
                         if link == "/zapytania-ofertowe" or link.endswith("/zapytania-ofertowe/"):
                             continue
+                        # Ignore category / region filters containing colons (e.g. województwo:lubelskie, branza:xyz)
+                        if ":" in link:
+                            continue
                         full_url = urllib.parse.urljoin(self.base_url, link)
                         detail_urls.append(full_url)
 
