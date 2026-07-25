@@ -45,6 +45,20 @@ async def _login_session(ctx, page, user: str, scraper_password: str, context: s
         logger.info("Playwright: Logging in to biznes-polska.pl...")
         await page.goto("https://www.biznes-polska.pl/logowanie/", wait_until="load", timeout=25000)
         
+        try:
+            cookie_btn = page.locator("#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll")
+            cookie_btn_text = page.locator("text=Zezwól na wszystkie")
+            if await cookie_btn.count() > 0:
+                logger.info("Cookiebot dialog button found by ID, clicking...")
+                await cookie_btn.click()
+                await asyncio.sleep(1)
+            elif await cookie_btn_text.count() > 0:
+                logger.info("Cookiebot dialog button found by text, clicking...")
+                await cookie_btn_text.click()
+                await asyncio.sleep(1)
+        except Exception as cookie_err:
+            logger.warning("Failed to accept Cookiebot: %s", cookie_err)
+            
         await page.wait_for_selector("#username", timeout=10000)
         await page.fill("#username", user)
         
@@ -52,8 +66,9 @@ async def _login_session(ctx, page, user: str, scraper_password: str, context: s
         await page.fill("#password", scraper_password)
         
         logger.info("Playwright: Clicking login button...")
-        await page.click("#login-form button.login", force=True)
+        await page.click("#login-form button.login")
         
+        await page.wait_for_url("https://www.biznes-polska.pl/", timeout=15000)
         await page.wait_for_load_state("networkidle", timeout=20000)
         logger.info("Playwright: BiznesPolska login process completed. Current URL: %s", page.url)
     else:
