@@ -160,13 +160,10 @@ class AutomatykaScraper(BaseScraper):
                     found_links = set(re.findall(r'href=["\'](/zapytania-ofertowe/[^"\']+)["\']', html))
                     detail_urls = []
                     for link in found_links:
-                        if link == "/zapytania-ofertowe" or link.endswith("/zapytania-ofertowe/"):
-                            continue
-                        # Ignore category / region filters containing colons (e.g. województwo:lubelskie, branza:xyz)
-                        if ":" in link:
-                            continue
-                        full_url = urllib.parse.urljoin(self.base_url, link)
-                        detail_urls.append(full_url)
+                        # Match only actual notice links ending with -ID1-ID2 pattern
+                        if re.match(r'^/zapytania-ofertowe/[^/:\?]+-\d+-\d+(?:\?|$)', link):
+                            full_url = urllib.parse.urljoin(self.base_url, link)
+                            detail_urls.append(full_url)
 
                     if not detail_urls:
                         logger.info("[Automatyka] Strona %d nie miała nowych linków.", page)

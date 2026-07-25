@@ -3,9 +3,11 @@
   "role": "Auditor Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/scrapers/automatyka.py"
+    "src/database.py",
+    "src/scrapers/automatyka.py",
+    "tests/test_automatyka.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-25T10:48:16Z",
-  "notes": "Auditor: Fixed Automatyka.pl scraper filter. Links containing colons are now excluded from page scanning, resolving SQLite IntegrityError."
+  "timestamp": "2026-07-25T10:55:00Z",
+  "notes": "Auditor: Whitelist regex filter and database hash fixes verified. Safe, multi-tenant url hashing resolved and tested."
 }

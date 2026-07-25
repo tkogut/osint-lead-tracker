@@ -65,7 +65,7 @@ class TestAutomatykaScraperAsync(unittest.IsolatedAsyncioTestCase):
         mock_list_resp.text = """
         <html>
         <body>
-            <a href="/zapytania-ofertowe/waga-samochodowa-1">Szczegóły</a>
+            <a href="/zapytania-ofertowe/waga-samochodowa-1-2">Szczegóły</a>
         </body>
         </html>
         """
@@ -92,7 +92,7 @@ class TestAutomatykaScraperAsync(unittest.IsolatedAsyncioTestCase):
         
         # 3. Setup mock Playwright multiple fetch (Phase 2)
         mock_fetch_multi.return_value = {
-            "https://www.automatyka.pl/zapytania-ofertowe/waga-samochodowa-1": """
+            "https://www.automatyka.pl/zapytania-ofertowe/waga-samochodowa-1-2": """
             <html>
             <body>
                 <section class="contact-details">
@@ -122,14 +122,14 @@ class TestAutomatykaScraperAsync(unittest.IsolatedAsyncioTestCase):
         # Verify results
         self.assertEqual(len(results), 1)
         lead = results[0]
-        self.assertEqual(lead["url"], "https://www.automatyka.pl/zapytania-ofertowe/waga-samochodowa-1")
+        self.assertEqual(lead["url"], "https://www.automatyka.pl/zapytania-ofertowe/waga-samochodowa-1-2")
         self.assertIn("Nazwa firmy: Przykładowy Klient", lead["raw_text"])
         self.assertIn("biuro@klient.pl", lead["raw_text"])
         self.assertIn("Szukamy wagi najazdowej", lead["raw_text"])
         
         # Verify mock calls
         mock_fetch_multi.assert_called_once_with(
-            ["https://www.automatyka.pl/zapytania-ofertowe/waga-samochodowa-1"],
+            ["https://www.automatyka.pl/zapytania-ofertowe/waga-samochodowa-1-2"],
             "", "", "Automatyka"
         )
 

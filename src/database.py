@@ -132,7 +132,9 @@ async def url_exists(url: str) -> bool:
 
 async def is_url_visited(url: str, account_id: int) -> bool:
     """Tier 0 Deduplication: Sprawdza czy dany URL dla konkretnego konta został już odwiedzony/przetworzony."""
-    url_hash = hashlib.sha256(url.strip().encode("utf-8")).hexdigest()
+    # Generate hash based on both account_id and url to allow multi-tenancy deduplication
+    combined_str = f"{account_id}:{url.strip()}"
+    url_hash = hashlib.sha256(combined_str.encode("utf-8")).hexdigest()
     async with AsyncSessionLocal() as session:
         result = await session.execute(
             select(VisitedURL).filter(
@@ -152,7 +154,9 @@ async def mark_url_visited(
     status: str = "PROCESSED"
 ) -> None:
     """Rejestruje odwiedzony URL w tabeli visited_urls dla deduplikacji Tier 0."""
-    url_hash = hashlib.sha256(url.strip().encode("utf-8")).hexdigest()
+    # Generate hash based on both account_id and url to allow multi-tenancy deduplication
+    combined_str = f"{account_id}:{url.strip()}"
+    url_hash = hashlib.sha256(combined_str.encode("utf-8")).hexdigest()
     now = datetime.utcnow()
     async with AsyncSessionLocal() as session:
         result = await session.execute(
