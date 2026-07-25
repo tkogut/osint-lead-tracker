@@ -52,7 +52,7 @@ async def _login_session(ctx, page, user: str, scraper_password: str, context: s
         await page.fill("#password", scraper_password)
         
         logger.info("Playwright: Clicking login button...")
-        await page.click("#login-form button.login")
+        await page.click("#login-form button.login", force=True)
         
         await page.wait_for_load_state("networkidle", timeout=20000)
         logger.info("Playwright: BiznesPolska login process completed. Current URL: %s", page.url)
