@@ -13,7 +13,7 @@ from typing import List, Dict, Any
 from curl_cffi.requests import AsyncSession
 from scrapers.base import BaseScraper, DOMSanitizer
 from database import is_url_visited, mark_url_visited, get_db_setting_sync
-from scrapers.playwright_fetcher import fetch_with_playwright
+from scrapers.playwright_fetcher import fetch_with_playwright, fetch_multiple_with_playwright
 
 logger = logging.getLogger(__name__)
 
@@ -183,13 +183,24 @@ class AutomatykaScraper(BaseScraper):
 
                     logger.info("[Automatyka] Znaleziono %d nowych linków ogłoszeń na stronie %d.", len(unvisited_urls), page)
 
-                    # Pętla po nieodwiedzonych ogłoszeniach
+                    candidate_leads = []
+                    candidate_urls = []
+                    stop_pagination = False
+
+                    # Phase 1: Quick scanning via curl_cffi (no login)
                     for detail_url in unvisited_urls:
                         # Jitter opóźnienia rate limiting
                         await asyncio.sleep(random.uniform(0.8, 2.2))
 
                         try:
-                            detail_html = await fetch_with_playwright(detail_url, user, pwd)
+                            logger.info("[Automatyka] Phase 1: Szybkie pobieranie %s przez curl_cffi...", detail_url)
+                            detail_resp = await session.get(detail_url, timeout=15)
+                            
+                            if detail_resp.status_code != 200:
+                                logger.warning("[Automatyka] Błąd pobierania %s: status %s", detail_url, detail_resp.status_code)
+                                continue
+
+                            detail_html = detail_resp.text
 
                             # Wyciągnij datę publikacji za pomocą regex
                             pub_date_str = None
@@ -206,14 +217,12 @@ class AutomatykaScraper(BaseScraper):
                                     pub_date = datetime.strptime(pub_date_str, "%Y-%m-%d").date()
                                     if start_dt and pub_date < start_dt:
                                         logger.info(f"[Automatyka] Napotkano ogłoszenie starsze niż start_date ({start_date}). Przerywam paginację.")
-                                        return raw_items
+                                        stop_pagination = True
+                                        break
                                 except Exception as parse_pub_err:
                                     logger.warning("[Automatyka] Błąd parsowania wyciągniętej daty %s: %s", pub_date_str, parse_pub_err)
 
-                            contact_header = extract_advertiser_info(detail_html)
                             clean_text = DOMSanitizer.clean(detail_html, max_chars=6000)
-                            if contact_header:
-                                clean_text = contact_header + clean_text
 
                             if len(clean_text) < 50:
                                 logger.warning("[Automatyka] Odrzucono zbyt krótki tekst po sanitacji DOM: %s", detail_url)
@@ -235,16 +244,39 @@ class AutomatykaScraper(BaseScraper):
                             title_match = re.search(r"<h1[^>]*>(.*?)</h1>", detail_html, flags=re.DOTALL | re.IGNORECASE)
                             title = re.sub(r"<[^>]+>", "", title_match.group(1)).strip() if title_match else "Zapytanie ofertowe - Automatyka.pl"
 
-                            raw_items.append({
+                            candidate_leads.append({
                                 "url": detail_url,
                                 "tytul": title,
                                 "raw_text": clean_text,
                                 "data": pub_date_str if pub_date_str else datetime.utcnow().strftime("%Y-%m-%d"),
                             })
-                            logger.info("[Automatyka] Pobrano nową treść ogłoszenia do ekstrakcji LLM: %s", title)
+                            candidate_urls.append(detail_url)
 
                         except Exception as detail_err:
-                            logger.error("[Automatyka] Błąd skanowania szczegółów %s: %s", detail_url, detail_err)
+                            logger.error("[Automatyka] Błąd skanowania szczegółów Phase 1 %s: %s", detail_url, detail_err)
+
+                    # Phase 2: Playwright fetch for candidates to get contact details
+                    if candidate_urls:
+                        logger.info("[Automatyka] Phase 2: Pobieranie z autoryzacją Playwright dla %d kandydatów...", len(candidate_urls))
+                        playwright_results = await fetch_multiple_with_playwright(candidate_urls, user, pwd, "Automatyka")
+                        
+                        for lead in candidate_leads:
+                            lead_url = lead["url"]
+                            authenticated_html = playwright_results.get(lead_url)
+                            
+                            if authenticated_html:
+                                logger.info("[Automatyka] Pomyślnie pobrano dane kontaktowe przez Playwright dla %s", lead_url)
+                                contact_header = extract_advertiser_info(authenticated_html)
+                                if contact_header:
+                                    lead["raw_text"] = contact_header + lead["raw_text"]
+                            else:
+                                logger.warning("[Automatyka] Playwright nie zdołał pobrać %s, używam fallback z Phase 1", lead_url)
+                            
+                            raw_items.append(lead)
+                            logger.info("[Automatyka] Dodano nową ofertę: %s", lead["tytul"])
+
+                    if stop_pagination:
+                        return raw_items
 
                 except Exception as page_err:
                     logger.error("[Automatyka] Wyjątek podczas skanowania strony %d: %s", page, page_err)
