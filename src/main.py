@@ -414,7 +414,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.25",
+    version="1.7.26",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -434,7 +434,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.25",
+        "version": "1.7.26",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
@@ -1273,8 +1273,8 @@ async def sandbox_fetch_url(
 
         if context == "Automatyka":
             user = get_db_setting_sync("SCRAPER_AUTOMATYKA_USER", "")
-            pwd = get_db_setting_sync("SCRAPER_AUTOMATYKA_PASS", "")
-            detail_html = await fetch_with_playwright(req.url, user, pwd, context="Automatyka")
+            scraper_password = get_db_setting_sync("SCRAPER_AUTOMATYKA_PASS", "")
+            detail_html = await fetch_with_playwright(req.url, user, scraper_password, context="Automatyka")
             clean_text = DOMSanitizer.clean(detail_html, max_chars=6000)
             from scrapers.automatyka import extract_advertiser_info
             contact_header = extract_advertiser_info(detail_html)
@@ -1284,16 +1284,16 @@ async def sandbox_fetch_url(
 
         elif context == "BiznesPolska":
             user = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_USER", "")
-            pwd = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_PASS", "")
-            detail_html = await fetch_with_playwright(req.url, user, pwd, context="BiznesPolska")
+            scraper_password = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_PASS", "")
+            detail_html = await fetch_with_playwright(req.url, user, scraper_password, context="BiznesPolska")
             clean_text = DOMSanitizer.clean(detail_html, max_chars=6000)
             return {"success": True, "clean_text": clean_text}
 
         async with CffiAsyncSession(impersonate="chrome124") as cffi_session:
             if context == "Logintrade":
                 user = get_db_setting_sync("SCRAPER_LOGINTRADE_USER", "")
-                pwd = get_db_setting_sync("SCRAPER_LOGINTRADE_PASS", "")
-                if user and pwd:
+                scraper_password = get_db_setting_sync("SCRAPER_LOGINTRADE_PASS", "")
+                if user and scraper_password:
                     try:
                         sso_resp = await cffi_session.get("https://platformazakupowa.logintrade.pl/sso-login", timeout=15)
                         _token = ""
@@ -1304,7 +1304,7 @@ async def sandbox_fetch_url(
                         
                         await cffi_session.post(
                             "https://platformazakupowa.logintrade.pl/sso-login?backUrl=https://platformazakupowa.logintrade.pl/",
-                            data={"username": user, "password": pwd, "_token": _token, "save": ""},
+                            data={"username": user, "password": scraper_password, "_token": _token, "save": ""},
                             timeout=15
                         )
                     except Exception as l_err:
@@ -1360,8 +1360,8 @@ async def run_sandbox_test(
 
             if context == "Automatyka":
                 user = get_db_setting_sync("SCRAPER_AUTOMATYKA_USER", "")
-                pwd = get_db_setting_sync("SCRAPER_AUTOMATYKA_PASS", "")
-                detail_html = await fetch_with_playwright(req.url, user, pwd, context="Automatyka")
+                scraper_password = get_db_setting_sync("SCRAPER_AUTOMATYKA_PASS", "")
+                detail_html = await fetch_with_playwright(req.url, user, scraper_password, context="Automatyka")
                 raw_text = DOMSanitizer.clean(detail_html, max_chars=6000)
                 from scrapers.automatyka import extract_advertiser_info
                 contact_header = extract_advertiser_info(detail_html)
@@ -1369,16 +1369,16 @@ async def run_sandbox_test(
                     raw_text = contact_header + raw_text
             elif context == "BiznesPolska":
                 user = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_USER", "")
-                pwd = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_PASS", "")
-                detail_html = await fetch_with_playwright(req.url, user, pwd, context="BiznesPolska")
+                scraper_password = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_PASS", "")
+                detail_html = await fetch_with_playwright(req.url, user, scraper_password, context="BiznesPolska")
                 raw_text = DOMSanitizer.clean(detail_html, max_chars=6000)
             else:
                 from curl_cffi.requests import AsyncSession as CffiAsyncSession
                 async with CffiAsyncSession(impersonate="chrome124") as cffi_session:
                     if context == "Logintrade":
                         user = get_db_setting_sync("SCRAPER_LOGINTRADE_USER", "")
-                        pwd = get_db_setting_sync("SCRAPER_LOGINTRADE_PASS", "")
-                        if user and pwd:
+                        scraper_password = get_db_setting_sync("SCRAPER_LOGINTRADE_PASS", "")
+                        if user and scraper_password:
                             try:
                                 sso_resp = await cffi_session.get("https://platformazakupowa.logintrade.pl/sso-login", timeout=15)
                                 _token = ""
@@ -1389,7 +1389,7 @@ async def run_sandbox_test(
                                 
                                 await cffi_session.post(
                                     "https://platformazakupowa.logintrade.pl/sso-login?backUrl=https://platformazakupowa.logintrade.pl/",
-                                    data={"username": user, "password": pwd, "_token": _token, "save": ""},
+                                    data={"username": user, "password": scraper_password, "_token": _token, "save": ""},
                                     timeout=15
                                 )
                             except Exception as l_err:

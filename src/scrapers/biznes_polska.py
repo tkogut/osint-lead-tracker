@@ -48,7 +48,7 @@ class BiznesPolskaScraper(BaseScraper):
         }
 
         user = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_USER", "")
-        pwd = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_PASS", "")
+        scraper_password = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_PASS", "")
 
         async with AsyncSession(impersonate="chrome124", headers=headers) as session:
             for page in range(1, 11):
@@ -158,7 +158,7 @@ class BiznesPolskaScraper(BaseScraper):
                     # Phase 2: Pobieranie autoryzowane Playwright
                     if candidate_urls:
                         logger.info("[BiznesPolska] Phase 2: Pobieranie z autoryzacją Playwright dla %d kandydatów...", len(candidate_urls))
-                        playwright_results = await fetch_multiple_with_playwright(candidate_urls, user, pwd, "BiznesPolska")
+                        playwright_results = await fetch_multiple_with_playwright(candidate_urls, user, scraper_password, "BiznesPolska")
 
                         for lead in candidate_leads:
                             lead_url = lead["url"]

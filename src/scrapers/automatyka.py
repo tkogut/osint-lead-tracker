@@ -120,7 +120,7 @@ class AutomatykaScraper(BaseScraper):
                 pass
 
         user = get_db_setting_sync("SCRAPER_AUTOMATYKA_USER", "")
-        pwd = get_db_setting_sync("SCRAPER_AUTOMATYKA_PASS", "")
+        scraper_password = get_db_setting_sync("SCRAPER_AUTOMATYKA_PASS", "")
 
         headers = {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
@@ -129,12 +129,12 @@ class AutomatykaScraper(BaseScraper):
         }
 
         async with AsyncSession(impersonate="chrome124", headers=headers) as session:
-            if user and pwd:
+            if user and scraper_password:
                 try:
                     logger.info("[Automatyka] Autoryzacja w xtech.pl dla użytkownika: %s", user)
                     login_resp = await session.post(
                         "https://www.xtech.pl/zaloguj",
-                        json={"LoginName": user, "Password": pwd, "Step": 1, "ServiceId": 3},
+                        json={"LoginName": user, "Password": scraper_password, "Step": 1, "ServiceId": 3},
                         timeout=15
                     )
                     logger.info("[Automatyka] Status autoryzacji w xtech.pl: %s", login_resp.status_code)
@@ -258,7 +258,7 @@ class AutomatykaScraper(BaseScraper):
                     # Phase 2: Playwright fetch for candidates to get contact details
                     if candidate_urls:
                         logger.info("[Automatyka] Phase 2: Pobieranie z autoryzacją Playwright dla %d kandydatów...", len(candidate_urls))
-                        playwright_results = await fetch_multiple_with_playwright(candidate_urls, user, pwd, "Automatyka")
+                        playwright_results = await fetch_multiple_with_playwright(candidate_urls, user, scraper_password, "Automatyka")
                         
                         for lead in candidate_leads:
                             lead_url = lead["url"]

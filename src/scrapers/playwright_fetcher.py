@@ -6,8 +6,8 @@ from playwright.async_api import async_playwright
 
 logger = logging.getLogger("osint.playwright")
 
-async def _login_session(ctx, page, user: str, pwd: str, context: str) -> None:
-    if not (user and pwd):
+async def _login_session(ctx, page, user: str, scraper_password: str, context: str) -> None:
+    if not (user and scraper_password):
         return
 
     if context == "Automatyka":
@@ -20,7 +20,7 @@ async def _login_session(ctx, page, user: str, pwd: str, context: str) -> None:
         await page.click("#next")
         
         await page.wait_for_selector("#Password", timeout=10000)
-        await page.fill("#Password", pwd)
+        await page.fill("#Password", scraper_password)
         logger.info("Filled Password, clicking ZALOGUJ (#submit)...")
         await page.click("#submit")
         
@@ -49,7 +49,7 @@ async def _login_session(ctx, page, user: str, pwd: str, context: str) -> None:
         await page.fill("#username", user)
         
         await page.wait_for_selector("#password", timeout=10000)
-        await page.fill("#password", pwd)
+        await page.fill("#password", scraper_password)
         
         logger.info("Playwright: Clicking login button...")
         await page.click("button.login")
@@ -59,7 +59,7 @@ async def _login_session(ctx, page, user: str, pwd: str, context: str) -> None:
     else:
         logger.warning("Unknown context for login: %s", context)
 
-async def fetch_with_playwright(url: str, user: str = "", pwd: str = "", context: str = "Automatyka") -> str:
+async def fetch_with_playwright(url: str, user: str = "", scraper_password: str = "", context: str = "Automatyka") -> str:
     """
     Fetches the URL using Playwright Chromium headless. If credentials are provided,
     performs multi-step login directly on automatyka.pl/zaloguj (which redirects to xtech.pl),
@@ -78,7 +78,7 @@ async def fetch_with_playwright(url: str, user: str = "", pwd: str = "", context
         page = await ctx.new_page()
         
         try:
-            await _login_session(ctx, page, user, pwd, context)
+            await _login_session(ctx, page, user, scraper_password, context)
             logger.info("Navigating to target URL: %s", url)
             await page.goto(url, wait_until="load", timeout=30000)
             # Wait for dynamic AJAX content to load
@@ -91,12 +91,12 @@ async def fetch_with_playwright(url: str, user: str = "", pwd: str = "", context
 async def fetch_multiple_with_playwright(
     urls: List[str],
     user: str = "",
-    pwd: str = "",
+    scraper_password: str = "",
     context: str = "Automatyka"
 ) -> Dict[str, str]:
     """
     Launches Playwright Chromium headless once.
-    Performs login once at the start of the session if credentials (user/pwd) are provided,
+    Performs login once at the start of the session if credentials (user/scraper_password) are provided,
     using logic specific to the context.
     Iterates through the list of URLs, navigates to each one (wait_until="load", timeout=30000),
     waits 3 seconds, and stores the HTML content in the returning dict.
@@ -118,7 +118,7 @@ async def fetch_multiple_with_playwright(
         page = await ctx.new_page()
         
         try:
-            await _login_session(ctx, page, user, pwd, context)
+            await _login_session(ctx, page, user, scraper_password, context)
             
             for url in urls:
                 try:

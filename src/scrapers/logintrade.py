@@ -58,10 +58,10 @@ class LogintradeScraper(BaseScraper):
         }
 
         user = get_db_setting_sync("SCRAPER_LOGINTRADE_USER", "")
-        pwd = get_db_setting_sync("SCRAPER_LOGINTRADE_PASS", "")
+        scraper_password = get_db_setting_sync("SCRAPER_LOGINTRADE_PASS", "")
 
         async with AsyncSession(impersonate="chrome124", headers=headers) as session:
-            if user and pwd:
+            if user and scraper_password:
                 try:
                     logger.info("[Logintrade] Autoryzacja w platformazakupowa.logintrade.pl dla użytkownika: %s", user)
                     sso_resp = await session.get("https://platformazakupowa.logintrade.pl/sso-login", timeout=15)
@@ -73,7 +73,7 @@ class LogintradeScraper(BaseScraper):
                     
                     login_resp = await session.post(
                         "https://platformazakupowa.logintrade.pl/sso-login?backUrl=https://platformazakupowa.logintrade.pl/",
-                        data={"username": user, "password": pwd, "_token": _token, "save": ""},
+                        data={"username": user, "password": scraper_password, "_token": _token, "save": ""},
                         timeout=15
                     )
                     logger.info("[Logintrade] Status autoryzacji: %s", login_resp.status_code)

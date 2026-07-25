@@ -30,11 +30,11 @@ async def seed_data() -> None:
         if not user_check.scalar_one_or_none():
             logger.info("Tworzenie domyślnego konta administratora (admin/admin)...")
             salt = generate_salt()
-            pwd_hash = hash_password("admin", salt)
+            password_hash = hash_password("admin", salt)
             
             admin_user = User(
                 username="admin",
-                password_hash=pwd_hash,
+                password_hash=password_hash,
                 salt=salt,
                 role="admin"
             )
