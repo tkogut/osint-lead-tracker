@@ -414,7 +414,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.24",
+    version="1.7.25",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -434,7 +434,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.24",
+        "version": "1.7.25",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
@@ -445,7 +445,8 @@ async def get_available_sources() -> List[dict]:
     sources = [
         {"id": "BZP", "name": "e-Zamówienia (BZP API)", "description": "Darmowe. Precyzyjne dla przetargów publicznych.", "is_plugin": False},
         {"id": "GUNB", "name": "Pozwolenia budowlane (GUNB RWDZ)", "description": "Darmowe. Dobre tylko dla inwestycji budowlanych.", "is_plugin": False},
-        {"id": "Google", "name": "Wyszukiwarka Google (Grounding)", "description": "Bardzo drogie (Tokeny Gemini). Szeroki zakres (przetargi prywatne, zapytania).", "is_plugin": False}
+        {"id": "Google", "name": "Wyszukiwarka Google (Grounding)", "description": "Bardzo drogie (Tokeny Gemini). Szeroki zakres (przetargi prywatne, zapytania).", "is_plugin": False},
+        {"id": "BiznesPolska", "name": "Biznes-Polska (Przetargi i Zlecenia)", "description": "Darmowe (wymagana subskrypcja). Agregacja zamówień publicznych i prywatnych.", "is_plugin": True}
     ]
     for source_name in SCRAPER_REGISTRY.keys():
         if not any(s["id"] == source_name for s in sources):
@@ -972,6 +973,8 @@ async def get_settings_list(
         "SCRAPER_AUTOMATYKA_PASS",
         "SCRAPER_LOGINTRADE_USER",
         "SCRAPER_LOGINTRADE_PASS",
+        "SCRAPER_BIZNESPOLSKA_USER",
+        "SCRAPER_BIZNESPOLSKA_PASS",
     ]
     result = await db.execute(select(Setting).order_by(Setting.key.asc()))
     rows = result.scalars().all()
@@ -1112,6 +1115,25 @@ async def verify_credentials(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Błąd połączenia: {str(e)}")
 
+    elif scraper == "BiznesPolska":
+        try:
+            logger.info("Weryfikacja danych logowania dla BiznesPolska...")
+            async with CffiAsyncSession(impersonate="chrome124") as session:
+                r = await session.post("https://www.biznes-polska.pl/logowanie/", data={
+                    "username": username,
+                    "password": password,
+                    "rememberme": "y"
+                }, timeout=15)
+                
+                if 'class="error"' in r.text and 'Niepoprawny login lub hasło' in r.text:
+                    raise HTTPException(status_code=400, detail="Błędny login lub hasło logowania.")
+                
+                return {"success": True}
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Błąd połączenia: {str(e)}")
+
     else:
         raise HTTPException(status_code=400, detail=f"Nieznany skraper: {scraper}")
 
@@ -1238,19 +1260,33 @@ async def sandbox_fetch_url(
     try:
         source_name = req.source or "DOMSanitizer"
         if req.scraper == "Auto":
-            context = "Automatyka" if ("automatyka.pl" in req.url or "xtech.pl" in req.url) else "Logintrade" if ("logintrade.pl" in req.url or "logintrade.net" in req.url) else "None"
+            if "automatyka.pl" in req.url or "xtech.pl" in req.url:
+                context = "Automatyka"
+            elif "logintrade.pl" in req.url or "logintrade.net" in req.url:
+                context = "Logintrade"
+            elif "biznes-polska.pl" in req.url:
+                context = "BiznesPolska"
+            else:
+                context = "None"
         else:
             context = req.scraper
 
         if context == "Automatyka":
             user = get_db_setting_sync("SCRAPER_AUTOMATYKA_USER", "")
             pwd = get_db_setting_sync("SCRAPER_AUTOMATYKA_PASS", "")
-            detail_html = await fetch_with_playwright(req.url, user, pwd)
+            detail_html = await fetch_with_playwright(req.url, user, pwd, context="Automatyka")
             clean_text = DOMSanitizer.clean(detail_html, max_chars=6000)
             from scrapers.automatyka import extract_advertiser_info
             contact_header = extract_advertiser_info(detail_html)
             if contact_header:
                 clean_text = contact_header + clean_text
+            return {"success": True, "clean_text": clean_text}
+
+        elif context == "BiznesPolska":
+            user = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_USER", "")
+            pwd = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_PASS", "")
+            detail_html = await fetch_with_playwright(req.url, user, pwd, context="BiznesPolska")
+            clean_text = DOMSanitizer.clean(detail_html, max_chars=6000)
             return {"success": True, "clean_text": clean_text}
 
         async with CffiAsyncSession(impersonate="chrome124") as cffi_session:
@@ -1311,19 +1347,31 @@ async def run_sandbox_test(
         import re
         try:
             if req.scraper == "Auto":
-                context = "Automatyka" if ("automatyka.pl" in req.url or "xtech.pl" in req.url) else "Logintrade" if ("logintrade.pl" in req.url or "logintrade.net" in req.url) else "None"
+                if "automatyka.pl" in req.url or "xtech.pl" in req.url:
+                    context = "Automatyka"
+                elif "logintrade.pl" in req.url or "logintrade.net" in req.url:
+                    context = "Logintrade"
+                elif "biznes-polska.pl" in req.url:
+                    context = "BiznesPolska"
+                else:
+                    context = "None"
             else:
                 context = req.scraper
 
             if context == "Automatyka":
                 user = get_db_setting_sync("SCRAPER_AUTOMATYKA_USER", "")
                 pwd = get_db_setting_sync("SCRAPER_AUTOMATYKA_PASS", "")
-                detail_html = await fetch_with_playwright(req.url, user, pwd)
+                detail_html = await fetch_with_playwright(req.url, user, pwd, context="Automatyka")
                 raw_text = DOMSanitizer.clean(detail_html, max_chars=6000)
                 from scrapers.automatyka import extract_advertiser_info
                 contact_header = extract_advertiser_info(detail_html)
                 if contact_header:
                     raw_text = contact_header + raw_text
+            elif context == "BiznesPolska":
+                user = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_USER", "")
+                pwd = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_PASS", "")
+                detail_html = await fetch_with_playwright(req.url, user, pwd, context="BiznesPolska")
+                raw_text = DOMSanitizer.clean(detail_html, max_chars=6000)
             else:
                 from curl_cffi.requests import AsyncSession as CffiAsyncSession
                 async with CffiAsyncSession(impersonate="chrome124") as cffi_session:

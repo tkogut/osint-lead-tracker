@@ -41,6 +41,21 @@ async def _login_session(ctx, page, user: str, pwd: str, context: str) -> None:
                 
         await ctx.add_cookies(duplicated_cookies)
         logger.info("Injected duplicated cookies. Total cookies: %d", len(await ctx.cookies()))
+    elif context == "BiznesPolska":
+        logger.info("Playwright: Logging in to biznes-polska.pl...")
+        await page.goto("https://www.biznes-polska.pl/logowanie/", wait_until="load", timeout=25000)
+        
+        await page.wait_for_selector("#username", timeout=10000)
+        await page.fill("#username", user)
+        
+        await page.wait_for_selector("#password", timeout=10000)
+        await page.fill("#password", pwd)
+        
+        logger.info("Playwright: Clicking login button...")
+        await page.click("button.login")
+        
+        await page.wait_for_load_state("networkidle", timeout=20000)
+        logger.info("Playwright: BiznesPolska login process completed. Current URL: %s", page.url)
     else:
         logger.warning("Unknown context for login: %s", context)
 

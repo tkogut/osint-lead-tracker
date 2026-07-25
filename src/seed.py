@@ -79,7 +79,9 @@ async def seed_data() -> None:
             "SCRAPER_AUTOMATYKA_USER",
             "SCRAPER_AUTOMATYKA_PASS",
             "SCRAPER_LOGINTRADE_USER",
-            "SCRAPER_LOGINTRADE_PASS"
+            "SCRAPER_LOGINTRADE_PASS",
+            "SCRAPER_BIZNESPOLSKA_USER",
+            "SCRAPER_BIZNESPOLSKA_PASS"
         ]
         
         for key in setting_keys:

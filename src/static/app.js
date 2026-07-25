@@ -1300,6 +1300,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const loginUser = unmask(settingsMap["SCRAPER_LOGINTRADE_USER"]);
         const loginPass = unmask(settingsMap["SCRAPER_LOGINTRADE_PASS"]);
         const loginHasSaved = settingsMap["SCRAPER_LOGINTRADE_PASS"] === "******";
+        const bizpolUser = unmask(settingsMap["SCRAPER_BIZNESPOLSKA_USER"]);
+        const bizpolPass = unmask(settingsMap["SCRAPER_BIZNESPOLSKA_PASS"]);
+        const bizpolHasSaved = settingsMap["SCRAPER_BIZNESPOLSKA_PASS"] === "******";
 
         const scrapersHtml = `
             <div class="settings-layout glass-card" style="margin-top: 24px;">
@@ -1350,6 +1353,28 @@ document.addEventListener("DOMContentLoaded", () => {
                             </button>
                         </div>
                     </div>
+
+                    <!-- BiznesPolska -->
+                    <div style="border: 1px solid rgba(255, 255, 255, 0.08); padding: 20px; border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
+                        <h4 style="margin-top: 0; margin-bottom: 12px; color: var(--color-accent); font-size: 1rem; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-briefcase"></i> Biznes-Polska.pl
+                        </h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="setting-SCRAPER_BIZNESPOLSKA_USER">Użytkownik / Email (Biznes-Polska)</label>
+                                <input type="text" id="setting-SCRAPER_BIZNESPOLSKA_USER" data-key="SCRAPER_BIZNESPOLSKA_USER" data-sensitive="true" value="${bizpolUser}" placeholder="${bizpolUser ? bizpolUser : 'np. login@firma.pl'}">
+                            </div>
+                            <div class="form-group">
+                                <label for="setting-SCRAPER_BIZNESPOLSKA_PASS">Hasło (Biznes-Polska) ${bizpolHasSaved ? '<span style="color: #4ade80; font-size: 0.75rem; margin-left: 8px;"><i class="fa-solid fa-check-circle"></i> zapisane</span>' : ''}</label>
+                                <input type="password" id="setting-SCRAPER_BIZNESPOLSKA_PASS" data-key="SCRAPER_BIZNESPOLSKA_PASS" data-sensitive="true" value="" placeholder="${bizpolHasSaved ? '(pozostaw puste, aby nie zmieniać)' : 'Wpisz hasło'}">
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
+                            <button type="button" class="btn-secondary btn-test-auth" data-scraper="BiznesPolska" style="padding: 8px 16px; font-size: 0.85rem; border-radius: 6px;">
+                                <i class="fa-solid fa-vial"></i> Testuj Połączenie
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -1375,6 +1400,8 @@ document.addEventListener("DOMContentLoaded", () => {
         categorizedKeys.add("SCRAPER_AUTOMATYKA_PASS");
         categorizedKeys.add("SCRAPER_LOGINTRADE_USER");
         categorizedKeys.add("SCRAPER_LOGINTRADE_PASS");
+        categorizedKeys.add("SCRAPER_BIZNESPOLSKA_USER");
+        categorizedKeys.add("SCRAPER_BIZNESPOLSKA_PASS");
 
         const otherSettings = settings.filter(s => !categorizedKeys.has(s.key));
         if (otherSettings.length > 0) {
