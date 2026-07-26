@@ -3,10 +3,11 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    ".agents/specs/knowledge/raport-baza-konkurencyjnosci-cst2021.md",
-    ".agents/specs/graph.json"
+    "src/scrapers/baza_konkurenconosci.py",
+    "src/main.py",
+    "tests/test_baza_konkurenconosci.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-26T08:25:57Z",
-  "notes": "Builder: Synced Baza Konkurencyjnosci API spec to knowledge base"
+  "timestamp": "2026-07-26T09:08:49Z",
+  "notes": "Builder: Implemented Baza Konkurencyjności scraper and fixed sandbox endpoints JSON parsing paths."
 }

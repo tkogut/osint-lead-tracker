@@ -2,6 +2,11 @@
 > **OSINT Lead Tracker**
 
 Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w tym pliku. Format jest oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/) i projekt jest zgodny z [SemVer](https://semver.org/spec/v2.0.0.html).
+## [1.7.31] - 2026-07-26
+
+### Added
+- feat: implement Baza Konkurencyjnosci API scraper and sandbox routes
+
 ## [1.7.30] - 2026-07-26
 
 ### Added
