@@ -7,11 +7,23 @@
       "label": "AGENTS-OS.md",
       "type": "Ultimate Source of Truth",
       "description": "Constitution of AGENTS-OS v6.0 governing all Swarm rules and system operations."
+    },
+    {
+      "id": ".agents/specs/knowledge/raport-baza-konkurencyjnosci-cst2021.md",
+      "label": "Raport Baza Konkurencyjnosci Cst2021",
+      "type": "Expert Knowledge",
+      "description": "Knowledge base note synchronized from NotebookLM: Raport Baza Konkurencyjnosci Cst2021"
     }
   ],
-  "edges": [],
+  "edges": [
+    {
+      "source": ".agents/specs/AGENTS-OS.md",
+      "target": ".agents/specs/knowledge/raport-baza-konkurencyjnosci-cst2021.md",
+      "relation": "governs_knowledge"
+    }
+  ],
   "metadata": {
-    "last_distillation": "2026-05-22",
+    "last_distillation": "2026-07-26",
     "source": "Inception Engine"
   }
 }
