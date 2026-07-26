@@ -117,7 +117,7 @@ class OdooClient:
   </tr>
 </table>
 
-<h4>🏗️ Zakres związany z wagą samochodową:</h4>
+<h4>🏗️ Zakres przedmiotu zamówienia:</h4>
 <p>{zakres}</p>
 
 <h4>💡 Uzasadnienie potencjału handlowego:</h4>
@@ -138,7 +138,7 @@ class OdooClient:
         name = (
             lead.get("tytul_generowany")
             or lead.get("tytul")
-            or "OSINT Lead – waga samochodowa"
+            or "OSINT Lead"
         )
 
         # --- mapowanie pól Odoo ---
