@@ -414,7 +414,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.33",
+    version="1.7.34",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -434,7 +434,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.33",
+        "version": "1.7.34",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
@@ -813,6 +813,36 @@ async def get_accounts(
     return resp
 
 
+async def expand_keywords_via_ai(keywords: List[str]) -> List[str]:
+    if not keywords:
+        return []
+    from google import genai
+    from google.genai import types
+    api_key = get_db_setting_sync("GEMINI_API_KEY", "")
+    if not api_key:
+        api_key = settings.gemini_api_key
+    if not api_key:
+        return keywords
+    try:
+        client = genai.Client(api_key=api_key)
+        prompt = f"Dla podanych słów kluczowych wygeneruj wszystkie poprawne i powszechnie stosowane w zamówieniach publicznych polskie odmiany gramatyczne (przez przypadki, liczby) oraz formy przyimkowe (np. dla 'waga samochodowa' -> 'wagi samochodowej', 'wagach samochodowych', 'wagi do samochodów'). Zwróć wynik jako płaską tablicę JSON zawierającą oryginalne słowa kluczowe oraz wygenerowane odmiany. Nie dodawaj żadnego formatowania markdown (tylko czysty JSON).\nSłowa kluczowe: {keywords}"
+        resp = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        text = resp.text.strip()
+        text = text.replace("```json", "").replace("```", "").strip()
+        import json
+        expanded = json.loads(text)
+        if isinstance(expanded, list):
+            # merge and unique
+            res = list(set([k.lower().strip() for k in keywords + expanded if k.strip()]))
+            return res
+    except Exception as e:
+        logger.error("Keyword expansion failed: %s", e)
+    return keywords
+
+
 @app.post("/api/accounts", response_model=AccountResponse, tags=["Accounts"])
 async def create_account(
     req: AccountCreate,
@@ -823,10 +853,11 @@ async def create_account(
     if check_name.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Konto o takiej nazwie już istnieje.")
 
+    expanded = await expand_keywords_via_ai(req.target_keywords)
     new_acc = Account(
         name=req.name,
         target_cpvs=json.dumps(req.target_cpvs),
-        target_keywords=json.dumps(req.target_keywords),
+        target_keywords=json.dumps(expanded),
         enabled_sources=json.dumps(req.enabled_sources),
         custom_prompt=req.custom_prompt,
         llm_model=req.llm_model,
@@ -884,7 +915,8 @@ async def update_account(
 
     acc.name = req.name
     acc.target_cpvs = json.dumps(req.target_cpvs)
-    acc.target_keywords = json.dumps(req.target_keywords)
+    expanded = await expand_keywords_via_ai(req.target_keywords)
+    acc.target_keywords = json.dumps(expanded)
     acc.enabled_sources = json.dumps(req.enabled_sources)
     # Wersjonowanie promptu
     if req.custom_prompt and req.custom_prompt != acc.custom_prompt:

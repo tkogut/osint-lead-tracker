@@ -9,6 +9,7 @@ from curl_cffi.requests import AsyncSession
 
 from scrapers.base import BaseScraper, DOMSanitizer
 from database import is_url_visited, mark_url_visited
+from src.utils import match_polish_keywords
 
 logger = logging.getLogger(__name__)
 
@@ -69,14 +70,7 @@ class BazaKonkurenconosciScraper(BaseScraper):
                     content = ad.get("content", "")
                     combined_text = (title + " " + content).lower()
                     
-                    match_found = False
-                    if not keywords_lower:
-                        match_found = True
-                    else:
-                        for kw in keywords_lower:
-                            if kw in combined_text:
-                                match_found = True
-                                break
+                    match_found = match_polish_keywords(combined_text, keywords)
                                 
                     if not match_found:
                         if account and hasattr(account, "id"):

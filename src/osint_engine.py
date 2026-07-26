@@ -23,6 +23,7 @@ from google.genai import types
 from config import get_settings
 from database import get_db_setting_sync, is_url_visited, mark_url_visited
 from scrapers.factory import get_scraper_for_source, SCRAPER_REGISTRY
+from src.utils import match_polish_keywords
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -252,7 +253,7 @@ class OSINTEngine:
             except Exception:
                 pass
 
-        has_keywords = any(k in title_lower or k in body_lower for k in keywords)
+        has_keywords = match_polish_keywords(title_lower + " " + body_lower, keywords)
         is_exact_cpv = any(c in notice.get("cpvCode", "") for c in cpvs)
 
         if not (has_keywords or is_exact_cpv):
@@ -779,7 +780,7 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
                             
                             text_search = (nazwa_zamierzenia + " " + inwestor).lower()
                             
-                            match_keyword = any(k in text_search for k in keywords)
+                            match_keyword = match_polish_keywords(text_search, keywords)
                             match_exact = any(e in text_search for e in exact_keywords)
                             
                             if match_keyword and match_exact:

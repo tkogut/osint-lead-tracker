@@ -14,6 +14,7 @@ from curl_cffi.requests import AsyncSession
 from scrapers.base import BaseScraper, DOMSanitizer
 from database import is_url_visited, mark_url_visited, get_db_setting_sync
 from scrapers.playwright_fetcher import fetch_with_playwright, fetch_multiple_with_playwright
+from src.utils import match_polish_keywords
 
 logger = logging.getLogger(__name__)
 
@@ -232,7 +233,7 @@ class AutomatykaScraper(BaseScraper):
 
                             # Sprawdzenie słów kluczowych pre-filter
                             text_lower = clean_text.lower()
-                            has_keyword = any(k in text_lower for k in keywords)
+                            has_keyword = match_polish_keywords(text_lower, keywords)
 
                             if not has_keyword:
                                 logger.debug("[Automatyka] Brak słów kluczowych w %s (SKIPPED pre-filter)", detail_url)
