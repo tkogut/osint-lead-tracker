@@ -72,8 +72,15 @@ graph TD
    * Limit `MAX_LEADS_PER_RUN` zabezpieczający Odoo CRM przed zatruciem fałszywymi lub zduplikowanymi danymi. Leady z anomaliami przekierowywane są do kwarantanny UI w celu ręcznej weryfikacji.
    * Asynchroniczna kolejka zapisu SQLite (Single Writer Queue) zapobiegająca błędowi `database is locked`.
 9. **Konfigurowalne Źródła i Okno Czasowe (Faza 7)**:
-   * Przełączniki aktywnych źródeł OSINT (e-Zamówienia BZP, GUNB RWDZ, Wyszukiwarka Google) per kampania.
+   * Przełączniki aktywnych źródeł OSINT (e-Zamówienia BZP, GUNB RWDZ, Wyszukiwarka Google, Baza Konkurencyjności) per kampania.
    * Rozszerzone okno skanowania `SEARCH_WINDOW_DAYS` (domyślnie 7 dni roboczych).
+10. **Skanowanie Dwuetapowe (Two-Phase Scraping - Faza 8)**:
+    * Hybrydowy mechanizm z automatyczną orkiestracją sesji: curl_cffi wykonuje szybkie, publiczne zapytania w celu filtrowania kandydatów, a Playwright Chromium loguje się i wyciąga dane kontaktowe wyłącznie dla leadów spełniających kryteria.
+11. **Integracja z Bazą Konkurencyjności (BK2021)**:
+    * Nowy, w pełni asynchroniczny moduł skrapujący REST API portalu Baza Konkurencyjności Funduszy Europejskich z zaawansowaną ekstrakcją zagnieżdżonych danych kontaktowych oferentów.
+12. **Obsługa fleksji języka polskiego i ekspansja słów kluczowych**:
+    * Parser bliskości tematów słów (stems) w [utils.py](file:///home/tkogut/projects/osint-lead-tracker/src/utils.py) dopasowujący polskie formy gramatyczne przez przypadki i liczby (np. "waga samochodowa" -> "wag samochodowych", "wagi do samochodów").
+    * Jednorazowa automatyczna ekspansja słów kluczowych przez model Gemini (`gemini-2.5-flash`) przy tworzeniu lub edycji konta w panelu Settings.
 
 ---
 
@@ -124,7 +131,7 @@ Liveness probe zwracający stan działania mikroserwisu oraz datę kolejnego aut
   {
     "status": "ok",
     "service": "osint-lead-tracker",
-    "version": "1.7.34",
+    "version": "1.7.35",
     "scheduler": "running",
     "next_run": "2026-07-15T06:00:00+02:00"
   }
