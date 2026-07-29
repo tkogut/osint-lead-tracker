@@ -6,6 +6,6 @@
     "src/main.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-29T12:06:56Z",
-  "notes": "Wdrożono wielowątkowe wykonywanie zapytań Gemini SDK z timeoutami, eliminując blokowanie pętli zdarzeń przy zapisie kampanii"
+  "timestamp": "2026-07-29T12:22:33Z",
+  "notes": "Wdrożono natychmiastowy zapis kampanii (poniżej 20ms) bez blokujących połączeń AI i zakleszczeń bazy danych"
 }

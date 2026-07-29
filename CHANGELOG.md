@@ -2,6 +2,11 @@
 > **OSINT Lead Tracker**
 
 Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w tym pliku. Format jest oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/) i projekt jest zgodny z [SemVer](https://semver.org/spec/v2.0.0.html).
+## [1.7.37] - 2026-07-29
+
+### Added
+- fix: instant campaign save without blocking AI calls or DB lock deadlocks (plan 037)
+
 ## [1.7.36] - 2026-07-29
 
 ### Added

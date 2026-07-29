@@ -414,7 +414,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.36",
+    version="1.7.37",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -434,7 +434,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.36",
+        "version": "1.7.37",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
@@ -860,11 +860,11 @@ async def create_account(
     if check_name.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Konto o takiej nazwie już istnieje.")
 
-    expanded = await expand_keywords_via_ai(req.target_keywords)
+    clean_keywords = list(set([k.lower().strip() for k in req.target_keywords if k and k.strip()]))
     new_acc = Account(
         name=req.name,
         target_cpvs=json.dumps(req.target_cpvs),
-        target_keywords=json.dumps(expanded),
+        target_keywords=json.dumps(clean_keywords),
         enabled_sources=json.dumps(req.enabled_sources),
         custom_prompt=req.custom_prompt,
         llm_model=req.llm_model,
@@ -922,8 +922,8 @@ async def update_account(
 
     acc.name = req.name
     acc.target_cpvs = json.dumps(req.target_cpvs)
-    expanded = await expand_keywords_via_ai(req.target_keywords)
-    acc.target_keywords = json.dumps(expanded)
+    clean_keywords = list(set([k.lower().strip() for k in req.target_keywords if k and k.strip()]))
+    acc.target_keywords = json.dumps(clean_keywords)
     acc.enabled_sources = json.dumps(req.enabled_sources)
     # Wersjonowanie promptu
     if req.custom_prompt and req.custom_prompt != acc.custom_prompt:
