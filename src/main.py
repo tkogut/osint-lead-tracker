@@ -414,7 +414,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.35",
+    version="1.7.36",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -434,7 +434,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.35",
+        "version": "1.7.36",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
@@ -816,16 +816,16 @@ async def get_accounts(
 async def expand_keywords_via_ai(keywords: List[str]) -> List[str]:
     if not keywords:
         return []
-    from google import genai
-    from google.genai import types
     api_key = get_db_setting_sync("GEMINI_API_KEY", "")
     if not api_key:
         api_key = settings.gemini_api_key
     if not api_key:
         return keywords
-    try:
-        client = genai.Client(api_key=api_key)
-        prompt = f"Dla podanych słów kluczowych wygeneruj wszystkie poprawne i powszechnie stosowane w zamówieniach publicznych polskie odmiany gramatyczne (przez przypadki, liczby) oraz formy przyimkowe (np. dla 'waga samochodowa' -> 'wagi samochodowej', 'wagach samochodowych', 'wagi do samochodów'). Zwróć wynik jako płaską tablicę JSON zawierającą oryginalne słowa kluczowe oraz wygenerowane odmiany. Nie dodawaj żadnego formatowania markdown (tylko czysty JSON).\nSłowa kluczowe: {keywords}"
+
+    def _sync_expand(kw_list: List[str], key: str) -> List[str]:
+        from google import genai
+        client = genai.Client(api_key=key)
+        prompt = f"Dla podanych słów kluczowych wygeneruj wszystkie poprawne i powszechnie stosowane w zamówieniach publicznych polskie odmiany gramatyczne (przez przypadki, liczby) oraz formy przyimkowe (np. dla 'waga samochodowa' -> 'wagi samochodowej', 'wagach samochodowych', 'wagi do samochodów'). Zwróć wynik jako płaską tablicę JSON zawierającą oryginalne słowa kluczowe oraz wygenerowane odmiany. Nie dodawaj żadnego formatowania markdown (tylko czysty JSON).\nSłowa kluczowe: {kw_list}"
         resp = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=prompt
@@ -835,12 +835,19 @@ async def expand_keywords_via_ai(keywords: List[str]) -> List[str]:
         import json
         expanded = json.loads(text)
         if isinstance(expanded, list):
-            # merge and unique
-            res = list(set([k.lower().strip() for k in keywords + expanded if k.strip()]))
+            res = list(set([k.lower().strip() for k in kw_list + expanded if k.strip()]))
             return res
+        return kw_list
+
+    try:
+        res = await asyncio.wait_for(asyncio.to_thread(_sync_expand, keywords, api_key), timeout=5.0)
+        return res
+    except asyncio.TimeoutError:
+        logger.warning("Keyword expansion timed out (>5.0s), returning original keywords fallback")
+        return keywords
     except Exception as e:
-        logger.error("Keyword expansion failed: %s", e)
-    return keywords
+        logger.warning("Keyword expansion failed: %s", e)
+        return keywords
 
 
 @app.post("/api/accounts", response_model=AccountResponse, tags=["Accounts"])
@@ -1540,11 +1547,17 @@ Wymagania:
 7. Jeśli treść NIE zawiera żadnych zapytań spełniających wymagania kampanii lub jawnie minął termin, zwróć {{"leady": []}}.
 Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown."""
 
+        def _sync_generate():
+            return client.models.generate_content(
+                model=req.llm_model,
+                contents=contents_to_send,
+                config=types.GenerateContentConfig(**config_kwargs)
+            )
+
         start_time = time.perf_counter()
-        response = client.models.generate_content(
-            model=req.llm_model,
-            contents=contents_to_send,
-            config=types.GenerateContentConfig(**config_kwargs)
+        response = await asyncio.wait_for(
+            asyncio.to_thread(_sync_generate),
+            timeout=35.0
         )
         latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
         
