@@ -8,6 +8,6 @@
     "src/static/app.js"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-31T12:22:35Z",
-  "notes": "Wdrożono serwerową paginację logów (50/stronę), ograniczenia okien osi czasu (10) i ostatnich szans (10) oraz pełną listę filtrów źródeł"
+  "timestamp": "2026-07-31T12:31:41Z",
+  "notes": "Zaimplementowano interaktywny skalowalny wykres Skanów vs Leadów (1D-5Y), paginację ostatnich szans (10/stronę) oraz poprawiono filtr kampanii w logach"
 }

@@ -423,7 +423,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.45",
+    version="1.7.46",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -446,7 +446,7 @@ async def health() -> dict:
         "status": "ok",
         "system_status": dep_report["status"],
         "service": "osint-lead-tracker",
-        "version": "1.7.45",
+        "version": "1.7.46",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
         "sanitizer": DOMSanitizer.get_status(),
@@ -497,12 +497,61 @@ async def list_leads(_token: Annotated[str, Depends(verify_token)], limit: int =
 @app.get("/api/leads", tags=["OSINT"], summary="Ostatnie leady (Sesyjnie)")
 async def list_leads_session(
     current_user: Annotated[User, Depends(get_current_user)],
-    limit: int = 10
+    db: AsyncSession = Depends(get_db),
+    page: int = 1,
+    limit: int = 10,
+    account_id: Optional[int] = None
 ) -> dict:
     if limit < 1 or limit > 500:
         raise HTTPException(status_code=400, detail="limit musi być w zakresie 1–500")
-    rows = await get_recent_leads(limit=limit)
-    return {"count": len(rows), "leads": rows}
+    if page < 1:
+        page = 1
+
+    count_stmt = select(func.count(Lead.id))
+    stmt = select(Lead).order_by(Lead.id.desc())
+
+    if account_id is not None:
+        count_stmt = count_stmt.join(PromptVersion, Lead.prompt_version_id == PromptVersion.id).filter(PromptVersion.account_id == account_id)
+        stmt = stmt.join(PromptVersion, Lead.prompt_version_id == PromptVersion.id).filter(PromptVersion.account_id == account_id)
+
+    total_res = await db.execute(count_stmt)
+    total = total_res.scalar_one() or 0
+
+    offset = (page - 1) * limit
+    stmt = stmt.offset(offset).limit(limit)
+
+    res = await db.execute(stmt)
+    leads = res.scalars().all()
+
+    rows = [
+        {
+            "id": l.id,
+            "url": l.url,
+            "tytul": l.tytul,
+            "typ": l.typ,
+            "lokalizacja": l.lokalizacja,
+            "inwestor": l.inwestor,
+            "wykonawca": l.wykonawca,
+            "zakres": l.zakres,
+            "uzasadnienie": l.uzasadnienie,
+            "priorytet": l.priorytet,
+            "data_pub": l.data_pub,
+            "odoo_id": l.odoo_id,
+            "status": l.status,
+            "created_at": l.created_at
+        }
+        for l in leads
+    ]
+
+    pages = math.ceil(total / limit) if total > 0 else 1
+
+    return {
+        "items": rows,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": pages
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1238,26 +1287,50 @@ async def get_analytics_kpis(
 async def get_analytics_timeline(
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
-    limit: int = 10
+    range_type: str = "7d",
+    account_id: Optional[int] = None
 ):
+    from datetime import datetime, timedelta
+
+    rt = (range_type or "7d").lower()
+    days_map = {
+        "1d": 1,
+        "7d": 7,
+        "1m": 30,
+        "3m": 90,
+        "6m": 180,
+        "1y": 365,
+        "5y": 1825,
+    }
+
+    date_col = func.date(ResearchLog.timestamp)
     stmt = select(
-        func.date(ResearchLog.timestamp).label("day"),
+        date_col.label("day"),
         func.count(ResearchLog.id).label("scans"),
         func.sum(ResearchLog.leads_created_count).label("leads_created")
-    ).group_by(
-        func.date(ResearchLog.timestamp)
-    ).order_by(
-        func.date(ResearchLog.timestamp).desc()
-    ).limit(limit)
-    
+    )
+
+    if rt in days_map:
+        cutoff = datetime.utcnow() - timedelta(days=days_map[rt])
+        stmt = stmt.filter(ResearchLog.timestamp >= cutoff)
+    elif rt == "all":
+        pass
+    else:
+        cutoff = datetime.utcnow() - timedelta(days=7)
+        stmt = stmt.filter(ResearchLog.timestamp >= cutoff)
+
+    if account_id is not None:
+        stmt = stmt.filter(ResearchLog.account_id == account_id)
+
+    stmt = stmt.group_by(date_col).order_by(date_col.asc())
+
     result = await db.execute(stmt)
     rows = result.all()
-    rows_asc = sorted(rows, key=lambda r: r.day)
-    
+
     timeline = []
-    for row in rows_asc:
+    for row in rows:
         timeline.append({
-            "date": row.day,
+            "date": str(row.day) if row.day else "",
             "scans": row.scans,
             "leads_created": int(row.leads_created) if row.leads_created is not None else 0
         })

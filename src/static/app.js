@@ -220,28 +220,52 @@ document.addEventListener("DOMContentLoaded", () => {
     if (leadFilterStatus) leadFilterStatus.addEventListener("change", filterAndRenderLeads);
     if (leadSort) leadSort.addEventListener("change", filterAndRenderLeads);
 
-    async function loadLeadsData() {
-        return loadDashboardData();
-    }
+    let currentLeadPage = 1;
+    let totalLeadPages = 1;
+    let currentTimelineRange = "7d";
 
-    async function loadDashboardData() {
+    async function loadLeadsData(page = 1) {
+        currentLeadPage = page;
         leadsTableBody.innerHTML = `<tr><td colspan="8" class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie leadów...</td></tr>`;
         
         try {
-            // Pobieramy leady za pomocą sesyjnie zabezpieczonego endpointu /api/leads
-            const data = await apiRequest("/api/leads?limit=10");
-            allLeads = data.leads || [];
+            const data = await apiRequest(`/api/leads?page=${page}&limit=10`);
+            allLeads = data.items || data.leads || [];
+            totalLeadPages = data.pages || 1;
             
-            // Wyświetlamy
+            updateLeadsPagination(data);
             filterAndRenderLeads();
             
-            // Faza 3: Pobieramy KPIs, Oś Czasu oraz status Notification Gate
             loadAnalyticsKPIs();
-            loadAnalyticsTimeline();
+            loadAnalyticsTimeline(currentTimelineRange);
             checkNotificationGate();
             populateSandboxSources();
         } catch (e) {
             leadsTableBody.innerHTML = `<tr><td colspan="8" class="loading-state text-error">Błąd ładowania danych: ${e.message}</td></tr>`;
+        }
+    }
+
+    async function loadDashboardData() {
+        return loadLeadsData(1);
+    }
+
+    function updateLeadsPagination(data) {
+        const pageInfo = document.getElementById("lead-page-info");
+        const btnPrev = document.getElementById("btn-lead-prev");
+        const btnNext = document.getElementById("btn-lead-next");
+
+        const page = data.page || 1;
+        const pages = data.pages || 1;
+        const total = data.total !== undefined ? data.total : (data.count || allLeads.length);
+
+        if (pageInfo) {
+            pageInfo.textContent = `Strona ${page} z ${pages} (Łącznie: ${total} szans)`;
+        }
+        if (btnPrev) {
+            btnPrev.disabled = (page <= 1);
+        }
+        if (btnNext) {
+            btnNext.disabled = (page >= pages);
         }
     }
 
@@ -287,42 +311,163 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    async function loadAnalyticsTimeline() {
-        const container = document.getElementById("analytics-timeline-chart");
-        container.innerHTML = `<div class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie osi czasu...</div>`;
+    async function loadAnalyticsTimeline(rangeType = currentTimelineRange) {
+        currentTimelineRange = rangeType;
+        const container = document.getElementById("analytics-chart-container") || document.getElementById("analytics-timeline-chart");
+        if (!container) return;
+        
+        container.innerHTML = `<div class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie wykresu aktywności...</div>`;
         
         try {
-            const timeline = await apiRequest("/api/analytics/timeline");
-            if (!timeline || timeline.length === 0) {
-                container.innerHTML = `<div class="loading-state">Brak danych historycznych do wyświetlenia.</div>`;
-                return;
-            }
-            
-            const maxVal = Math.max(...timeline.map(d => Math.max(d.scans, d.leads_created)), 1);
-            
-            container.innerHTML = timeline.map(d => {
-                const scanWidth = (d.scans / maxVal) * 100;
-                const leadWidth = (d.leads_created / maxVal) * 100;
-                
-                return `
-                    <div class="timeline-row">
-                        <span class="timeline-date">${d.date}</span>
-                        <div class="timeline-bars">
-                            <div class="timeline-bar-group">
-                                <div class="timeline-bar bar-scans" style="width: ${scanWidth}%;" title="Skanowania: ${d.scans}"></div>
-                                <span class="bar-val" title="Skanowania">${d.scans}</span>
-                            </div>
-                            <div class="timeline-bar-group">
-                                <div class="timeline-bar bar-leads" style="width: ${leadWidth}%;" title="Zapisane Szanse: ${d.leads_created}"></div>
-                                <span class="bar-val" title="Zapisane Szanse">${d.leads_created}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join("");
+            const timeline = await apiRequest(`/api/analytics/timeline?range_type=${rangeType}`);
+            renderAnalyticsChart(timeline || []);
         } catch (e) {
-            container.innerHTML = `<div class="loading-state text-error">Błąd pobierania osi czasu.</div>`;
+            container.innerHTML = `<div class="loading-state text-error">Błąd pobierania wykresu: ${e.message}</div>`;
         }
+    }
+
+    function renderAnalyticsChart(timelineData) {
+        const container = document.getElementById("analytics-chart-container") || document.getElementById("analytics-timeline-chart");
+        if (!container) return;
+
+        if (!timelineData || timelineData.length === 0) {
+            container.innerHTML = `<div class="loading-state">Brak danych historycznych do wyświetlenia.</div>`;
+            return;
+        }
+
+        const padding = { top: 30, right: 30, bottom: 45, left: 45 };
+        const width = container.clientWidth || 800;
+        const height = 280;
+
+        const svgWidth = width;
+        const svgHeight = height;
+
+        const maxVal = Math.max(...timelineData.map(d => Math.max(d.scans || 0, d.leads_created || 0)), 5);
+
+        const chartW = svgWidth - padding.left - padding.right;
+        const chartH = svgHeight - padding.top - padding.bottom;
+
+        const numPoints = timelineData.length;
+        const stepX = numPoints > 1 ? chartW / (numPoints - 1) : chartW / 2;
+
+        const getX = (i) => numPoints === 1 ? padding.left + chartW / 2 : padding.left + i * stepX;
+        const getY = (val) => padding.top + chartH - (val / maxVal) * chartH;
+
+        let gridLinesHtml = '';
+        const yTicks = 4;
+        for (let i = 0; i <= yTicks; i++) {
+            const val = Math.round((maxVal / yTicks) * i);
+            const y = getY(val);
+            gridLinesHtml += `
+                <line x1="${padding.left}" y1="${y}" x2="${svgWidth - padding.right}" y2="${y}" stroke="rgba(255,255,255,0.07)" stroke-dasharray="3,3" />
+                <text x="${padding.left - 8}" y="${y + 4}" fill="var(--text-muted)" font-size="10" text-anchor="end">${val}</text>
+            `;
+        }
+
+        let scansPath = '';
+        let leadsPath = '';
+        let scansArea = '';
+        let leadsArea = '';
+
+        let scansPoints = [];
+        let leadsPoints = [];
+
+        timelineData.forEach((d, i) => {
+            const x = getX(i);
+            const yScan = getY(d.scans || 0);
+            const yLead = getY(d.leads_created || 0);
+
+            scansPoints.push({ x, y: yScan, val: d.scans || 0, date: d.date });
+            leadsPoints.push({ x, y: yLead, val: d.leads_created || 0, date: d.date });
+        });
+
+        if (numPoints > 0) {
+            scansPath = scansPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+            leadsPath = leadsPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
+            const bottomY = getY(0);
+            scansArea = `${scansPath} L ${scansPoints[scansPoints.length - 1].x} ${bottomY} L ${scansPoints[0].x} ${bottomY} Z`;
+            leadsArea = `${leadsPath} L ${leadsPoints[leadsPoints.length - 1].x} ${bottomY} L ${leadsPoints[0].x} ${bottomY} Z`;
+        }
+
+        let xAxisHtml = '';
+        const stepLabel = Math.max(1, Math.floor(numPoints / 7));
+        timelineData.forEach((d, i) => {
+            if (i % stepLabel === 0 || i === numPoints - 1) {
+                const x = getX(i);
+                const dateShort = d.date ? (d.date.length > 10 ? d.date.slice(5, 16).replace('T', ' ') : d.date.slice(5)) : '';
+                xAxisHtml += `<text x="${x}" y="${svgHeight - 12}" fill="var(--text-muted)" font-size="11" text-anchor="middle">${dateShort}</text>`;
+            }
+        });
+
+        let dotsHtml = '';
+        scansPoints.forEach((p, i) => {
+            const lP = leadsPoints[i];
+            dotsHtml += `
+                <circle class="chart-dot scan-dot" cx="${p.x}" cy="${p.y}" r="4" fill="#38bdf8" stroke="#090d16" stroke-width="2" data-idx="${i}" style="cursor:pointer;" />
+                <circle class="chart-dot lead-dot" cx="${lP.x}" cy="${lP.y}" r="4" fill="#34d399" stroke="#090d16" stroke-width="2" data-idx="${i}" style="cursor:pointer;" />
+            `;
+        });
+
+        container.innerHTML = `
+            <div style="display: flex; justify-content: flex-end; gap: 16px; margin-bottom: 8px; font-size: 12px;">
+                <span style="display: flex; align-items: center; gap: 6px; color: #38bdf8; font-weight: 500;">
+                    <span style="width: 12px; height: 3px; background: #38bdf8; display: inline-block; border-radius: 2px;"></span> Skanowania
+                </span>
+                <span style="display: flex; align-items: center; gap: 6px; color: #34d399; font-weight: 500;">
+                    <span style="width: 12px; height: 3px; background: #34d399; display: inline-block; border-radius: 2px;"></span> Pozyskane Leady
+                </span>
+            </div>
+            <div id="chart-tooltip" class="glass-card" style="position: absolute; display: none; padding: 8px 12px; border-radius: 8px; font-size: 12px; pointer-events: none; z-index: 10; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 4px 20px rgba(0,0,0,0.5); background: rgba(13, 19, 33, 0.95);"></div>
+            <svg width="100%" height="${height}" viewBox="0 0 ${svgWidth} ${height}" preserveAspectRatio="none" style="overflow: visible;">
+                <defs>
+                    <linearGradient id="scansGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.25"/>
+                        <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.0"/>
+                    </linearGradient>
+                    <linearGradient id="leadsGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#34d399" stop-opacity="0.25"/>
+                        <stop offset="100%" stop-color="#34d399" stop-opacity="0.0"/>
+                    </linearGradient>
+                </defs>
+                ${gridLinesHtml}
+                ${scansArea ? `<path d="${scansArea}" fill="url(#scansGrad)" />` : ''}
+                ${leadsArea ? `<path d="${leadsArea}" fill="url(#leadsGrad)" />` : ''}
+                ${scansPath ? `<path d="${scansPath}" fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" />` : ''}
+                ${leadsPath ? `<path d="${leadsPath}" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round" />` : ''}
+                ${dotsHtml}
+                ${xAxisHtml}
+            </svg>
+        `;
+
+        const tooltip = container.querySelector("#chart-tooltip");
+        const dots = container.querySelectorAll(".chart-dot");
+
+        dots.forEach(dot => {
+            dot.addEventListener("mouseenter", (e) => {
+                const idx = parseInt(dot.getAttribute("data-idx"));
+                const item = timelineData[idx];
+                if (!item) return;
+
+                tooltip.innerHTML = `
+                    <div style="font-weight: 600; margin-bottom: 4px; color: var(--text-main);">${item.date}</div>
+                    <div style="color: #38bdf8;">Skanowania: <strong>${item.scans}</strong></div>
+                    <div style="color: #34d399;">Pozyskane Leady: <strong>${item.leads_created}</strong></div>
+                `;
+                tooltip.style.display = "block";
+
+                const rect = container.getBoundingClientRect();
+                const dotCX = parseFloat(dot.getAttribute("cx"));
+                const dotCY = parseFloat(dot.getAttribute("cy"));
+
+                tooltip.style.left = `${Math.min(dotCX, rect.width - 140)}px`;
+                tooltip.style.top = `${Math.max(10, dotCY - 60)}px`;
+            });
+
+            dot.addEventListener("mouseleave", () => {
+                tooltip.style.display = "none";
+            });
+        });
     }
 
     async function checkNotificationGate() {
@@ -1578,22 +1723,34 @@ document.addEventListener("DOMContentLoaded", () => {
     const logFilterEnd = document.getElementById("log-filter-date-end");
     if (logFilterEnd) logFilterEnd.addEventListener("change", applyLogFilters);
 
-    // --- Pagination Event Listeners ---
-    const btnLogPrev = document.getElementById("btn-log-prev");
-    if (btnLogPrev) {
-        btnLogPrev.addEventListener("click", () => {
-            if (currentLogPage > 1) {
-                loadLogsData(currentLogPage - 1);
+    // --- Leads Pagination Listeners ---
+    const btnLeadPrev = document.getElementById("btn-lead-prev");
+    if (btnLeadPrev) {
+        btnLeadPrev.addEventListener("click", () => {
+            if (currentLeadPage > 1) {
+                loadLeadsData(currentLeadPage - 1);
             }
         });
     }
 
-    const btnLogNext = document.getElementById("btn-log-next");
-    if (btnLogNext) {
-        btnLogNext.addEventListener("click", () => {
-            loadLogsData(currentLogPage + 1);
+    const btnLeadNext = document.getElementById("btn-lead-next");
+    if (btnLeadNext) {
+        btnLeadNext.addEventListener("click", () => {
+            if (currentLeadPage < totalLeadPages) {
+                loadLeadsData(currentLeadPage + 1);
+            }
         });
     }
+
+    // --- Chart Range Selector Listeners ---
+    document.querySelectorAll(".btn-range").forEach(btn => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".btn-range").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            const range = btn.getAttribute("data-range") || "7d";
+            loadAnalyticsTimeline(range);
+        });
+    });
 
     // Modal close listeners for log details
     const logModalCloseBtn = document.getElementById("log-modal-close-btn");

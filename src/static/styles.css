@@ -980,3 +980,28 @@ select option {
     font-family: monospace;
 }
 
+/* Range Selector Buttons for Analytics Chart */
+.btn-range {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-range:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+}
+
+.btn-range.active {
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary-hover);
+    box-shadow: 0 2px 8px rgba(81, 107, 235, 0.4);
+}
+
