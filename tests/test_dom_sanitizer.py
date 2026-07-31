@@ -85,6 +85,37 @@ class TestDOMSanitizer(unittest.TestCase):
         self.assertNotIn("Wadium w 2 minuty", clean_text)
         self.assertNotIn("Bid bond in 2 minutes", clean_text)
 
+    def test_bs4_tag_decomposition(self):
+        sample_html = """
+        <html>
+        <body>
+            <h1>Przetarg: Zakup systemu monitoringu</h1>
+            <div class="cookie-banner-container">
+                <p>Używamy technologii partnerów Google i Meta.</p>
+            </div>
+            <div id="rodo_privacy_modal">
+                <p>Informacja RODO i przetwarzanie danych osobowych.</p>
+            </div>
+            <div test-id="consent-popup">
+                <p>Zgoda na śledzenie.</p>
+            </div>
+            <div class="wadium-calculator-box">
+                <p>Kalkulator wadium przetargowego</p>
+            </div>
+            <div class="main-content">
+                <p>Ważne szczegóły zamówienia publicznego nr 12345.</p>
+            </div>
+        </body>
+        </html>
+        """
+        clean_text = DOMSanitizer.clean(sample_html)
+        self.assertIn("Przetarg: Zakup systemu monitoringu", clean_text)
+        self.assertIn("Ważne szczegóły zamówienia publicznego nr 12345", clean_text)
+        self.assertNotIn("Google i Meta", clean_text)
+        self.assertNotIn("Informacja RODO", clean_text)
+        self.assertNotIn("Zgoda na śledzenie", clean_text)
+        self.assertNotIn("Kalkulator wadium", clean_text)
+
 
 if __name__ == "__main__":
     unittest.main()

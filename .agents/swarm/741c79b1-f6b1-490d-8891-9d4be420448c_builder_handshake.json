@@ -6,6 +6,6 @@
     "src/scrapers/base.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-31T11:44:43Z",
-  "notes": "Wdrożono filtrację banerów cookie i RODO w DOMSanitizer z zachowaniem 100% treści przetargowych"
+  "timestamp": "2026-07-31T12:01:34Z",
+  "notes": "Wdrożono zaawansowane dekomponowanie tagów cookie/RODO/modal w BeautifulSoup w klasie DOMSanitizer"
 }

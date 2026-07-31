@@ -7,6 +7,7 @@ import logging
 import re
 from typing import List, Dict, Any, Optional
 
+from bs4 import BeautifulSoup
 import trafilatura
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,8 @@ class DOMSanitizer:
     Ekstrahuje czysty tekst z surowego kodu HTML, wycinając szum DOM (nawigacje, reklamy, stopki),
     co pozwala zaoszczędzić tokeny i zapobiega halucynacjom LLM.
     """
+
+    DECOMPOSITION_PATTERN = re.compile(r"cookie|consent|rodo|privacy|wadium|modal|banner", re.I)
 
     LOGINTRADE_BOILERPLATE_PATTERNS = [
         r"Enquiry\s+is\s+out\s+of\s+date\.?",
@@ -47,14 +50,33 @@ class DOMSanitizer:
     @staticmethod
     def clean(html_content: str, max_chars: int = 6000) -> str:
         """
-        Wyciąga czysty tekst za pomocą Trafilatura, a w przypadku braku wyniku stosuje czyszczenie regex.
+        Wyciąga czysty tekst za pomocą Trafilatura po uprzednim wyczyszczeniu tagów DOM w BS4,
+        a w przypadku braku wyniku stosuje czyszczenie regex.
         Wykonuje również czyszczenie stopek systemowych Logintrade, banerów cookie/RODO i reklam.
         """
         if not html_content or not html_content.strip():
             return ""
 
+        # Pre-cleaning BS4: dekompozycja tagów o class/id/test-id pasujących do wzorca
+        soup = BeautifulSoup(html_content, "html.parser")
+        for tag in list(soup.find_all(True)):
+            if getattr(tag, "decomposed", False):
+                continue
+            matched = False
+            for attr in ("class", "id", "test-id", "data-test-id"):
+                val = tag.get(attr)
+                if val:
+                    val_str = " ".join(val) if isinstance(val, list) else str(val)
+                    if DOMSanitizer.DECOMPOSITION_PATTERN.search(val_str):
+                        matched = True
+                        break
+            if matched:
+                tag.decompose()
+
+        cleaned_html = str(soup)
+
         extracted = trafilatura.extract(
-            html_content,
+            cleaned_html,
             include_links=True,
             include_tables=True,
             no_fallback=False
@@ -65,7 +87,7 @@ class DOMSanitizer:
             text = re.sub(
                 r"<(script|style|nav|footer|header|aside|iframe)[^>]*>.*?</\1>",
                 "",
-                html_content,
+                cleaned_html,
                 flags=re.DOTALL | re.IGNORECASE
             )
             text = re.sub(r"<[^>]+>", " ", text)
