@@ -220,13 +220,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (leadFilterStatus) leadFilterStatus.addEventListener("change", filterAndRenderLeads);
     if (leadSort) leadSort.addEventListener("change", filterAndRenderLeads);
 
-    // --- Dashboard & Leads ---
+    async function loadLeadsData() {
+        return loadDashboardData();
+    }
+
     async function loadDashboardData() {
         leadsTableBody.innerHTML = `<tr><td colspan="8" class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie leadów...</td></tr>`;
         
         try {
             // Pobieramy leady za pomocą sesyjnie zabezpieczonego endpointu /api/leads
-            const data = await apiRequest("/api/leads?limit=100");
+            const data = await apiRequest("/api/leads?limit=10");
             allLeads = data.leads || [];
             
             // Wyświetlamy
@@ -1056,8 +1059,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- Logs (Hard Proof Viewer) ---
     let allLogs = [];
+    let currentLogPage = 1;
 
-    async function loadLogsData() {
+    async function loadLogsData(page = 1) {
+        currentLogPage = page;
         logsTableBody.innerHTML = `<tr><td colspan="9" class="loading-state"><i class="fa-solid fa-spinner fa-spin"></i> Ładowanie rejestru...</td></tr>`;
         try {
             // Ensure accounts list is loaded to populate the campaign dropdown
@@ -1066,12 +1071,57 @@ document.addEventListener("DOMContentLoaded", () => {
                 accountsList = accounts || [];
                 populateCampaignFilter(accountsList);
             }
-            
-            const logs = await apiRequest("/api/logs");
-            allLogs = logs || [];
-            applyLogFilters();
+
+            const searchText = document.getElementById("log-search")?.value.trim() || "";
+            const campaignFilter = document.getElementById("log-filter-campaign")?.value || "";
+            const statusFilter = document.getElementById("log-filter-status")?.value || "";
+            const sourceFilter = document.getElementById("log-filter-source")?.value || "";
+            const dateStart = document.getElementById("log-filter-date-start")?.value || "";
+            const dateEnd = document.getElementById("log-filter-date-end")?.value || "";
+
+            const params = new URLSearchParams({
+                page: page,
+                limit: 50
+            });
+
+            if (searchText) params.append("search", searchText);
+            if (campaignFilter) params.append("account_id", campaignFilter);
+            if (statusFilter) params.append("status", statusFilter);
+            if (sourceFilter) params.append("source", sourceFilter);
+            if (dateStart) params.append("date_start", dateStart);
+            if (dateEnd) params.append("date_end", dateEnd);
+
+            const resp = await apiRequest(`/api/logs?${params.toString()}`);
+            if (resp && resp.items !== undefined) {
+                allLogs = resp.items || [];
+                renderLogs(allLogs);
+                updateLogsPagination(resp);
+            } else if (Array.isArray(resp)) {
+                allLogs = resp;
+                renderLogs(allLogs);
+            }
         } catch (e) {
             logsTableBody.innerHTML = `<tr><td colspan="9" class="loading-state text-error">Błąd pobierania rejestru.</td></tr>`;
+        }
+    }
+
+    function updateLogsPagination(resp) {
+        const pageInfo = document.getElementById("log-page-info");
+        const btnPrev = document.getElementById("btn-log-prev");
+        const btnNext = document.getElementById("btn-log-next");
+
+        const page = resp.page || 1;
+        const pages = resp.pages || 1;
+        const total = resp.total || 0;
+
+        if (pageInfo) {
+            pageInfo.textContent = `Strona ${page} z ${pages} (Łącznie: ${total} logów)`;
+        }
+        if (btnPrev) {
+            btnPrev.disabled = (page <= 1);
+        }
+        if (btnNext) {
+            btnNext.disabled = (page >= pages);
         }
     }
 
@@ -1089,56 +1139,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function applyLogFilters() {
-        const searchText = document.getElementById("log-search").value.toLowerCase();
-        const campaignFilter = document.getElementById("log-filter-campaign").value;
-        const statusFilter = document.getElementById("log-filter-status").value;
-        const sourceFilter = document.getElementById("log-filter-source").value;
-        const dateStart = document.getElementById("log-filter-date-start").value;
-        const dateEnd = document.getElementById("log-filter-date-end").value;
-
-        const filtered = allLogs.filter(log => {
-            // 1. Text search
-            if (searchText) {
-                const campaignName = (log.account_name || "").toLowerCase();
-                const logText = (log.log_text || "").toLowerCase();
-                const source = (log.source || "").toLowerCase();
-                const hash = (log.raw_response_hash || "").toLowerCase();
-                
-                const match = campaignName.includes(searchText) || 
-                              logText.includes(searchText) || 
-                              source.includes(searchText) || 
-                              hash.includes(searchText);
-                if (!match) return false;
-            }
-
-            // 2. Campaign filter
-            if (campaignFilter && String(log.account_id) !== String(campaignFilter)) {
-                return false;
-            }
-
-            // 3. Status filter (success = 200, error != 200)
-            if (statusFilter) {
-                const isSuccess = log.response_status_code === 200;
-                if (statusFilter === "success" && !isSuccess) return false;
-                if (statusFilter === "error" && isSuccess) return false;
-            }
-
-            // 4. Source filter
-            if (sourceFilter && log.source !== sourceFilter) {
-                return false;
-            }
-
-            // 5. Date range filter
-            if (dateStart || dateEnd) {
-                const logDate = log.timestamp.split("T")[0]; // YYYY-MM-DD
-                if (dateStart && logDate < dateStart) return false;
-                if (dateEnd && logDate > dateEnd) return false;
-            }
-
-            return true;
-        });
-
-        renderLogs(filtered);
+        loadLogsData(1);
     }
 
     function renderLogs(logs) {
@@ -1576,6 +1577,23 @@ document.addEventListener("DOMContentLoaded", () => {
     
     const logFilterEnd = document.getElementById("log-filter-date-end");
     if (logFilterEnd) logFilterEnd.addEventListener("change", applyLogFilters);
+
+    // --- Pagination Event Listeners ---
+    const btnLogPrev = document.getElementById("btn-log-prev");
+    if (btnLogPrev) {
+        btnLogPrev.addEventListener("click", () => {
+            if (currentLogPage > 1) {
+                loadLogsData(currentLogPage - 1);
+            }
+        });
+    }
+
+    const btnLogNext = document.getElementById("btn-log-next");
+    if (btnLogNext) {
+        btnLogNext.addEventListener("click", () => {
+            loadLogsData(currentLogPage + 1);
+        });
+    }
 
     // Modal close listeners for log details
     const logModalCloseBtn = document.getElementById("log-modal-close-btn");

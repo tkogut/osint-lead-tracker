@@ -11,7 +11,7 @@
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Premium Stylesheet -->
-    <link rel="stylesheet" href="/static/styles.css?v=1.7.44">
+    <link rel="stylesheet" href="/static/styles.css?v=1.7.45">
 </head>
 <body>
 
@@ -47,7 +47,7 @@
                 <i class="fa-solid fa-scale-balanced logo-icon"></i>
                 <div>
                     <h1>MIW Group</h1>
-                    <span>OSINT v1.7.44</span>
+                    <span>OSINT v1.7.45</span>
                 </div>
             </div>
             
@@ -379,9 +379,16 @@
                                 </select>
                                 <select id="log-filter-source" style="flex: 1; min-width: 120px; background: #121b2d; color: var(--text-primary);">
                                     <option value="">Wszystkie źródła</option>
+                                    <option value="Ezamowienia">Ezamowienia</option>
+                                    <option value="BazaKonkurenconosci">BazaKonkurenconosci</option>
+                                    <option value="Automatyka">Automatyka</option>
+                                    <option value="Logintrade">Logintrade</option>
+                                    <option value="BiznesPolska">BiznesPolska</option>
+                                    <option value="PlatformaZakupowa">PlatformaZakupowa</option>
                                     <option value="BZP">BZP</option>
                                     <option value="Google">Google</option>
                                     <option value="GUNB">GUNB</option>
+                                    <option value="Manual">Manual</option>
                                 </select>
                                 <div style="display: flex; align-items: center; gap: 8px; flex: 1.5; min-width: 260px;">
                                     <span style="color: var(--text-muted); font-size: 12px; white-space: nowrap;">Od:</span>
@@ -412,6 +419,13 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                        <div id="logs-pagination" style="display: flex; align-items: center; justify-content: space-between; padding: 16px; border-top: 1px solid var(--border-color); flex-wrap: wrap; gap: 12px;">
+                            <span id="log-page-info" style="color: var(--text-muted); font-size: 14px;">Strona 1 z 1 (Łącznie: 0 logów)</span>
+                            <div style="display: flex; gap: 8px;">
+                                <button id="btn-log-prev" class="btn-secondary" style="padding: 6px 16px;" disabled><i class="fa-solid fa-chevron-left"></i> Poprzednia</button>
+                                <button id="btn-log-next" class="btn-secondary" style="padding: 6px 16px;" disabled>Następna <i class="fa-solid fa-chevron-right"></i></button>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -614,6 +628,6 @@
     <!-- Notification Toast -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/app.js?v=1.7.44"></script>
+    <script src="/static/app.js?v=1.7.45"></script>
 </body>
 </html>

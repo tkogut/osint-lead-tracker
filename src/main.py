@@ -11,6 +11,7 @@ import sqlite3
 import os
 import hashlib
 import time
+import math
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Annotated, Any, List, Optional
@@ -422,7 +423,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.44",
+    version="1.7.45",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -445,7 +446,7 @@ async def health() -> dict:
         "status": "ok",
         "system_status": dep_report["status"],
         "service": "osint-lead-tracker",
-        "version": "1.7.44",
+        "version": "1.7.45",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
         "sanitizer": DOMSanitizer.get_status(),
@@ -496,7 +497,7 @@ async def list_leads(_token: Annotated[str, Depends(verify_token)], limit: int =
 @app.get("/api/leads", tags=["OSINT"], summary="Ostatnie leady (Sesyjnie)")
 async def list_leads_session(
     current_user: Annotated[User, Depends(get_current_user)],
-    limit: int = 100
+    limit: int = 10
 ) -> dict:
     if limit < 1 or limit > 500:
         raise HTTPException(status_code=400, detail="limit musi być w zakresie 1–500")
@@ -1236,7 +1237,8 @@ async def get_analytics_kpis(
 @app.get("/api/analytics/timeline", tags=["Analytics"])
 async def get_analytics_timeline(
     current_user: Annotated[User, Depends(get_current_user)],
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    limit: int = 10
 ):
     stmt = select(
         func.date(ResearchLog.timestamp).label("day"),
@@ -1245,13 +1247,15 @@ async def get_analytics_timeline(
     ).group_by(
         func.date(ResearchLog.timestamp)
     ).order_by(
-        func.date(ResearchLog.timestamp).asc()
-    )
+        func.date(ResearchLog.timestamp).desc()
+    ).limit(limit)
+    
     result = await db.execute(stmt)
     rows = result.all()
+    rows_asc = sorted(rows, key=lambda r: r.day)
     
     timeline = []
-    for row in rows:
+    for row in rows_asc:
         timeline.append({
             "date": row.day,
             "scans": row.scans,
@@ -1264,16 +1268,66 @@ async def get_analytics_timeline(
 async def get_research_logs(
     current_user: Annotated[User, Depends(get_current_user)],
     db: AsyncSession = Depends(get_db),
-    limit: int = 100
+    page: int = 1,
+    limit: int = 50,
+    account_id: Optional[int] = None,
+    status: Optional[str] = None,
+    source: Optional[str] = None,
+    search: Optional[str] = None,
+    date_start: Optional[str] = None,
+    date_end: Optional[str] = None
 ):
-    result = await db.execute(
-        select(ResearchLog, Account)
-        .join(Account, Account.id == ResearchLog.account_id)
-        .order_by(ResearchLog.timestamp.desc())
-        .limit(limit)
-    )
+    query = select(ResearchLog, Account).join(Account, Account.id == ResearchLog.account_id)
+    count_query = select(func.count(ResearchLog.id)).join(Account, Account.id == ResearchLog.account_id)
+
+    if account_id is not None:
+        query = query.filter(ResearchLog.account_id == account_id)
+        count_query = count_query.filter(ResearchLog.account_id == account_id)
+
+    if source:
+        query = query.filter(ResearchLog.source == source)
+        count_query = count_query.filter(ResearchLog.source == source)
+
+    if status:
+        if status == "success":
+            query = query.filter(ResearchLog.response_status_code == 200)
+            count_query = count_query.filter(ResearchLog.response_status_code == 200)
+        elif status == "error":
+            query = query.filter(ResearchLog.response_status_code != 200)
+            count_query = count_query.filter(ResearchLog.response_status_code != 200)
+        elif status.isdigit():
+            query = query.filter(ResearchLog.response_status_code == int(status))
+            count_query = count_query.filter(ResearchLog.response_status_code == int(status))
+
+    if search:
+        search_pattern = f"%{search}%"
+        search_filter = (
+            (Account.name.ilike(search_pattern)) |
+            (ResearchLog.log_text.ilike(search_pattern)) |
+            (ResearchLog.source.ilike(search_pattern)) |
+            (ResearchLog.raw_response_hash.ilike(search_pattern))
+        )
+        query = query.filter(search_filter)
+        count_query = count_query.filter(search_filter)
+
+    if date_start:
+        query = query.filter(func.date(ResearchLog.timestamp) >= date_start)
+        count_query = count_query.filter(func.date(ResearchLog.timestamp) >= date_start)
+
+    if date_end:
+        query = query.filter(func.date(ResearchLog.timestamp) <= date_end)
+        count_query = count_query.filter(func.date(ResearchLog.timestamp) <= date_end)
+
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    pages = math.ceil(total / limit) if total > 0 else 1
+    offset = (page - 1) * limit
+
+    query = query.order_by(ResearchLog.timestamp.desc()).offset(offset).limit(limit)
+    result = await db.execute(query)
     rows = result.all()
-    
+
     resp = []
     for log, acc in rows:
         resp.append({
@@ -1294,7 +1348,14 @@ async def get_research_logs(
             "odoo_team_id": acc.odoo_team_id,
             "odoo_source_id": acc.odoo_source_id
         })
-    return resp
+
+    return {
+        "items": resp,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": pages
+    }
 
 
 # ---------------------------------------------------------------------------
