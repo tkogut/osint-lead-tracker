@@ -36,6 +36,8 @@ from models import User, Session as UserSession, Account, ResearchLog, Setting, 
 from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest, SandboxFetchUrlRequest, SettingUpdate, ChangePasswordRequest, VerifyCredentialsRequest
 from auth import verify_password, create_user_session, validate_session_token
 from seed import seed_data
+from dependency_checker import audit_dependencies, log_dependency_banner
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -360,6 +362,9 @@ async def sync_lead_statuses() -> dict:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- startup ---
+    dep_report = audit_dependencies()
+    log_dependency_banner(dep_report)
+
     await init_db()
     await seed_data()
 
@@ -417,7 +422,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.43",
+    version="1.7.44",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -434,13 +439,17 @@ async def health() -> dict:
     if job and job.next_run_time:
         next_run = job.next_run_time.isoformat()
 
+    dep_report = audit_dependencies()
+
     return {
         "status": "ok",
+        "system_status": dep_report["status"],
         "service": "osint-lead-tracker",
-        "version": "1.7.43",
+        "version": "1.7.44",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
         "sanitizer": DOMSanitizer.get_status(),
+        "dependencies": dep_report,
     }
 
 
