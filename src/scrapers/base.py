@@ -7,7 +7,13 @@ import logging
 import re
 from typing import List, Dict, Any, Optional
 
-from bs4 import BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+    HAS_BS4 = True
+except ImportError:
+    BeautifulSoup = None
+    HAS_BS4 = False
+
 import trafilatura
 
 logger = logging.getLogger(__name__)
@@ -57,23 +63,28 @@ class DOMSanitizer:
         if not html_content or not html_content.strip():
             return ""
 
-        # Pre-cleaning BS4: dekompozycja tagów o class/id/test-id pasujących do wzorca
-        soup = BeautifulSoup(html_content, "html.parser")
-        for tag in list(soup.find_all(True)):
-            if getattr(tag, "decomposed", False):
-                continue
-            matched = False
-            for attr in ("class", "id", "test-id", "data-test-id"):
-                val = tag.get(attr)
-                if val:
-                    val_str = " ".join(val) if isinstance(val, list) else str(val)
-                    if DOMSanitizer.DECOMPOSITION_PATTERN.search(val_str):
-                        matched = True
-                        break
-            if matched:
-                tag.decompose()
+        cleaned_html = html_content
 
-        cleaned_html = str(soup)
+        # Pre-cleaning BS4: dekompozycja tagów o class/id/test-id pasujących do wzorca
+        if HAS_BS4:
+            try:
+                soup = BeautifulSoup(html_content, "html.parser")
+                for tag in list(soup.find_all(True)):
+                    if getattr(tag, "decomposed", False):
+                        continue
+                    matched = False
+                    for attr in ("class", "id", "test-id", "data-test-id"):
+                        val = tag.get(attr)
+                        if val:
+                            val_str = " ".join(val) if isinstance(val, list) else str(val)
+                            if DOMSanitizer.DECOMPOSITION_PATTERN.search(val_str):
+                                matched = True
+                                break
+                    if matched:
+                        tag.decompose()
+                cleaned_html = str(soup)
+            except Exception as bs_err:
+                logger.warning(f"BS4 pre-cleaning failed: {bs_err}")
 
         extracted = trafilatura.extract(
             cleaned_html,
