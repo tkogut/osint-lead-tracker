@@ -63,6 +63,28 @@ class TestDOMSanitizer(unittest.TestCase):
         self.assertNotIn("Registering in our company suppliers base", clean_text)
         self.assertNotIn("To browse enquiries from a given company", clean_text)
 
+    def test_clean_cookie_gdpr_and_ads_boilerplate(self):
+        sample_html = """
+        <html>
+        <body>
+            <h1>Przetarg: Dostawa wagi samochodowej 60t</h1>
+            <p>Zamawiający: Przedsiębiorstwo Komunalne Sp. z o.o.</p>
+            <div>Ta strona korzysta z plików cookies w celu realizacji usług zgodnie z Polityką Plików Cookies. Zgadzam się.</div>
+            <div>Używamy narzędzi analitycznych takich jak Google Analytics, Meta Pixel, Microsoft Clarity oraz LinkedIn Insight Tag do analizy ruchu.</div>
+            <div>Wadium w 2 minuty - sprawdź ofertę gwarancji wadialnej online.</div>
+            <div>Bid bond in 2 minutes - get your deposit guarantee now.</div>
+        </body>
+        </html>
+        """
+        clean_text = DOMSanitizer.clean(sample_html)
+        self.assertIn("Przetarg: Dostawa wagi samochodowej 60t", clean_text)
+        self.assertIn("Przedsiębiorstwo Komunalne Sp. z o.o.", clean_text)
+        self.assertNotIn("Ta strona korzysta z plików cookies", clean_text)
+        self.assertNotIn("Google Analytics", clean_text)
+        self.assertNotIn("Meta Pixel", clean_text)
+        self.assertNotIn("Wadium w 2 minuty", clean_text)
+        self.assertNotIn("Bid bond in 2 minutes", clean_text)
+
 
 if __name__ == "__main__":
     unittest.main()

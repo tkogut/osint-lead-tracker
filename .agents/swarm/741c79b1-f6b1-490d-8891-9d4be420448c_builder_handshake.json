@@ -3,13 +3,9 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/scrapers/platforma_zakupowa.py",
-    "src/scrapers/factory.py",
-    "src/scrapers/__init__.py",
-    "src/main.py",
-    "src/static/index.html"
+    "src/scrapers/base.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-31T11:25:28Z",
-  "notes": "Zaimplementowano dedykowany skraper publiczny PlatformaZakupowa.pl (Open Nexus) z sesją cookie i ekstrakcją postępowań"
+  "timestamp": "2026-07-31T11:44:43Z",
+  "notes": "Wdrożono filtrację banerów cookie i RODO w DOMSanitizer z zachowaniem 100% treści przetargowych"
 }
