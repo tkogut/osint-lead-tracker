@@ -1,86 +1,91 @@
 # OSINT Lead Tracker 🚀
-> **AGENTS-OS v5.0 Swarm Edition**
+> **AGENTS-OS v5.0 Swarm Edition** (Wersja v1.7.46)
 
-Mikroserwis w Pythonie (FastAPI) automatyzujący wyszukiwanie i kwalifikację szans sprzedażowych (leadów) w branży wag samochodowych. Narzędzie łączy bezpośrednie odpytywanie rządowego API platformy **e-Zamówienia**, skanowanie rejestru pozwoleń na budowę **GUNB (RWDZ)** oraz przeszukiwanie szerokiego internetu za pomocą **Google Gemini 2.5 Flash (Search Grounding)**, po czym przesyła wyselekcjonowane i sformatowane rekordy do systemu **Odoo CRM**.
+Mikroserwis w Pythonie (FastAPI) automatyzujący wyszukiwanie i kwalifikację szans sprzedażowych (leadów) w branży wag samochodowych i przemysłowych. Narzędzie łączy bezpośrednie odpytywanie rządowych i komercyjnych platform przetargowych (**e-Zamówienia**, **PlatformaZakupowa.pl**, **Baza Konkurencyjności BK2021**), skanowanie rejestru pozwoleń na budowę **GUNB (RWDZ)** oraz przeszukiwanie szerokiego internetu za pomocą **Google Gemini 2.5 Flash (Search Grounding)**, po czym przesyła wyselekcjonowane i sformatowane rekordy do systemu **Odoo CRM**.
 
 ---
 
 ## 🏗️ Architektura Systemu
 
-Poniższy diagram Mermaid przedstawia przepływ danych w potoku OSINT:
+Poniższy diagram Mermaid przedstawia przepływ danych i kluczowe moduły w potoku OSINT v1.7.46:
 
 ```mermaid
 graph TD
-    A[Skaner / Chron / Ręczne wywołanie] --> B{Skanowanie hybrydowe}
-    
+    A[Skaner / APScheduler / Wywołanie Manualne] --> B{Skanowanie Hybrydowe}
+
     B -->|1. BZP REST API| C[Zapytanie o kody CPV 42923110-6...]
-    B -->|2. Rejestr GUNB RWDZ| D{Czy rozmiar pliku ZIP uległ zmianie?}
-    B -->|3. Google Search Grounding| E[AI Web Search dla przetargów i inwestycji]
-    
-    D -->|Nie| F[Pomiń pobieranie / Użyj cache]
-    D -->|Tak| G[Pobierz ZIP, rozpakuj CSV i filtruj linie]
-    
-    C --> H[Pobrane ogłoszenia BZP]
-    H --> I[Lokalny pre-filter słów kluczowych]
-    I -->|Przepuszczone| J[Gemini: weryfikacja i ekstrakcja szczegółów]
-    
-    E --> K[Sparsowane leady internetowe]
-    
-    G --> L[Wygenerowane leady z pozwoleń budowlanych]
-    
-    J --> M[Konsolidacja i deduplikacja po URL]
-    K --> M
-    L --> M
-    
-    M --> N{Czy URL istnieje w SQLite?}
-    N -->|Tak| O[Ignoruj duplikat]
-    N -->|Nie| P[Utwórz Lead w Odoo crm.lead]
-    P --> Q[Zapisz URL + Odoo ID w bazie leads.db]
+    B -->|2. PlatformaZakupowa.pl| D[Skraper Open Nexus z sesją Cookie]
+    B -->|3. Rejestr GUNB RWDZ| E{Czy rozmiar pliku ZIP uległ zmianie?}
+    B -->|4. BK2021 REST API| F[Baza Konkurencyjności FE]
+    B -->|5. Google Search Grounding| G[AI Web Search & Scrapery Branżowe]
+
+    E -->|Nie| H[Pomiń pobieranie / Cache]
+    E -->|Tak| I[Pobierz ZIP, rozpakuj CSV i filtruj linie]
+
+    C --> J[Surowy HTML / JSON Zawiadomień]
+    D --> J
+    F --> J
+    G --> J
+
+    J --> K[DOMSanitizer: Decompozycja Tagów BS4 & Strip RODO/Cookies/Ad]
+    K -->|Oszczędność >1000 tokenów| L[Gemini 2.5 Flash / Pro: Kwalifikacja & Ekstrakcja]
+
+    I --> M[Wygenerowane leady z pozwoleń budowlanych]
+    L --> N[Konsolidacja Wyników]
+    M --> N
+
+    N --> O{Smart Deduplikacja lead_exists po URL + Tytule + Kampanii}
+    O -->|Duplikat| P[Ignoruj duplikat]
+    O -->|Nowy Lead| Q{Circuit Breaker MAX_LEADS_PER_RUN}
+
+    Q -->|Przekroczono limit| R[Kwarantanna UI - Pending Approval]
+    Q -->|W normie| S[Non-Blocking Async Pipeline: Zapis do SQLite <20ms & Odoo CRM]
 ```
+
+### Kluczowe założenia architektoniczne:
+- **Non-Blocking Async Event Loop Protection**: Przetwarzanie skanowania i zapis kampanii w odrębnym wątku/kolejce (`asyncio.to_thread` / Single Writer Queue), co gwarantuje natychmiastową reaktywność panelu UI (<20ms na zapis ustawień/kampanii).
+- **DOMSanitizer z Decompozycją Tagów BS4**: Strukturalne usuwanie węzłów Vue/React, modali zgodności RODO, banerów ciasteczek oraz widżetów reklamowych przy użyciu `BeautifulSoup4` przed przekazaniem kontekstu do LLM (zmniejszenie zużycia tokenów wejściowych o ponad 1,000 tokenów na zapytanie).
+- **Uniwersalny Skaner Spójności Zależności (`dependency_checker.py`)**: Automatyczny moduł sprawdzający spójność i obecność 11 pakietów systemowych (m.in. `curl_cffi`, `bs4`, `playwright`, `fastapi`, `sqlalchemy`) z automatycznym raportowaniem banerów ostrzegawczych/krytycznych w `/health`.
 
 ---
 
 ## 🌟 Kluczowe Funkcjonalności
 
-1. **Hybrydowe Źródło Danych**:
-   * **e-Zamówienia (Biuletyn Zamówień Publicznych)**: Bezpośrednie odpytywanie REST API dla kodów CPV związanych z wagami (np. `42923110-6` - wagi samochodowe, `42923000-2`, `42923200-0`). Zapewnia 100% wykrywalności i natychmiastowy dostęp do dokumentacji przetargowej.
-   * **Główny Urząd Nadzoru Budowlanego (GUNB RWDZ)**: Pobieranie i parsing rejestrów wniosków i decyzji budowlanych z 16 województw w poszukiwaniu budowy stacjonarnych wag samochodowych/najazdowych.
-   * **Google Search Grounding (Gemini)**: Przeszukiwanie szerszego internetu w poszukiwaniu komercyjnych zapytań ofertowych, przetargów niepublicznych i wiadomości inwestycyjnych.
-2. **Optymalizacja Wydajności (GUNB Caching)**:
-   * System wysyła lekkie zapytania `HEAD` w celu sprawdzenia `Content-Length` plików ZIP.
-   * Pobieranie danych następuje tylko wtedy, gdy baza urzędu uległa aktualizacji, co oszczędza ponad 350 MB transferu przy rutynowych skanach.
-3. **Kwalifikacja przez Modele Gemini (2.5 Flash / 2.5 Pro)**:
-   * Dynamiczna parametryzacja modelu LLM, temperatury i max tokens na poziomie każdej kampanii.
-   * Zabezpieczenie przed przeterminowanymi lub rozstrzygniętymi zamówieniami.
-   * Ekstrakcja kluczowych danych (zakres wagi, typ, dane inwestora) i ocena priorytetu biznesowego.
-4. **Formatowanie HTML i Mapowanie Odoo Multicompany**:
-   * Tworzenie przejrzystych tabel szczegółowych na karcie leada w Odoo CRM.
-   * Przypisywanie leadów do właściwych spółek (`company_id`), handlowców (`user_id`), zespołów (`team_id`), źródeł (`source_id`) oraz tagów (`tag_ids`) dynamicznie na podstawie kampanii.
-5. **Dedykowany Rejestr "Twardych Dowodów" i Analityka KPI**:
-   * Zapisywanie szczegółowych logów z unikalnym skrótem SHA-256 surowej odpowiedzi z API.
-   * Wykresy i metryki KPI obrazujące liczbę skanów, współczynnik sukcesu LLM oraz wykryte błędy w czasie.
-   * Notification Gate powiadamiający w czasie rzeczywistym o błędach autoryzacji Odoo lub statusach 4xx/5xx w logach API.
-6. **Wersjonowanie i Historia Promptów Systemowych (Faza 5)**:
-   * Pełna historia zmian promptów per kampania.
-   * Statystyki efektywności i konwersji (lead count, won count, rate %) powiązane z konkretną wersją promptu.
-   * Opcja błyskawicznego przywrócenia (restore) wybranego promptu z poziomu UI.
-7. **Deduplikacja i Bezpieczeństwo**:
-   * Unikalny indeks URL w bazie SQLite uniemożliwia wielokrotne tworzenie tej samej szansy w CRM.
-   * Autoryzacja sesyjna panelu oraz tokenowa (`X-API-Token`) dla zewnętrznych wywołań.
-   * Wbudowane maskowanie kluczy API i haseł przed wyciekiem w logach i czatach.
-8. **Bezpiecznik Kwarantanny (Circuit Breaker & Single Writer)**:
-   * Limit `MAX_LEADS_PER_RUN` zabezpieczający Odoo CRM przed zatruciem fałszywymi lub zduplikowanymi danymi. Leady z anomaliami przekierowywane są do kwarantanny UI w celu ręcznej weryfikacji.
-   * Asynchroniczna kolejka zapisu SQLite (Single Writer Queue) zapobiegająca błędowi `database is locked`.
-9. **Konfigurowalne Źródła i Okno Czasowe (Faza 7)**:
-   * Przełączniki aktywnych źródeł OSINT (e-Zamówienia BZP, GUNB RWDZ, Wyszukiwarka Google, Baza Konkurencyjności) per kampania.
-   * Rozszerzone okno skanowania `SEARCH_WINDOW_DAYS` (domyślnie 7 dni roboczych).
-10. **Skanowanie Dwuetapowe (Two-Phase Scraping - Faza 8)**:
-    * Hybrydowy mechanizm z automatyczną orkiestracją sesji: curl_cffi wykonuje szybkie, publiczne zapytania w celu filtrowania kandydatów, a Playwright Chromium loguje się i wyciąga dane kontaktowe wyłącznie dla leadów spełniających kryteria.
-11. **Integracja z Bazą Konkurencyjności (BK2021)**:
-    * Nowy, w pełni asynchroniczny moduł skrapujący REST API portalu Baza Konkurencyjności Funduszy Europejskich z zaawansowaną ekstrakcją zagnieżdżonych danych kontaktowych oferentów.
-12. **Obsługa fleksji języka polskiego i ekspansja słów kluczowych**:
-    * Parser bliskości tematów słów (stems) w [utils.py](file:///home/tkogut/projects/osint-lead-tracker/src/utils.py) dopasowujący polskie formy gramatyczne przez przypadki i liczby (np. "waga samochodowa" -> "wag samochodowych", "wagi do samochodów").
-    * Jednorazowa automatyczna ekspansja słów kluczowych przez model Gemini (`gemini-2.5-flash`) przy tworzeniu lub edycji konta w panelu Settings.
+1. **Hybrydowe Źródła Danych & Skrapery Dedykowane**:
+   * **e-Zamówienia (Biuletyn Zamówień Publicznych)**: Bezpośrednie odpytywanie REST API dla kodów CPV związanych z wagami (np. `42923110-6` - wagi samochodowe, `42923000-2`, `42923200-0`). Zapewnia 100% wykrywalności przetargów publicznych.
+   * **PlatformaZakupowa.pl (Open Nexus)**: Dedykowany skraper hybrydowy z bezpieczną inicjalizacją i utrzymywaniem sesji cookie, pozwalający na sprawne pobieranie postępowań przetargowych z platformy Open Nexus.
+   * **Baza Konkurencyjności (BK2021)**: Asynchroniczne odpytywanie portalu BK2021 z głęboką ekstrakcją zagnieżdżonych danych kontaktowych oferentów.
+   * **Główny Urząd Nadzoru Budowlanego (GUNB RWDZ)**: Parsing rejestrów wniosków i decyzji budowlanych z 16 województw dla stacjonarnych wag samochodowych/najazdowych.
+   * **Google Search Grounding (Gemini)**: Przeszukiwanie sieci w poszukiwaniu komercyjnych zapytań ofertowych i przetargów niepublicznych.
+2. **Dekompozycja Tagów DOM i Czyszczenie Banerów (`DOMSanitizer`)**:
+   * Zaawansowany parser HTML oparty na `BeautifulSoup4` i fallbackowych wyrażeniach regularnych.
+   * Fizyczne odcinanie i decompozycja tagów nawigacji, skryptów, modali RODO/Cookie, skryptów śledzących oraz banerów reklamowych.
+   * Redukcja rozmiaru promptu do LLM o **ponad 1000 tokenów** na zapytanie przy zachowaniu 100% kluczowej treści merytorycznej zawiadomień.
+3. **Uniwersalny Skaner Spójności Zależności (`dependency_checker.py`)**:
+   * Integracyjny skaner weryfikujący stan 11 kluczowych bibliotek i modułów w czasie uruchamiania aplikacji i podczas wywołania `/health`.
+   * Prezentacja czytelnych banerów statusu (`OK`, `WARNING`, `CRITICAL`) w logach konsoli i API.
+4. **Paginacja Logów Badawczych i Leadów z Filtrowaniem 10+ Źródeł**:
+   * Wydajna paginacja logów w panelu (`ResearchLog` - 50 wpisów / stronę) oraz leadów (10 wpisów / stronę).
+   * Filtracja po 10 źródłach danych: `PlatformaZakupowa`, `Logintrade`, `Automatyka`, `BiznesPolska`, `BazaKonkurenconosci`, `Ezamowienia`, `BZP`, `GUNB`, `GoogleGrounding`, itp.
+   * Dedykowane filtrowanie po konkretnych kampaniach/kontach (`account_id`).
+5. **Interaktywny Skalowalny Wykres Trendów SVG (Dashboard Analytics)**:
+   * Dynamiczny wykres osi czasu porównujący skanowania vs wykryte leady z pełnym wsparciem skalowalności SVG.
+   * Przełączniki zakresu czasowego w czasie rzeczywistym: `1D`, `7D`, `1M`, `3M`, `6M`, `1Y`, `5Y`, `Wszystkie`.
+6. **Zaawansowana Deduplikacja (`lead_exists`) & Non-Blocking Async Pipeline**:
+   * Wielopoziomowa deduplikacja po kanonicznym URL, tytule oraz identyfikatorze kampanii (`lead_exists`), zapobiegająca ponownemu przetwarzaniu tych samych szans.
+   * Asynchroniczny pipeline zapisu kampanii (<20ms) z izolacją operacji dyskowych i zapobieganiem blokowaniu pętli zdarzeń Event Loop (`asyncio.to_thread` oraz `Single Writer Queue` w SQLite).
+7. **Kwalifikacja przez Modele Gemini (2.5 Flash / 2.5 Pro)**:
+   * Dynamiczna parametryzacja modelu LLM, temperatury i max tokens per kampania.
+   * Ekstrakcja typu wagi, lokalizacji, inwestora, zakresu oraz ocena priorytetu biznesowego.
+8. **Formatowanie HTML i Mapowanie Odoo Multicompany**:
+   * Generowanie estetycznych tabel HTML na karcie leada w Odoo CRM.
+   * Mapowanie spółek (`company_id`), opiekunów (`user_id`), zespołów (`team_id`), źródeł (`source_id`) oraz tagów (`tag_ids`) na poziomie kampanii.
+9. **Wersjonowanie Promptów & Bezpiecznik Kwarantanny (Circuit Breaker)**:
+   * Wersjonowanie i przywracanie promptów systemowych z analityką konwersji (lead count, won count).
+   * Kwarantanna UI (`pending_approval`) chroniąca Odoo CRM w przypadku nagłego skoku liczby znalezionych wyników (`MAX_LEADS_PER_RUN`).
+10. **Fleksja Języka Polskiego i Automatyczna Ekspansja Słów Kluczowych**:
+    * Parser bliskości tematów (stems) dopasowujący odmiany gramatyczne polskich słów kluczowych.
+    * Automatyczna generacja synonimów i ekspansja słów kluczowych przez Gemini 2.5 Flash.
 
 ---
 
@@ -97,25 +102,22 @@ ODOO_URL="https://twoje-odoo.pl"
 ODOO_DB="nazwa_bazy_odoo"
 ODOO_USER="twoj_login_odoo"
 ODOO_API_KEY="twój_klucz_api_odoo"
-ODOO_TEAM_ID=0         # Opcjonalne: ID zespołu sprzedaży w Odoo
-ODOO_SOURCE_ID=0       # Opcjonalne: ID źródła pozyskania leada
+ODOO_TEAM_ID=0         # Opcjonalne: ID zespołu sprzedaży w Odoo (fallback)
+ODOO_SOURCE_ID=0       # Opcjonalne: ID źródła pozyskania leada (fallback)
 
 # --- API Security ---
 API_TOKEN="silny-token-zabezpieczajacy-api"
 
 # --- Database ---
-DATABASE_URL="sqlite:///./data/leads.db"
+DATABASE_URL="sqlite+aiosqlite:///./data/leads.db"
 SQLITE_PATH="./data/leads.db"
 
 # --- APScheduler & Pipeline ---
 CRON_HOUR=6
 CRON_MINUTE=0
 CRON_TIMEZONE="Europe/Warsaw"
-SEARCH_WINDOW_DAYS=7   # Opcjonalne: Liczba dni roboczych wstecz przy skanowaniu (domyślnie 7)
+SEARCH_WINDOW_DAYS=7   # Liczba dni roboczych wstecz przy skanowaniu
 ```
-
-> [!NOTE]
-> Parametry mapowania Odoo takie jak **Odoo Company ID** (`odoo_company_id`), **Odoo User ID / Handlowiec** (`odoo_user_id`), **Odoo Tag IDs** (`odoo_tag_ids`), a także dedykowane parametry **Team ID** (`odoo_team_id`) i **Source ID** (`odoo_source_id`) są konfigurowane **dynamicznie w panelu graficznym (zakładka Accounts)** osobno dla każdej kampanii (Account). Zapisywane są one w bazie danych SQLite. Zmienne `ODOO_TEAM_ID` i `ODOO_SOURCE_ID` w pliku `.env` pełnią jedynie rolę opcjonalnych domyślnych wartości (fallbacks).
 
 ---
 
@@ -124,67 +126,57 @@ SEARCH_WINDOW_DAYS=7   # Opcjonalne: Liczba dni roboczych wstecz przy skanowaniu
 Aplikacja udostępnia interaktywną dokumentację Swagger pod adresem `/docs` oraz ReDoc pod `/redoc`.
 
 ### 1. `GET /health`
-Liveness probe zwracający stan działania mikroserwisu oraz datę kolejnego automatycznego skanu.
+Liveness probe zwracający stan działania mikroserwisu, datę kolejnego automatycznego skanu, status sanityzatora DOM oraz pełny raport spójności zależności.
 * **Autoryzacja**: Brak.
 * **Przykładowa odpowiedź**:
   ```json
   {
     "status": "ok",
+    "system_status": "OK",
     "service": "osint-lead-tracker",
-    "version": "1.7.46",
+    "version": "1.7.47",
     "scheduler": "running",
-    "next_run": "2026-07-15T06:00:00+02:00"
+    "next_run": "2026-08-01T06:00:00+02:00",
+    "sanitizer": {
+      "bs4_available": true,
+      "mode": "bs4_decomp_fallback_regex"
+    },
+    "dependencies": {
+      "status": "OK",
+      "total_packages": 11,
+      "installed": 11,
+      "missing": 0,
+      "packages": [ ... ]
+    }
   }
   ```
 
 ### 2. `POST /trigger-osint`
 Wymusza natychmiastowe uruchomienie potoku OSINT.
 * **Autoryzacja**: Nagłówek `X-API-Token` (zgodny z `API_TOKEN`) lub aktywna sesja administratora.
-* **Przykładowa odpowiedź**:
-  ```json
-  {
-    "triggered": true,
-    "stats": {
-      "found": 1,
-      "new": 1,
-      "duplicates": 0,
-      "odoo_ok": 1,
-      "odoo_fail": 0
-    }
-  }
-  ```
+* **Przykładowy parametr**: `account_id` (opcjonalny ID kampanii).
 
 ### 3. `GET /api/leads`
-Zwraca ostatnie N przetworzonych leadów zapisanych w bazie SQLite (endpoint sesyjnie zabezpieczony na potrzeby UI).
+Zwraca stronicowaną listę przetwarzanych leadów w SQLite.
 * **Autoryzacja**: Aktywna sesja administratora.
-* **Parametry**: `limit` (opcjonalny, domyślnie 100).
+* **Parametry**: `page` (domyślnie 1), `limit` (domyślnie 10), `account_id` (opcjonalny).
 
-### 4. `GET /api/analytics/kpis`
-Zwraca zagregowane dane statystyczne KPI (współczynnik sukcesu LLM, łączna liczba skanów, błędy API).
+### 4. `GET /api/logs`
+Zwraca stronicowaną listę logów badawczych z filtrowaniem po źródłach i kampaniach.
 * **Autoryzacja**: Aktywna sesja administratora.
+* **Parametry**: `page` (domyślnie 1), `limit` (domyślnie 50), `source` (`PlatformaZakupowa`, `Logintrade`, `BZP`, itp.), `account_id`.
 
 ### 5. `GET /api/analytics/timeline`
-Zwraca statystyki wyszukiwań i nowych leadów na osi czasu.
+Zwraca statystyki skanowań i leadów na osi czasu do generowania skalowalnego wykresu SVG.
+* **Autoryzacja**: Aktywna sesja administratora.
+* **Parametry**: `range` (`1D`, `7D`, `1M`, `3M`, `6M`, `1Y`, `5Y`, `ALL`).
+
+### 6. `GET /api/analytics/dashboard`
+Zwraca kluczowe metryki KPI (Yield 7d, Token Economy - input/output, zapytania Grounding, błędy API oraz zdarzenia kwarantanny Circuit Breaker).
 * **Autoryzacja**: Aktywna sesja administratora.
 
-### 6. `GET /api/analytics/prompts`
-Zwraca historię modyfikacji promptów wraz ze wskaźnikami konwersji i sprzedaży CRM.
-* **Autoryzacja**: Aktywna sesja administratora.
-
-### 7. `POST /api/leads/sync-crm`
-Uruchamia ręczną synchronizację statusów szans z Odoo.
-* **Autoryzacja**: Aktywna sesja administratora.
-
-### 8. `GET /api/analytics/dashboard`
-Zwraca statystyki wydajności (Yield 7d, Yield per Chunk, zapytania Google Grounding, zużycie tokenów input/output oraz zdarzenia kwarantanny Circuit Breaker).
-* **Autoryzacja**: Aktywna sesja administratora.
-
-### 9. `GET /api/leads/pending`
-Zwraca listę leadów zatrzymanych w kwarantannie przez Circuit Breaker (oczekujących na zatwierdzenie).
-* **Autoryzacja**: Aktywna sesja administratora.
-
-### 10. `POST /api/leads/{lead_id}/approve`
-Zatwierdza lead z kwarantanny, przesyła go do odpowiedniej firmy w Odoo CRM na podstawie mapowania kampanii i oznacza jako zaakceptowany.
+### 7. `GET /api/leads/pending` & `POST /api/leads/{lead_id}/approve`
+Obsługa leadów zatrzymanych w kwarantannie Circuit Breakers (podgląd i zatwierdzanie do Odoo CRM).
 * **Autoryzacja**: Aktywna sesja administratora.
 
 ---
@@ -196,8 +188,7 @@ Zatwierdza lead z kwarantanny, przesyła go do odpowiedniej firmy w Odoo CRM na 
 docker compose up -d --build
 ```
 
-### 2. Odczyt bazy SQLite z poziomu hosta VPS
-Baza danych znajduje się na zamontowanym wolumenie. Ponieważ obraz `python:slim` nie posiada domyślnie klienta `sqlite3`, odpytanie bazy najwygodniej wykonać jednolinijkowcem Pythona:
+### 2. Szybki odczyt bazy SQLite z poziomu hosta VPS
 ```bash
-docker exec osint-lead-tracker python3 -c "import sqlite3; [print(r) for r in sqlite3.connect('./data/leads.db').cursor().execute('SELECT id, tytul, priorytet, created_at FROM leads')]"
+docker exec osint-lead-tracker python3 -c "import sqlite3; [print(r) for r in sqlite3.connect('./data/leads.db').cursor().execute('SELECT id, tytul, priorytet, created_at FROM leads ORDER BY id DESC LIMIT 10')]"
 ```

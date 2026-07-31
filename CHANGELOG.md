@@ -2,6 +2,11 @@
 > **OSINT Lead Tracker**
 
 Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w tym pliku. Format jest oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/) i projekt jest zgodny z [SemVer](https://semver.org/spec/v2.0.0.html).
+## [1.7.47] - 2026-07-31
+
+### Added
+- docs: update README.md documentation with v1.7.46 features (plan 047)
+
 ## [1.7.46] - 2026-07-31
 
 ### Added
