@@ -416,7 +416,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.38",
+    version="1.7.39",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -436,7 +436,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.38",
+        "version": "1.7.39",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
@@ -1309,6 +1309,8 @@ async def sandbox_fetch_url(
                 context = "BiznesPolska"
             elif "bazakonkurencyjnosci.funduszeeuropejskie.gov.pl" in req.url:
                 context = "BazaKonkurenconosci"
+            elif "platformazakupowa.pl" in req.url:
+                context = "PlatformaZakupowa"
             else:
                 context = "None"
         else:
@@ -1378,6 +1380,11 @@ async def sandbox_fetch_url(
                         )
                     except Exception as l_err:
                         logger.warning("Sandbox login to logintrade failed: %s", l_err)
+            elif context == "PlatformaZakupowa":
+                try:
+                    await cffi_session.get("https://platformazakupowa.pl/all", timeout=15)
+                except Exception as pz_err:
+                    logger.warning("Sandbox session init for PlatformaZakupowa failed: %s", pz_err)
 
             resp = await cffi_session.get(req.url, timeout=15)
             if resp.status_code != 200:
@@ -1424,6 +1431,8 @@ async def run_sandbox_test(
                     context = "BiznesPolska"
                 elif "bazakonkurencyjnosci.funduszeeuropejskie.gov.pl" in req.url:
                     context = "BazaKonkurenconosci"
+                elif "platformazakupowa.pl" in req.url:
+                    context = "PlatformaZakupowa"
                 else:
                     context = "None"
             else:
@@ -1490,6 +1499,11 @@ async def run_sandbox_test(
                                 )
                             except Exception as l_err:
                                 logger.warning("Sandbox login to logintrade failed: %s", l_err)
+                    elif context == "PlatformaZakupowa":
+                        try:
+                            await cffi_session.get("https://platformazakupowa.pl/all", timeout=15)
+                        except Exception as pz_err:
+                            logger.warning("Sandbox session init for PlatformaZakupowa failed: %s", pz_err)
 
                     resp = await cffi_session.get(req.url, timeout=15)
                     if resp.status_code == 200:

@@ -3,10 +3,13 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/database.py",
-    "src/main.py"
+    "src/scrapers/platforma_zakupowa.py",
+    "src/scrapers/factory.py",
+    "src/scrapers/__init__.py",
+    "src/main.py",
+    "src/static/index.html"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-31T10:47:44Z",
-  "notes": "Wdrożono zaawansowaną deduplikację leadów (lead_exists) zapobiegającą odrzucaniu unikalnych zapytań ze zbiorczych adresów URL"
+  "timestamp": "2026-07-31T11:25:28Z",
+  "notes": "Zaimplementowano dedykowany skraper publiczny PlatformaZakupowa.pl (Open Nexus) z sesją cookie i ekstrakcją postępowań"
 }
