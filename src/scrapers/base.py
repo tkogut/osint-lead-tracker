@@ -18,12 +18,23 @@ import trafilatura
 
 logger = logging.getLogger(__name__)
 
+if not HAS_BS4:
+    logger.warning("Biblioteka beautifulsoup4 (bs4) nie jest zainstalowana — aktywny tryb awaryjny Trafilatura.")
+
 
 class DOMSanitizer:
     """
     Ekstrahuje czysty tekst z surowego kodu HTML, wycinając szum DOM (nawigacje, reklamy, stopki),
     co pozwala zaoszczędzić tokeny i zapobiega halucynacjom LLM.
     """
+
+    @staticmethod
+    def get_status() -> Dict[str, Any]:
+        return {
+            "bs4_available": HAS_BS4,
+            "active_engine": "BS4 + Trafilatura" if HAS_BS4 else "Trafilatura Fallback",
+            "warning": None if HAS_BS4 else "Biblioteka beautifulsoup4 (bs4) nie jest zainstalowana — aktywny tryb awaryjny Trafilatura.",
+        }
 
     DECOMPOSITION_PATTERN = re.compile(r"cookie|consent|rodo|privacy|wadium|modal|banner", re.I)
 

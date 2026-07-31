@@ -31,6 +31,7 @@ from odoo_integration import get_odoo_client
 from osint_engine import get_engine, get_date_limits, get_system_instruction, format_prompt_dates
 from scrapers.factory import SCRAPER_REGISTRY
 from scrapers.playwright_fetcher import fetch_with_playwright
+from scrapers.base import DOMSanitizer
 from models import User, Session as UserSession, Account, ResearchLog, Setting, PromptVersion, Lead, RunPerformanceSnapshot
 from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest, SandboxFetchUrlRequest, SettingUpdate, ChangePasswordRequest, VerifyCredentialsRequest
 from auth import verify_password, create_user_session, validate_session_token
@@ -416,7 +417,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.42",
+    version="1.7.43",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -436,9 +437,10 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.42",
+        "version": "1.7.43",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
+        "sanitizer": DOMSanitizer.get_status(),
     }
 
 
@@ -1298,6 +1300,7 @@ async def sandbox_fetch_url(
     from curl_cffi.requests import AsyncSession as CffiAsyncSession
     from scrapers.base import DOMSanitizer
     import re
+    res = {}
     try:
         source_name = req.source or "DOMSanitizer"
         if req.scraper == "Auto":
@@ -1325,77 +1328,83 @@ async def sandbox_fetch_url(
             contact_header = extract_advertiser_info(detail_html)
             if contact_header:
                 clean_text = contact_header + clean_text
-            return {"success": True, "clean_text": clean_text}
+            res = {"success": True, "clean_text": clean_text}
 
         elif context == "BiznesPolska":
             user = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_USER", "")
             scraper_password = get_db_setting_sync("SCRAPER_BIZNESPOLSKA_PASS", "")
             detail_html = await fetch_with_playwright(req.url, user, scraper_password, context="BiznesPolska")
             clean_text = DOMSanitizer.clean(detail_html, max_chars=6000)
-            return {"success": True, "clean_text": clean_text}
+            res = {"success": True, "clean_text": clean_text}
 
         elif context == "BazaKonkurenconosci":
             match = re.search(r'/ogloszenia/(\d+)', req.url)
             if not match:
-                return {"success": False, "error": "Brak ID w URL Bazy Konkurencyjności"}
-            ad_id = match.group(1)
-            api_url = f"https://bazakonkurencyjnosci.funduszeeuropejskie.gov.pl/api/announcements/{ad_id}"
+                res = {"success": False, "error": "Brak ID w URL Bazy Konkurencyjności"}
+            else:
+                ad_id = match.group(1)
+                api_url = f"https://bazakonkurencyjnosci.funduszeeuropejskie.gov.pl/api/announcements/{ad_id}"
+                async with CffiAsyncSession(impersonate="chrome124") as cffi_session:
+                    resp = await cffi_session.get(api_url, timeout=15)
+                    if resp.status_code != 200:
+                        res = {"success": False, "error": f"HTTP {resp.status_code}"}
+                    else:
+                        detail_json = resp.json()
+                        adv_details = detail_json.get("data", {}).get("advertisement", {})
+                        title = adv_details.get("title", "")
+                        content = ""
+                        contact_persons = adv_details.get("contact_persons", [])
+                        orders = adv_details.get("orders", [])
+                        details_text = f"Title: {title}\nDescription: {content}\n\nContact Persons:\n"
+                        for cp in contact_persons:
+                            details_text += f"- {cp.get('forename', '')} {cp.get('surname', '')} | Phone: {cp.get('phone_number', '')} | Email: {cp.get('email', '')}\n"
+                        details_text += "\nOrders:\n"
+                        for order in orders:
+                            for item in order.get("order_items", []):
+                                details_text += f"- {item.get('description', '')}\n"
+                        clean_text = DOMSanitizer.clean(details_text)
+                        res = {"success": True, "clean_text": clean_text}
+
+        else:
             async with CffiAsyncSession(impersonate="chrome124") as cffi_session:
-                resp = await cffi_session.get(api_url, timeout=15)
-                if resp.status_code != 200:
-                    return {"success": False, "error": f"HTTP {resp.status_code}"}
-                detail_json = resp.json()
-                adv_details = detail_json.get("data", {}).get("advertisement", {})
-                title = adv_details.get("title", "")
-                content = ""
-                contact_persons = adv_details.get("contact_persons", [])
-                orders = adv_details.get("orders", [])
-                details_text = f"Title: {title}\nDescription: {content}\n\nContact Persons:\n"
-                for cp in contact_persons:
-                    details_text += f"- {cp.get('forename', '')} {cp.get('surname', '')} | Phone: {cp.get('phone_number', '')} | Email: {cp.get('email', '')}\n"
-                details_text += "\nOrders:\n"
-                for order in orders:
-                    for item in order.get("order_items", []):
-                        details_text += f"- {item.get('description', '')}\n"
-                clean_text = DOMSanitizer.clean(details_text)
-                return {"success": True, "clean_text": clean_text}
-
-        async with CffiAsyncSession(impersonate="chrome124") as cffi_session:
-            if context == "Logintrade":
-                user = get_db_setting_sync("SCRAPER_LOGINTRADE_USER", "")
-                scraper_password = get_db_setting_sync("SCRAPER_LOGINTRADE_PASS", "")
-                if user and scraper_password:
+                if context == "Logintrade":
+                    user = get_db_setting_sync("SCRAPER_LOGINTRADE_USER", "")
+                    scraper_password = get_db_setting_sync("SCRAPER_LOGINTRADE_PASS", "")
+                    if user and scraper_password:
+                        try:
+                            sso_resp = await cffi_session.get("https://platformazakupowa.logintrade.pl/sso-login", timeout=15)
+                            _token = ""
+                            if sso_resp.status_code == 200:
+                                token_match = re.search(r'name="_token"\s+value="([^"]+)"', sso_resp.text)
+                                if token_match:
+                                    _token = token_match.group(1)
+                            
+                            await cffi_session.post(
+                                "https://platformazakupowa.logintrade.pl/sso-login?backUrl=https://platformazakupowa.logintrade.pl/",
+                                data={"username": user, "password": scraper_password, "_token": _token, "save": ""},
+                                timeout=15
+                            )
+                        except Exception as l_err:
+                            logger.warning("Sandbox login to logintrade failed: %s", l_err)
+                elif context == "PlatformaZakupowa":
                     try:
-                        sso_resp = await cffi_session.get("https://platformazakupowa.logintrade.pl/sso-login", timeout=15)
-                        _token = ""
-                        if sso_resp.status_code == 200:
-                            token_match = re.search(r'name="_token"\s+value="([^"]+)"', sso_resp.text)
-                            if token_match:
-                                _token = token_match.group(1)
-                        
-                        await cffi_session.post(
-                            "https://platformazakupowa.logintrade.pl/sso-login?backUrl=https://platformazakupowa.logintrade.pl/",
-                            data={"username": user, "password": scraper_password, "_token": _token, "save": ""},
-                            timeout=15
-                        )
-                    except Exception as l_err:
-                        logger.warning("Sandbox login to logintrade failed: %s", l_err)
-            elif context == "PlatformaZakupowa":
-                try:
-                    await cffi_session.get("https://platformazakupowa.pl/all", timeout=15)
-                except Exception as pz_err:
-                    logger.warning("Sandbox session init for PlatformaZakupowa failed: %s", pz_err)
+                        await cffi_session.get("https://platformazakupowa.pl/all", timeout=15)
+                    except Exception as pz_err:
+                        logger.warning("Sandbox session init for PlatformaZakupowa failed: %s", pz_err)
 
-            resp = await cffi_session.get(req.url, timeout=15)
-            if resp.status_code != 200:
-                return {"success": False, "error": f"HTTP {resp.status_code}"}
-            
-            detail_html = resp.text
-            clean_text = DOMSanitizer.clean(detail_html, max_chars=6000)
-            return {"success": True, "clean_text": clean_text}
+                resp = await cffi_session.get(req.url, timeout=15)
+                if resp.status_code != 200:
+                    res = {"success": False, "error": f"HTTP {resp.status_code}"}
+                else:
+                    detail_html = resp.text
+                    clean_text = DOMSanitizer.clean(detail_html, max_chars=6000)
+                    res = {"success": True, "clean_text": clean_text}
     except Exception as exc:
         logger.error("Sandbox fetch url error: %s", exc)
-        return {"success": False, "error": str(exc)}
+        res = {"success": False, "error": str(exc)}
+
+    res["sanitizer"] = DOMSanitizer.get_status()
+    return res
 
 
 @app.post("/api/sandbox/test", tags=["Sandbox"])
