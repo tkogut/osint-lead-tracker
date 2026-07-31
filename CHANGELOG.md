@@ -2,6 +2,11 @@
 > **OSINT Lead Tracker**
 
 Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w tym pliku. Format jest oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/) i projekt jest zgodny z [SemVer](https://semver.org/spec/v2.0.0.html).
+## [1.7.38] - 2026-07-31
+
+### Added
+- fix: smart lead deduplication by title and account to prevent generic URL collisions (plan 038)
+
 ## [1.7.37] - 2026-07-29
 
 ### Added

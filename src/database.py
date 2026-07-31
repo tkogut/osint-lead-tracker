@@ -130,6 +130,34 @@ async def url_exists(url: str) -> bool:
         return lead is not None
 
 
+async def lead_exists(url: str, title: str = "", account_id: Optional[int] = None) -> bool:
+    """Deduplikacja leadów zapobiegająca kolizjom na ogólnych adresach URL platform."""
+    url_clean = (url or "").strip()
+    title_clean = (title or "").strip()
+    if not url_clean and not title_clean:
+        return False
+
+    async with AsyncSessionLocal() as session:
+        if title_clean and len(title_clean) > 5:
+            query = select(Lead).filter(Lead.tytul == title_clean)
+            if account_id:
+                query = query.filter(Lead.account_id == account_id)
+            res = await session.execute(query.limit(1))
+            if res.scalar_one_or_none():
+                return True
+
+        if url_clean and len(url_clean) > 20 and not url_clean.rstrip("/").endswith((".pl", ".com", ".net", ".gov.pl")):
+            query = select(Lead).filter(Lead.url == url_clean)
+            if account_id:
+                query = query.filter(Lead.account_id == account_id)
+            res = await session.execute(query.limit(1))
+            if res.scalar_one_or_none():
+                return True
+
+        return False
+
+
+
 async def is_url_visited(url: str, account_id: int) -> bool:
     """Tier 0 Deduplication: Sprawdza czy dany URL dla konkretnego konta został już odwiedzony/przetworzony."""
     # Generate hash based on both account_id and url to allow multi-tenancy deduplication

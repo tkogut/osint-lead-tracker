@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from config import get_settings
-from database import get_recent_leads, init_db, save_lead, url_exists, AsyncSessionLocal, get_db_setting_sync
+from database import get_recent_leads, init_db, save_lead, url_exists, lead_exists, AsyncSessionLocal, get_db_setting_sync
 from odoo_integration import get_odoo_client
 from osint_engine import get_engine, get_date_limits, get_system_instruction, format_prompt_dates
 from scrapers.factory import SCRAPER_REGISTRY
@@ -222,7 +222,8 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
                     # Save all leads as pending_approval, skip Odoo
                     for lead in leads:
                         url = lead.get("url", "").strip()
-                        if not url or await url_exists(url):
+                        title = lead.get("tytul", "").strip()
+                        if not url or await lead_exists(url, title=title, account_id=account.id):
                             continue
                         try:
                             await save_lead(lead, odoo_id=None, prompt_version_id=active_prompt_version_id, pending_approval=True)
@@ -237,7 +238,8 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
                             continue
                             
                         # Deduplikacja w SQLite
-                        if await url_exists(url):
+                        title = lead.get("tytul", "").strip()
+                        if await lead_exists(url, title=title, account_id=account.id):
                             logger.info("[%s] Duplikat URL pomijam: %s", source, url)
                             continue
                             
@@ -414,7 +416,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.37",
+    version="1.7.38",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -434,7 +436,7 @@ async def health() -> dict:
     return {
         "status": "ok",
         "service": "osint-lead-tracker",
-        "version": "1.7.37",
+        "version": "1.7.38",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
     }
