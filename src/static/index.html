@@ -11,7 +11,7 @@
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Premium Stylesheet -->
-    <link rel="stylesheet" href="/static/styles.css?v=1.7.48">
+    <link rel="stylesheet" href="/static/styles.css?v=1.7.49">
 </head>
 <body>
 
@@ -47,7 +47,7 @@
                 <i class="fa-solid fa-scale-balanced logo-icon"></i>
                 <div>
                     <h1>MIW Group</h1>
-                    <span>OSINT v1.7.48</span>
+                    <span>OSINT v1.7.49</span>
                 </div>
             </div>
             
@@ -109,6 +109,15 @@
                 <div style="flex-grow: 1;">
                     <strong>Ostrzeżenie: Wykryto błąd zewnętrznego API!</strong>
                     <span id="api-failure-msg">Jeden z ostatnich skanów zakończył się niepowodzeniem.</span>
+                </div>
+            </div>
+
+            <!-- MODEL FAILURE BANNER (UNSUPPORTED MODELS ALERT) -->
+            <div id="model-failure-banner" class="alert alert-warning hidden" style="margin-bottom: 24px; display: flex; align-items: center; gap: 12px; font-size: 14px; padding: 16px 20px; background-color: rgba(245, 158, 11, 0.15); border: 1px solid rgb(245, 158, 11); color: rgb(245, 158, 11);">
+                <i class="fa-solid fa-triangle-exclamation" style="font-size: 20px;"></i>
+                <div style="flex-grow: 1;">
+                    <strong>Ostrzeżenie: Wykryto nieobsługiwany model AI w aktywnej kampanii!</strong>
+                    <span id="model-failure-msg">Kampania używa modelu, który nie jest już obsługiwany przez API Gemini. Zmień model, aby skanowanie działało poprawnie.</span>
                 </div>
             </div>
 
@@ -645,6 +654,6 @@
     <!-- Notification Toast -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="/static/app.js?v=1.7.48"></script>
+    <script src="/static/app.js?v=1.7.49"></script>
 </body>
 </html>

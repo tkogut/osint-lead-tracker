@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let currentUser = null;
     let accountsList = [];
     let allLeads = [];
+    let availableModelsList = [];
 
     // --- DOM Elements ---
     const loginContainer = document.getElementById("login-container");
@@ -135,12 +136,21 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.classList.add("centered-layout");
     }
 
-    function showAppScreen() {
+    async function showAppScreen() {
         loginContainer.classList.add("hidden");
         appContainer.classList.remove("hidden");
         document.body.classList.remove("centered-layout");
         userDisplayName.textContent = currentUser.username;
-        loadAvailableModels();
+        try {
+            const [accounts] = await Promise.all([
+                apiRequest("/api/accounts"),
+                loadAvailableModels()
+            ]);
+            accountsList = accounts || [];
+            checkCampaignModelsIntegrity();
+        } catch (e) {
+            console.error("Error on initialization:", e);
+        }
         loadDashboardData();
         loadSandboxData();
         checkNotificationGate();
@@ -618,6 +628,7 @@ document.addEventListener("DOMContentLoaded", () => {
             renderAccounts(accounts);
             populateCampaignFilter(accounts);
             populateSandboxCampaigns(accounts);
+            checkCampaignModelsIntegrity();
         } catch (e) {
             accountsContainer.innerHTML = `<div class="loading-state text-error">Nie udało się załadować kont.</div>`;
         }
@@ -729,12 +740,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 
             const userIdDisplay = acc.odoo_user_id !== null ? acc.odoo_user_id : "<i>Nieprzypisane (Puste)</i>";
 
+            const isModelValid = availableModelsList.length === 0 || availableModelsList.includes(acc.llm_model);
+            const modelDisplay = isModelValid
+                ? `${acc.llm_model}`
+                : `<span class="text-error" style="color: var(--error); font-weight: bold;"><i class="fa-solid fa-triangle-exclamation"></i> ${acc.llm_model} (Nieobsługiwany!)</span>`;
+
             return `
                 <div class="account-card glass-card">
                     <div class="account-card-header">
                         <div>
                             <h4>${acc.name}</h4>
-                            <small>${acc.llm_model} | Temp: ${acc.llm_temperature}</small>
+                            <small>${modelDisplay} | Temp: ${acc.llm_temperature}</small>
                         </div>
                         ${statusBadge}
                     </div>
@@ -1775,6 +1791,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch("/api/available-models");
             if (!res.ok) throw new Error("HTTP error " + res.status);
             const models = await res.json();
+            availableModelsList = models || [];
             
             const sandboxModelSelect = document.getElementById("sandbox-model");
             const accModelSelect = document.getElementById("acc-model");
@@ -1794,6 +1811,22 @@ document.addEventListener("DOMContentLoaded", () => {
             renderOptions(accModelSelect);
         } catch (e) {
             console.error("Failed to load available models:", e);
+        }
+    }
+
+    function checkCampaignModelsIntegrity() {
+        if (!availableModelsList || availableModelsList.length === 0) return;
+        const badAccounts = accountsList.filter(acc => acc.is_active && !availableModelsList.includes(acc.llm_model));
+        const banner = document.getElementById("model-failure-banner");
+        if (badAccounts.length > 0) {
+            const badNames = badAccounts.map(a => `'${a.name}' (${a.llm_model})`).join(", ");
+            const msgSpan = document.getElementById("model-failure-msg");
+            if (msgSpan) {
+                msgSpan.textContent = `Następujące aktywne kampanie używają nieobsługiwanych modeli: ${badNames}. Zmień model w edycji kampanii, aby skanowanie działało poprawnie.`;
+            }
+            if (banner) banner.classList.remove("hidden");
+        } else {
+            if (banner) banner.classList.add("hidden");
         }
     }
 

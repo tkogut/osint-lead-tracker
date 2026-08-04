@@ -3,10 +3,10 @@
   "role": "Auditor Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/main.py",
+    "src/static/index.html",
     "src/static/app.js"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-08-04T16:28:24Z",
-  "notes": "Auditor: Verified dynamic available models list, frontend populate, and fallback list."
+  "timestamp": "2026-08-04T19:13:43Z",
+  "notes": "QA Audit: Unsupported models warning banner and inline alerts verified. 18 tests OK."
 }

@@ -3,10 +3,10 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/main.py",
+    "src/static/index.html",
     "src/static/app.js"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-08-04T16:28:24Z",
-  "notes": "Builder: Implemented /api/available-models and UI dynamic populating & verification."
+  "timestamp": "2026-08-04T19:13:22Z",
+  "notes": "feat: warning banner and inline alerts for unsupported campaign models"
 }

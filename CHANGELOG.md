@@ -2,6 +2,11 @@
 > **OSINT Lead Tracker**
 
 Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w tym pliku. Format jest oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/) i projekt jest zgodny z [SemVer](https://semver.org/spec/v2.0.0.html).
+## [1.7.49] - 2026-08-04
+
+### Added
+- feat: add warning banner and inline alerts for unsupported campaign models
+
 ## [1.7.48] - 2026-08-04
 
 ### Added
