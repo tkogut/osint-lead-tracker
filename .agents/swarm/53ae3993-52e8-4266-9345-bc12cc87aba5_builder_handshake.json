@@ -3,9 +3,10 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "README.md"
+    "src/main.py",
+    "src/static/app.js"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-07-26T13:42:29Z",
-  "notes": "Builder: Updated README.md with Baza Konkurencyjnosci, Two-Phase Scraping, and Polish keyword inflection/AI expansion documentation."
+  "timestamp": "2026-08-04T16:28:24Z",
+  "notes": "Builder: Implemented /api/available-models and UI dynamic populating & verification."
 }

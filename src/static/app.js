@@ -140,6 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
         appContainer.classList.remove("hidden");
         document.body.classList.remove("centered-layout");
         userDisplayName.textContent = currentUser.username;
+        loadAvailableModels();
         loadDashboardData();
         loadSandboxData();
         checkNotificationGate();
@@ -839,7 +840,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 modalTitle.textContent = "Edytuj Kampanię";
                 accountIdInput.value = acc.id;
                 document.getElementById("acc-name").value = acc.name;
-                document.getElementById("acc-model").value = acc.llm_model;
+                const accModelSelect = document.getElementById("acc-model");
+                if (accModelSelect) {
+                    const modelExists = Array.from(accModelSelect.options).some(opt => opt.value === acc.llm_model);
+                    if (!modelExists && acc.llm_model) {
+                        const opt = document.createElement("option");
+                        opt.value = acc.llm_model;
+                        opt.textContent = `${acc.llm_model} (nieaktywny/nieobsługiwany)`;
+                        accModelSelect.appendChild(opt);
+                    }
+                    accModelSelect.value = acc.llm_model;
+                }
                 document.getElementById("acc-temperature").value = acc.llm_temperature;
                 document.getElementById("acc-max-tokens").value = acc.llm_max_tokens;
                 document.getElementById("acc-cpvs").value = acc.target_cpvs.join(", ");
@@ -1758,6 +1769,47 @@ document.addEventListener("DOMContentLoaded", () => {
     
     const logModalOkBtn = document.getElementById("log-modal-ok-btn");
     if (logModalOkBtn) logModalOkBtn.addEventListener("click", closeLogDetailsModal);
+
+    async function loadAvailableModels() {
+        try {
+            const res = await fetch("/api/available-models");
+            if (!res.ok) throw new Error("HTTP error " + res.status);
+            const models = await res.json();
+            
+            const sandboxModelSelect = document.getElementById("sandbox-model");
+            const accModelSelect = document.getElementById("acc-model");
+            
+            const renderOptions = (selectEl) => {
+                if (!selectEl) return;
+                selectEl.innerHTML = "";
+                models.forEach(model => {
+                    const opt = document.createElement("option");
+                    opt.value = model;
+                    opt.textContent = prettyModelName(model);
+                    selectEl.appendChild(opt);
+                });
+            };
+            
+            renderOptions(sandboxModelSelect);
+            renderOptions(accModelSelect);
+        } catch (e) {
+            console.error("Failed to load available models:", e);
+        }
+    }
+
+    function prettyModelName(model) {
+        const prettyNames = {
+            "gemini-2.5-flash": "Gemini 2.5 Flash",
+            "gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite",
+            "gemini-2.5-pro": "Gemini 2.5 Pro",
+            "gemini-1.5-flash": "Gemini 1.5 Flash",
+            "gemini-1.5-pro": "Gemini 1.5 Pro",
+            "gemini-2.0-flash": "Gemini 2.0 Flash",
+            "gemini-2.0-flash-lite": "Gemini 2.0-Flash-Lite"
+        };
+        if (prettyNames[model]) return prettyNames[model];
+        return model.replace(/-/g, ' ').replace(/\b[a-z]/g, letter => letter.toUpperCase());
+    }
 
     // --- Start ---
     checkSession();

@@ -423,7 +423,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.47",
+    version="1.7.48",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -446,7 +446,7 @@ async def health() -> dict:
         "status": "ok",
         "system_status": dep_report["status"],
         "service": "osint-lead-tracker",
-        "version": "1.7.47",
+        "version": "1.7.48",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
         "sanitizer": DOMSanitizer.get_status(),
@@ -471,6 +471,34 @@ async def get_available_sources() -> List[dict]:
                 "is_plugin": True
             })
     return sources
+
+
+@app.get("/api/available-models", tags=["System"], summary="Pobiera listę dostępnych modeli Gemini")
+async def get_available_models() -> List[str]:
+    fallback_list = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "gemini-1.5-pro"]
+    try:
+        api_key = get_db_setting_sync("GEMINI_API_KEY", settings.gemini_api_key)
+        if not api_key:
+            return fallback_list
+        from google import genai
+        client = genai.Client(api_key=api_key)
+        models_list = client.models.list()
+        filtered = []
+        for m in models_list:
+            name = m.name or ""
+            if "gemini" in name.lower():
+                methods = getattr(m, "supported_generation_methods", None) or getattr(m, "supported_actions", None)
+                if methods and "generateContent" in methods:
+                    clean_name = name
+                    if clean_name.startswith("models/"):
+                        clean_name = clean_name[len("models/"):]
+                    filtered.append(clean_name)
+        if not filtered:
+            return fallback_list
+        return filtered
+    except Exception as e:
+        logger.error("Failed to retrieve available Gemini models: %s", e, exc_info=True)
+        return fallback_list
 
 
 @app.post("/trigger-osint", tags=["OSINT"], summary="Ręczne uruchomienie skanu (X-API-Token / Sesja)")
