@@ -1846,4 +1846,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- Start ---
     checkSession();
+
+    // Expose for testing environments
+    if (typeof window !== "undefined") {
+        window.prettyModelName = prettyModelName;
+        window.checkCampaignModelsIntegrity = checkCampaignModelsIntegrity;
+        window.renderAnalyticsChart = renderAnalyticsChart;
+    }
+    if (typeof module !== "undefined" && module.exports) {
+        module.exports = {
+            prettyModelName,
+            checkCampaignModelsIntegrity,
+            renderAnalyticsChart
+        };
+    }
 });
