@@ -134,7 +134,7 @@ Liveness probe zwracający stan działania mikroserwisu, datę kolejnego automat
     "status": "ok",
     "system_status": "OK",
     "service": "osint-lead-tracker",
-    "version": "1.7.52",
+    "version": "1.7.53",
     "scheduler": "running",
     "next_run": "2026-08-01T06:00:00+02:00",
     "sanitizer": {
@@ -178,6 +178,31 @@ Zwraca kluczowe metryki KPI (Yield 7d, Token Economy - input/output, zapytania G
 ### 7. `GET /api/leads/pending` & `POST /api/leads/{lead_id}/approve`
 Obsługa leadów zatrzymanych w kwarantannie Circuit Breakers (podgląd i zatwierdzanie do Odoo CRM).
 * **Autoryzacja**: Aktywna sesja administratora.
+
+---
+
+## 🧪 Infrastruktura Jakości (Testy)
+
+Wersja **v1.7.52** wprowadza kompletną, trójwarstwową suitę testową (Phase 10: Quality Infrastructure), która automatycznie weryfikuje spójność obliczeń matematycznych, interfejs API oraz ścieżki krytyczne użytkownika:
+
+1. **Testy jednostkowe frontendu (Vitest + jsdom)**:
+   * Skonfigurowane w katalogu `frontend-tests/`.
+   * Testują logiczne odwzorowania nazw modeli Gemini oraz matematykę generowania wykresów SVG na osi czasu.
+   * Uruchamiane w odizolowanym środowisku JSDOM z mockowaniem zapytań sieciowych.
+
+2. **Testy integracyjne i API backendu (pytest)**:
+   * Skonfigurowane w głównym katalogu `tests/` oraz `tests/backend/`.
+   * Testują asynchroniczną bazę danych SQLite, poprawność logiczną deduplikacji (`lead_exists`), parsowanie słów kluczowych oraz zapobieganie dzieleniu przez zero przy braku danych historycznych.
+
+3. **Testy E2E oraz komunikacji bridge (Playwright)**:
+   * Skonfigurowane w katalogu `frontend-tests/e2e/`.
+   * Automatycznie podnoszą lokalny serwer uvicorn, uruchamiają przeglądarkę Chromium headless i testują procesy logowania oraz interakcje z dashboardem.
+
+### Uruchamianie wszystkich testów (lokalnie):
+W głównym katalogu projektu udostępniono skrypt automatyzujący:
+```bash
+./run_tests.sh
+```
 
 ---
 
