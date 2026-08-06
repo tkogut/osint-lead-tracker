@@ -141,7 +141,9 @@ async def lead_exists(url: str, title: str = "", account_id: Optional[int] = Non
         if title_clean and len(title_clean) > 5:
             query = select(Lead).filter(Lead.tytul == title_clean)
             if account_id:
-                query = query.filter(Lead.account_id == account_id)
+                query = query.outerjoin(PromptVersion, Lead.prompt_version_id == PromptVersion.id).filter(
+                    (PromptVersion.account_id == account_id) | (Lead.prompt_version_id == None)
+                )
             res = await session.execute(query.limit(1))
             if res.scalar_one_or_none():
                 return True
@@ -149,12 +151,14 @@ async def lead_exists(url: str, title: str = "", account_id: Optional[int] = Non
         if url_clean and len(url_clean) > 20 and not url_clean.rstrip("/").endswith((".pl", ".com", ".net", ".gov.pl")):
             query = select(Lead).filter(Lead.url == url_clean)
             if account_id:
-                query = query.filter(Lead.account_id == account_id)
+                query = query.outerjoin(PromptVersion, Lead.prompt_version_id == PromptVersion.id).filter(
+                    (PromptVersion.account_id == account_id) | (Lead.prompt_version_id == None)
+                )
             res = await session.execute(query.limit(1))
             if res.scalar_one_or_none():
                 return True
 
-        return False
+    return False
 
 
 

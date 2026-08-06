@@ -3,10 +3,10 @@
   "role": "Auditor Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/static/index.html",
-    "src/static/app.js"
+    "src/database.py",
+    "tests/test_tier0_deduplication.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-08-04T19:13:43Z",
-  "notes": "QA Audit: Unsupported models warning banner and inline alerts verified. 18 tests OK."
+  "timestamp": "2026-08-06T14:27:57Z",
+  "notes": "QA Audit: Verified Lead and PromptVersion join for lead_exists to resolve AttributeError crash. 19 tests OK."
 }

@@ -134,7 +134,7 @@ Liveness probe zwracający stan działania mikroserwisu, datę kolejnego automat
     "status": "ok",
     "system_status": "OK",
     "service": "osint-lead-tracker",
-    "version": "1.7.49",
+    "version": "1.7.50",
     "scheduler": "running",
     "next_run": "2026-08-01T06:00:00+02:00",
     "sanitizer": {

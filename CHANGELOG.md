@@ -2,6 +2,11 @@
 > **OSINT Lead Tracker**
 
 Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w tym pliku. Format jest oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/) i projekt jest zgodny z [SemVer](https://semver.org/spec/v2.0.0.html).
+## [1.7.50] - 2026-08-06
+
+### Added
+- fix: resolve Lead account_id exception in lead_exists
+
 ## [1.7.49] - 2026-08-04
 
 ### Added
