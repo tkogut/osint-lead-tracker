@@ -1414,7 +1414,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 id: "ai",
                 title: "Sztuczna Inteligencja (AI)",
                 icon: "fa-brain",
-                keys: ["GEMINI_API_KEY"],
+                keys: ["GEMINI_API_KEY", "GOOGLE_LLM_MODEL"],
                 hint: "Konfiguracja połączenia z modelami LLM Google Gemini."
             },
             {
@@ -1443,6 +1443,7 @@ document.addEventListener("DOMContentLoaded", () => {
         function renderField(key, value) {
             const labelMap = {
                 "GEMINI_API_KEY": "Klucz API Gemini (Google Cloud)",
+                "GOOGLE_LLM_MODEL": "Model AI dla Google Search Grounding",
                 "ODOO_URL": "Adres URL serwera Odoo",
                 "ODOO_DB": "Nazwa bazy danych Odoo",
                 "ODOO_USER": "Login / Email użytkownika Odoo",

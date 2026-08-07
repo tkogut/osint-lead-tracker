@@ -570,13 +570,12 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
         """Przeszukuje publiczny internet za pomocą Google Search Grounding."""
         logger.info("Google Search Grounding: start skanowania…")
         
-        llm_model = "gemini-2.5-flash"
+        llm_model = get_db_setting_sync("GOOGLE_LLM_MODEL", "gemini-2.5-flash")
         llm_temp = 0.1
         llm_max_tokens = 8192
         instruction = get_system_instruction(today_date, start_date, account=account)
 
         if account:
-            llm_model = account.llm_model
             llm_temp = account.llm_temperature
             llm_max_tokens = account.llm_max_tokens
 
