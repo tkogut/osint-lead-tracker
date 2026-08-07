@@ -1456,6 +1456,24 @@ document.addEventListener("DOMContentLoaded", () => {
             };
 
             const label = labelMap[key] || key;
+
+            if (key === "GOOGLE_LLM_MODEL") {
+                const fallbackModels = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"];
+                const modelsToUse = (availableModelsList && availableModelsList.length > 0) ? availableModelsList : fallbackModels;
+                const optionsHtml = modelsToUse.map(m => {
+                    const selected = m === value ? " selected" : "";
+                    return `<option value="${m}"${selected}>${prettyModelName(m)}</option>`;
+                }).join("");
+                return `
+                    <div class="form-group">
+                        <label for="setting-${key}"><code>${key}</code> — ${label}</label>
+                        <select id="setting-${key}" data-key="${key}">
+                            ${optionsHtml}
+                        </select>
+                    </div>
+                `;
+            }
+
             const type = (key.includes("KEY") || key.includes("PASSWORD") || key.includes("TOKEN") || key.includes("PASS")) ? "password" : "text";
 
             return `
@@ -1598,7 +1616,7 @@ document.addEventListener("DOMContentLoaded", () => {
     settingsForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         
-        const inputs = settingsForm.querySelectorAll("input[data-key]");
+        const inputs = settingsForm.querySelectorAll("input[data-key], select[data-key]");
         let savedCount = 0;
         
         for (const input of inputs) {
@@ -1796,20 +1814,26 @@ document.addEventListener("DOMContentLoaded", () => {
             
             const sandboxModelSelect = document.getElementById("sandbox-model");
             const accModelSelect = document.getElementById("acc-model");
+            const googleLlmModelSelect = document.getElementById("setting-GOOGLE_LLM_MODEL");
             
             const renderOptions = (selectEl) => {
                 if (!selectEl) return;
+                const currentVal = selectEl.value;
                 selectEl.innerHTML = "";
                 models.forEach(model => {
                     const opt = document.createElement("option");
                     opt.value = model;
                     opt.textContent = prettyModelName(model);
+                    if (currentVal && currentVal === model) {
+                        opt.selected = true;
+                    }
                     selectEl.appendChild(opt);
                 });
             };
             
             renderOptions(sandboxModelSelect);
             renderOptions(accModelSelect);
+            renderOptions(googleLlmModelSelect);
         } catch (e) {
             console.error("Failed to load available models:", e);
         }
