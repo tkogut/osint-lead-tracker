@@ -5,6 +5,7 @@ llm_client.py — Unified LLM client supporting Google Gemini and OpenRouter API
 import json
 import logging
 import re
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -18,6 +19,10 @@ logger = logging.getLogger(__name__)
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 OPENROUTER_AUTH_URL = "https://openrouter.ai/api/v1/auth/key"
+
+_cached_models: Optional[List[Dict[str, Any]]] = None
+_cache_timestamp: float = 0.0
+_CACHE_TTL_SECONDS: float = 900.0  # 15 minutes
 
 CURATED_OPENROUTER_MODELS = [
     {"id": "anthropic/claude-3.7-sonnet", "name": "Claude 3.7 Sonnet", "provider": "OpenRouter"},
@@ -171,12 +176,20 @@ async def generate_content_with_llm(
         )
 
 
-async def fetch_available_models() -> List[Dict[str, Any]]:
+async def fetch_available_models(force_refresh: bool = False) -> List[Dict[str, Any]]:
     """
     Returns list of model dicts:
     [{"id": model_id, "name": display_name, "provider": "Gemini" | "OpenRouter"}, ...]
+    Caches model list in-memory for _CACHE_TTL_SECONDS (15 min).
     """
-    models: List[Dict[str, Any]] = []
+    global _cached_models, _cache_timestamp
+
+    if not force_refresh and _cached_models is not None:
+        if time.time() - _cache_timestamp < _CACHE_TTL_SECONDS:
+            return _cached_models
+
+    gemini_models: List[Dict[str, Any]] = []
+    openrouter_models: List[Dict[str, Any]] = []
     settings = get_settings()
 
     # 1. Fetch Gemini models
@@ -197,7 +210,7 @@ async def fetch_available_models() -> List[Dict[str, Any]]:
                         if clean_name.startswith("models/"):
                             clean_name = clean_name[len("models/"):]
                         display_name = getattr(m, "display_name", None) or clean_name
-                        models.append({
+                        gemini_models.append({
                             "id": clean_name,
                             "name": display_name,
                             "provider": "Gemini"
@@ -205,37 +218,44 @@ async def fetch_available_models() -> List[Dict[str, Any]]:
         except Exception as e:
             logger.warning("Failed to dynamically fetch Gemini models: %s", e)
 
-    if not any(m["provider"] == "Gemini" for m in models):
-        models.extend(DEFAULT_GEMINI_MODELS)
+    if not gemini_models:
+        gemini_models.extend(DEFAULT_GEMINI_MODELS)
 
-    # 2. Fetch OpenRouter models
+    # 2. Fetch OpenRouter models (public endpoint, works with or without key)
     openrouter_key = get_db_setting_sync("OPENROUTER_API_KEY", "")
-    if openrouter_key:
-        try:
-            headers = {
-                "Authorization": f"Bearer {openrouter_key}",
-                "HTTP-Referer": "https://github.com/tkogut/osint-lead-tracker",
-                "X-Title": "OSINT Lead Tracker",
-            }
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(OPENROUTER_MODELS_URL, headers=headers)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    or_models = data.get("data", [])
-                    for item in or_models:
-                        m_id = item.get("id")
-                        if not m_id:
-                            continue
-                        name = item.get("name") or m_id
-                        models.append({
-                            "id": m_id,
-                            "name": name,
-                            "provider": "OpenRouter"
-                        })
-        except Exception as e:
-            logger.warning("Failed to dynamically fetch OpenRouter models: %s", e)
+    try:
+        headers = {
+            "HTTP-Referer": "https://github.com/tkogut/osint-lead-tracker",
+            "X-Title": "OSINT Lead Tracker",
+        }
+        if openrouter_key:
+            headers["Authorization"] = f"Bearer {openrouter_key}"
 
-    if not any(m["provider"] == "OpenRouter" for m in models):
-        models.extend(CURATED_OPENROUTER_MODELS)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(OPENROUTER_MODELS_URL, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                or_models = data.get("data", [])
+                for item in or_models:
+                    m_id = item.get("id")
+                    if not m_id:
+                        continue
+                    name = item.get("name") or m_id
+                    openrouter_models.append({
+                        "id": m_id,
+                        "name": name,
+                        "provider": "OpenRouter"
+                    })
+    except Exception as e:
+        logger.warning("Failed to dynamically fetch OpenRouter models: %s", e)
 
-    return models
+    if not openrouter_models:
+        openrouter_models.extend(CURATED_OPENROUTER_MODELS)
+    else:
+        openrouter_models.sort(key=lambda x: (x.get("name") or "").lower())
+
+    combined = gemini_models + openrouter_models
+    _cached_models = combined
+    _cache_timestamp = time.time()
+
+    return combined

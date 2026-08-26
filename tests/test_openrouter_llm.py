@@ -119,12 +119,16 @@ async def test_gemini_routing():
 
 @pytest.mark.anyio
 async def test_fetch_available_models_merging():
+    import src.llm_client as llm_module
+    llm_module._cached_models = None
+    llm_module._cache_timestamp = 0.0
+
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_resp.json.return_value = {
         "data": [
-            {"id": "anthropic/claude-3.7-sonnet", "name": "Claude 3.7 Sonnet"},
-            {"id": "deepseek/deepseek-r1", "name": "DeepSeek R1"}
+            {"id": "deepseek/deepseek-r1", "name": "DeepSeek R1"},
+            {"id": "anthropic/claude-3.7-sonnet", "name": "Claude 3.7 Sonnet"}
         ]
     }
 
@@ -143,7 +147,7 @@ async def test_fetch_available_models_merging():
     with patch("google.genai.Client", return_value=mock_client), \
          patch("src.llm_client.httpx.AsyncClient", return_value=mock_httpx), \
          patch("src.llm_client.get_db_setting_sync", side_effect=lambda k, d="": "key-val" if k in ("GEMINI_API_KEY", "OPENROUTER_API_KEY") else d):
-        models = await fetch_available_models()
+        models = await fetch_available_models(force_refresh=True)
 
         assert len(models) >= 3
         providers = {m["provider"] for m in models}
@@ -153,6 +157,83 @@ async def test_fetch_available_models_merging():
         ids = [m["id"] for m in models]
         assert "gemini-2.5-flash" in ids
         assert "anthropic/claude-3.7-sonnet" in ids
+        # Check alphabetical sorting of OpenRouter models
+        or_names = [m["name"] for m in models if m["provider"] == "OpenRouter"]
+        assert or_names == sorted(or_names, key=lambda x: x.lower())
+
+
+@pytest.mark.anyio
+async def test_fetch_available_models_without_api_key():
+    import src.llm_client as llm_module
+    llm_module._cached_models = None
+    llm_module._cache_timestamp = 0.0
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "data": [
+            {"id": "meta-llama/llama-3.3-70b-instruct", "name": "Llama 3.3 70B"},
+            {"id": "mistralai/mistral-large-2411", "name": "Mistral Large 2411"},
+            {"id": "anthropic/claude-3.5-haiku", "name": "Claude 3.5 Haiku"}
+        ]
+    }
+
+    mock_httpx = AsyncMock()
+    mock_httpx.get.return_value = mock_resp
+    mock_httpx.__aenter__.return_value = mock_httpx
+
+    with patch("src.llm_client.httpx.AsyncClient", return_value=mock_httpx), \
+         patch("src.llm_client.get_db_setting_sync", return_value=""):
+        models = await fetch_available_models(force_refresh=True)
+
+        # Gemini should fallback to DEFAULT_GEMINI_MODELS since no key
+        gemini_ids = [m["id"] for m in models if m["provider"] == "Gemini"]
+        assert "gemini-2.5-flash" in gemini_ids
+
+        # OpenRouter should have fetched models from public endpoint without key
+        or_models = [m for m in models if m["provider"] == "OpenRouter"]
+        assert len(or_models) == 3
+        assert [m["name"] for m in or_models] == ["Claude 3.5 Haiku", "Llama 3.3 70B", "Mistral Large 2411"]
+
+        # Verify get called without Authorization header
+        call_args = mock_httpx.get.call_args
+        assert "Authorization" not in call_args.kwargs.get("headers", {})
+
+
+@pytest.mark.anyio
+async def test_fetch_available_models_caching():
+    import src.llm_client as llm_module
+    llm_module._cached_models = None
+    llm_module._cache_timestamp = 0.0
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "data": [
+            {"id": "openai/gpt-4o", "name": "GPT-4o"}
+        ]
+    }
+
+    mock_httpx = AsyncMock()
+    mock_httpx.get.return_value = mock_resp
+    mock_httpx.__aenter__.return_value = mock_httpx
+
+    with patch("src.llm_client.httpx.AsyncClient", return_value=mock_httpx), \
+         patch("src.llm_client.get_db_setting_sync", return_value=""):
+        # First call fetches and caches
+        res1 = await fetch_available_models()
+        assert mock_httpx.get.call_count == 1
+        assert any(m["id"] == "openai/gpt-4o" for m in res1)
+
+        # Second call should use cache (no new get call)
+        res2 = await fetch_available_models()
+        assert mock_httpx.get.call_count == 1
+        assert res1 == res2
+
+        # Third call with force_refresh=True should fetch again
+        res3 = await fetch_available_models(force_refresh=True)
+        assert mock_httpx.get.call_count == 2
+        assert res3 == res1
 
 
 @pytest.mark.anyio
