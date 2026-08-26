@@ -24,6 +24,7 @@ from config import get_settings
 from database import get_db_setting_sync, is_url_visited, mark_url_visited
 from scrapers.factory import get_scraper_for_source, SCRAPER_REGISTRY
 from src.utils import match_polish_keywords
+from src.llm_client import generate_content_with_llm
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -306,19 +307,36 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
             llm_model = account.llm_model
             llm_temp = account.llm_temperature
 
-        api_key = get_db_setting_sync("GEMINI_API_KEY", self._settings.gemini_api_key)
-        client = genai.Client(api_key=api_key)
-
         try:
-            response = client.models.generate_content(
-                model=llm_model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=llm_temp,
-                ),
-            )
-            ans = (response.text or "").strip()
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
+                # If already in async event loop
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    result = executor.submit(
+                        asyncio.run,
+                        generate_content_with_llm(
+                            model=llm_model,
+                            prompt=prompt,
+                            system_instruction=system_instruction,
+                            temperature=llm_temp,
+                        )
+                    ).result()
+            else:
+                result = asyncio.run(
+                    generate_content_with_llm(
+                        model=llm_model,
+                        prompt=prompt,
+                        system_instruction=system_instruction,
+                        temperature=llm_temp,
+                    )
+                )
+
+            ans = (result.text or "").strip()
             if ans == "ODRZUĆ" or "ODRZUĆ" in ans[:20]:
                 logger.debug("AI odrzuciło ogłoszenie BZP: %s", notice.get("orderObject"))
                 return None
@@ -338,44 +356,32 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
         account: Optional[Any] = None
     ) -> Tuple[Optional[dict], int, int]:
         """
-        Zleca Gemini wyciągnięcie ustrukturyzowanych danych leada z oczyszczonego surowego tekstu ogłoszenia
-        pobranego przez wtyczkę skrapera (bez zapytań wyszukiwarki / Search Grounding).
-        Zwraca (lead_dict, input_tokens, output_tokens).
+        Analizuje treść ogłoszenia z zewnętrznego skrapera za pomocą LLM.
+        Zwraca (lead_data, input_tokens, output_tokens).
         """
         if not text_content or len(text_content.strip()) < 50:
             return None, 0, 0
 
         today_str, start_str = get_date_limits()
-        system_instruction = get_system_instruction(today_str, start_str, account)
+        system_instruction = get_system_instruction(today_str, start_str, account=account)
 
-        prompt = f"""Przeanalizuj poniższy tekst ogłoszenia/zapytania ofertowego ze strony: {source_url}
+        prompt = f"""Przeanalizuj poniższe ogłoszenie/zapytanie ofertowe i określ, czy odpowiada ono kryteriom w system_instruction.
+
+Adres URL ogłoszenia: {source_url}
 
 Treść ogłoszenia:
 \"\"\"
 {text_content}
 \"\"\"
 
-Wymagania:
-1. Kryterium Tematyczne (GŁÓWNE): Jeśli treść dotyczy tematyki kampanii zdefiniowanej w system_instruction, treść JEST wartościowym leadem.
-2. OBSŁUGA STRON ZBIORCZYCH I WIELOKROTNYCH ZAPYTAŃ:
-   - Przekazana treść może stanowić stronę zbiorczą, zestawienie kategorialne lub agregator zapytań zawierający wiele różnych produktów lub usług.
-   - Przeszukaj cały tekst i WYEKSTRAHUJ WSZYSTKIE POJEDYNCZE OGŁOSZENIA/ZAPYTANIA, których treść ściśle odpowiada wymaganiom kampanii zdefiniowanym w system_instruction.
-   - Ignoruj wszelkie inne wpisy, produkty i ogłoszenia w tekście, które NIE ODPOWIADAJĄ kryteriom kampanii.
-   - Zwróć każdy pasujący lead w strukturze JSON. Jeśli żaden wpis w tekście nie odpowiada wymaganiom kampanii, zwróć tablicę {{"leady": []}}.
-3. Reguła braku dat: Brak jawnej daty publikacji lub terminu składania ofert w surowej treści NIE MOŻE powodować odrzucenia leada (ODRZUĆ / empty json). Jeśli brak dat w tekście, załóż status AKTYWNY.
-4. Gradacja Priorytetu:
-   - wysoki: Pełne dane (jawna data ofert, inwestor, szczegółowy zakres).
-   - sredni: Jasny zakres i kontakt, drobne braki.
-   - niski: Krótkie/proste zapytanie lub brak jawnego terminu ofert, ale treść odpowiada tematyce kampanii.
-5. Ekstrakcja Inwestora: Jeśli nazwa zamawiającego nie występuje bezpośrednio w nagłówku, WYCIĄGNIJ ją z kontekstu treści (np. nazwa zakładu produkcyjnego, fabryki, inwestora, kompleksu, oddziału spółki, np. Zakład Produkcyjny 'Pomorze' i 'Mazowsze').
-6. Jeśli treść NIE zawiera żadnego zapytania spełniającego wymagania tematyczne kampanii lub minął jawnie podany termin, zwróć wyłącznie słowo: ODRZUĆ.
-7. Jeśli ogłoszenie spełnia kryteria, zwróć dane wszystkich dopasowanych leadów w formacie JSON w strukturze {{"leady": [...]}} z elementami o poniższej strukturze:
+Jeśli treść NIE dotyczy tematyki kampanii lub termin składania ofert minął, odpowiedz dokładnie jednym słowem: ODRZUĆ.
+Jeśli treść spełnia kryteria, zwróć poprawny obiekt JSON:
 {{
-  "tytul": "Tytuł ogłoszenia / zapytania",
+  "tytul": "Tytuł ogłoszenia lub krótka nazwa zadania",
   "typ": "lead",
-  "nazwa_inwestycji": "Nazwa inwestycji",
-  "lokalizacja": "Lokalizacja (miasto, województwo)",
-  "inwestor": "Nazwa zamawiającego / inwestora",
+  "nazwa_inwestycji": "Nazwa inwestycji/zamówienia",
+  "lokalizacja": "Miejscowość, województwo",
+  "inwestor": "Nazwa zamawiającego / firmy",
   "wykonawca": "",
   "zakres": "Opis zakresu przedmiotu zamówienia",
   "uzasadnienie": "Dlaczego to ogłoszenie jest wartościowym leadem",
@@ -392,26 +398,37 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
             llm_model = account.llm_model
             llm_temp = account.llm_temperature
 
-        api_key = get_db_setting_sync("GEMINI_API_KEY", self._settings.gemini_api_key)
-        client = genai.Client(api_key=api_key)
-
         try:
-            response = client.models.generate_content(
-                model=llm_model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=llm_temp,
-                ),
-            )
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
 
-            input_tokens = 0
-            output_tokens = 0
-            if hasattr(response, 'usage_metadata') and response.usage_metadata:
-                input_tokens = getattr(response.usage_metadata, 'prompt_token_count', 0) or 0
-                output_tokens = getattr(response.usage_metadata, 'candidates_token_count', 0) or 0
+            if loop and loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    result = executor.submit(
+                        asyncio.run,
+                        generate_content_with_llm(
+                            model=llm_model,
+                            prompt=prompt,
+                            system_instruction=system_instruction,
+                            temperature=llm_temp,
+                        )
+                    ).result()
+            else:
+                result = asyncio.run(
+                    generate_content_with_llm(
+                        model=llm_model,
+                        prompt=prompt,
+                        system_instruction=system_instruction,
+                        temperature=llm_temp,
+                    )
+                )
 
-            ans = (response.text or "").strip()
+            input_tokens = result.input_tokens
+            output_tokens = result.output_tokens
+            ans = (result.text or "").strip()
             if ans == "ODRZUĆ" or "ODRZUĆ" in ans[:20]:
                 logger.debug("AI odrzuciło tekst ogłoszenia ze źródła %s", source_url)
                 return None, input_tokens, output_tokens
@@ -595,36 +612,52 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
             f"Zwróć wyłącznie oryginalne, bezpośrednie adresy URL (nie linki vertexaisearch). Zwróć czysty JSON bez markdown."
         )
 
-        api_key = get_db_setting_sync("GEMINI_API_KEY", self._settings.gemini_api_key)
-        client = genai.Client(api_key=api_key)
-
         try:
-            response = client.models.generate_content(
-                model=llm_model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=instruction,
-                    tools=[types.Tool(google_search=types.GoogleSearch())],
-                    temperature=llm_temp,
-                    max_output_tokens=llm_max_tokens,
-                ),
-            )
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
 
-            raw_text = response.text or ""
+            tools = [types.Tool(google_search=types.GoogleSearch())] if not ("/" in llm_model or llm_model.startswith("openrouter/")) else None
+
+            if loop and loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    result = executor.submit(
+                        asyncio.run,
+                        generate_content_with_llm(
+                            model=llm_model,
+                            prompt=prompt,
+                            system_instruction=instruction,
+                            temperature=llm_temp,
+                            max_output_tokens=llm_max_tokens,
+                            tools=tools
+                        )
+                    ).result()
+            else:
+                result = asyncio.run(
+                    generate_content_with_llm(
+                        model=llm_model,
+                        prompt=prompt,
+                        system_instruction=instruction,
+                        temperature=llm_temp,
+                        max_output_tokens=llm_max_tokens,
+                        tools=tools
+                    )
+                )
+
+            raw_text = result.text or ""
             leads = _parse_leads(raw_text)
             response_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
 
             # Extract grounding metadata and token usage
             grounding_chunks = 0
             grounding_queries = 0
-            input_tokens = 0
-            output_tokens = 0
+            input_tokens = result.input_tokens
+            output_tokens = result.output_tokens
 
-            if hasattr(response, 'usage_metadata') and response.usage_metadata:
-                input_tokens = getattr(response.usage_metadata, 'prompt_token_count', 0) or 0
-                output_tokens = getattr(response.usage_metadata, 'candidates_token_count', 0) or 0
-
-            if hasattr(response, 'candidates') and response.candidates:
+            response = result.raw_response
+            if response and hasattr(response, 'candidates') and response.candidates:
                 candidate = response.candidates[0]
                 gm = getattr(candidate, 'grounding_metadata', None)
                 if gm:

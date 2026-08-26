@@ -67,6 +67,7 @@ async def seed_data() -> None:
             
         setting_keys = [
             "GEMINI_API_KEY",
+            "OPENROUTER_API_KEY",
             "GOOGLE_LLM_MODEL",
             "ODOO_URL",
             "ODOO_DB",
@@ -93,6 +94,7 @@ async def seed_data() -> None:
                 # Pobieramy wartość z pydantic settings
                 val = ""
                 if key == "GEMINI_API_KEY": val = settings.gemini_api_key
+                elif key == "OPENROUTER_API_KEY": val = ""
                 elif key == "GOOGLE_LLM_MODEL": val = "gemini-2.5-flash"
                 elif key == "ODOO_URL": val = settings.odoo_url
                 elif key == "ODOO_DB": val = settings.odoo_db

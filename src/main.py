@@ -38,6 +38,7 @@ from schemas import LoginRequest, AccountCreate, AccountResponse, SandboxRequest
 from auth import verify_password, create_user_session, validate_session_token
 from seed import seed_data
 from dependency_checker import audit_dependencies, log_dependency_banner
+from src.llm_client import generate_content_with_llm, fetch_available_models, OPENROUTER_AUTH_URL
 
 
 # ---------------------------------------------------------------------------
@@ -423,7 +424,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.55",
+    version="1.7.57",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -446,7 +447,7 @@ async def health() -> dict:
         "status": "ok",
         "system_status": dep_report["status"],
         "service": "osint-lead-tracker",
-        "version": "1.7.55",
+        "version": "1.7.57",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
         "sanitizer": DOMSanitizer.get_status(),
@@ -473,31 +474,21 @@ async def get_available_sources() -> List[dict]:
     return sources
 
 
-@app.get("/api/available-models", tags=["System"], summary="Pobiera listę dostępnych modeli Gemini")
-async def get_available_models() -> List[str]:
-    fallback_list = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "gemini-1.5-pro"]
+@app.get("/api/available-models", tags=["System"], summary="Pobiera listę dostępnych modeli Gemini i OpenRouter")
+async def get_available_models() -> Any:
     try:
-        api_key = get_db_setting_sync("GEMINI_API_KEY", settings.gemini_api_key)
-        if not api_key:
-            return fallback_list
-        from google import genai
-        client = genai.Client(api_key=api_key)
-        models_list = client.models.list()
-        filtered = []
-        for m in models_list:
-            name = m.name or ""
-            if "gemini" in name.lower():
-                methods = getattr(m, "supported_generation_methods", None) or getattr(m, "supported_actions", None)
-                if methods and "generateContent" in methods:
-                    clean_name = name
-                    if clean_name.startswith("models/"):
-                        clean_name = clean_name[len("models/"):]
-                    filtered.append(clean_name)
-        if not filtered:
-            return fallback_list
-        return filtered
+        models = await fetch_available_models()
+        return models
     except Exception as e:
-        logger.error("Failed to retrieve available Gemini models: %s", e, exc_info=True)
+        logger.error("Failed to retrieve available models: %s", e, exc_info=True)
+        fallback_list = [
+            {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "provider": "Gemini"},
+            {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "provider": "Gemini"},
+            {"id": "gemini-1.5-flash", "name": "Gemini 1.5 Flash", "provider": "Gemini"},
+            {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro", "provider": "Gemini"},
+            {"id": "anthropic/claude-3.7-sonnet", "name": "Claude 3.7 Sonnet", "provider": "OpenRouter"},
+            {"id": "openai/gpt-4o", "name": "GPT-4o", "provider": "OpenRouter"},
+        ]
         return fallback_list
 
 
@@ -907,34 +898,28 @@ async def get_accounts(
 async def expand_keywords_via_ai(keywords: List[str]) -> List[str]:
     if not keywords:
         return []
-    api_key = get_db_setting_sync("GEMINI_API_KEY", "")
-    if not api_key:
-        api_key = settings.gemini_api_key
-    if not api_key:
-        return keywords
 
-    def _sync_expand(kw_list: List[str], key: str) -> List[str]:
-        from google import genai
-        client = genai.Client(api_key=key)
-        prompt = f"Dla podanych słów kluczowych wygeneruj wszystkie poprawne i powszechnie stosowane w zamówieniach publicznych polskie odmiany gramatyczne (przez przypadki, liczby) oraz formy przyimkowe (np. dla 'waga samochodowa' -> 'wagi samochodowej', 'wagach samochodowych', 'wagi do samochodów'). Zwróć wynik jako płaską tablicę JSON zawierającą oryginalne słowa kluczowe oraz wygenerowane odmiany. Nie dodawaj żadnego formatowania markdown (tylko czysty JSON).\nSłowa kluczowe: {kw_list}"
-        resp = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
-        text = resp.text.strip()
-        text = text.replace("```json", "").replace("```", "").strip()
-        import json
-        expanded = json.loads(text)
-        if isinstance(expanded, list):
-            res = list(set([k.lower().strip() for k in kw_list + expanded if k.strip()]))
-            return res
-        return kw_list
+    llm_model = get_db_setting_sync("GOOGLE_LLM_MODEL", "gemini-2.5-flash")
+    prompt = f"Dla podanych słów kluczowych wygeneruj wszystkie poprawne i powszechnie stosowane w zamówieniach publicznych polskie odmiany gramatyczne (przez przypadki, liczby) oraz formy przyimkowe (np. dla 'waga samochodowa' -> 'wagi samochodowej', 'wagach samochodowych', 'wagi do samochodów'). Zwróć wynik jako płaską tablicę JSON zawierającą oryginalne słowa kluczowe oraz wygenerowane odmiany. Nie dodawaj żadnego formatowania markdown (tylko czysty JSON).\nSłowa kluczowe: {keywords}"
 
     try:
-        res = await asyncio.wait_for(asyncio.to_thread(_sync_expand, keywords, api_key), timeout=5.0)
-        return res
+        res_obj = await asyncio.wait_for(
+            generate_content_with_llm(
+                model=llm_model,
+                prompt=prompt,
+                temperature=0.1
+            ),
+            timeout=8.0
+        )
+        text = res_obj.text.strip()
+        text = text.replace("```json", "").replace("```", "").strip()
+        expanded = json.loads(text)
+        if isinstance(expanded, list):
+            res = list(set([k.lower().strip() for k in keywords + expanded if k.strip()]))
+            return res
+        return keywords
     except asyncio.TimeoutError:
-        logger.warning("Keyword expansion timed out (>5.0s), returning original keywords fallback")
+        logger.warning("Keyword expansion timed out (>8.0s), returning original keywords fallback")
         return keywords
     except Exception as e:
         logger.warning("Keyword expansion failed: %s", e)
@@ -1165,6 +1150,51 @@ async def verify_credentials(
         result = await db.execute(select(Setting).filter(Setting.key == db_key).limit(1))
         item = result.scalar_one_or_none()
         password = item.value if item else ""
+
+    if scraper == "OpenRouter":
+        api_key = password or username
+        if not api_key or api_key == "******":
+            result = await db.execute(select(Setting).filter(Setting.key == "OPENROUTER_API_KEY").limit(1))
+            item = result.scalar_one_or_none()
+            api_key = item.value if item else ""
+        if not api_key:
+            raise HTTPException(status_code=400, detail="Brak klucza API OpenRouter.")
+        try:
+            import httpx
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "HTTP-Referer": "https://github.com/tkogut/osint-lead-tracker",
+                "X-Title": "OSINT Lead Tracker",
+            }
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(OPENROUTER_AUTH_URL, headers=headers)
+                if resp.status_code == 200:
+                    return {"success": True, "message": "Autoryzacja OpenRouter poprawna."}
+                elif resp.status_code == 401:
+                    raise HTTPException(status_code=400, detail="Nieprawidłowy klucz API OpenRouter (401 Unauthorized).")
+                else:
+                    raise HTTPException(status_code=400, detail=f"Błąd weryfikacji OpenRouter: HTTP {resp.status_code}")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Błąd połączenia z OpenRouter: {str(e)}")
+
+    elif scraper == "Gemini":
+        api_key = password or username
+        if not api_key or api_key == "******":
+            result = await db.execute(select(Setting).filter(Setting.key == "GEMINI_API_KEY").limit(1))
+            item = result.scalar_one_or_none()
+            api_key = item.value if item else settings.gemini_api_key
+        if not api_key:
+            raise HTTPException(status_code=400, detail="Brak klucza API Gemini.")
+        try:
+            from google import genai
+            client = genai.Client(api_key=api_key)
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, client.models.list)
+            return {"success": True, "message": "Autoryzacja Google Gemini poprawna."}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Błąd autoryzacji Gemini: {str(e)}")
 
     if not username or not password:
         raise HTTPException(status_code=400, detail="Brak danych logowania (nazwa użytkownika lub hasło).")
@@ -1698,19 +1728,13 @@ async def run_sandbox_test(
         return {"success": False, "error": "Brak tekstu źródłowego i brak poprawnego URL."}
 
     try:
-        client = genai.Client(api_key=api_key)
-        
         today_str, start_str = get_date_limits()
         formatted_prompt = format_prompt_dates(req.prompt, today_str, start_str)
         
-        config_kwargs = {
-            "system_instruction": formatted_prompt,
-            "temperature": req.llm_temperature,
-            "max_output_tokens": req.llm_max_tokens,
-        }
-        
+        tools = None
         if req.source == "Google":
-            config_kwargs["tools"] = [types.Tool(google_search=types.GoogleSearch())]
+            from google.genai import types
+            tools = [types.Tool(google_search=types.GoogleSearch())] if not ("/" in req.llm_model or req.llm_model.startswith("openrouter/")) else None
             if not raw_text:
                 raw_text = "Wykonaj wyszukiwanie z użyciem Google Search."
             contents_to_send = raw_text
@@ -1743,21 +1767,21 @@ Wymagania:
 7. Jeśli treść NIE zawiera żadnych zapytań spełniających wymagania kampanii lub jawnie minął termin, zwróć {{"leady": []}}.
 Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown."""
 
-        def _sync_generate():
-            return client.models.generate_content(
-                model=req.llm_model,
-                contents=contents_to_send,
-                config=types.GenerateContentConfig(**config_kwargs)
-            )
-
         start_time = time.perf_counter()
-        response = await asyncio.wait_for(
-            asyncio.to_thread(_sync_generate),
+        llm_result = await asyncio.wait_for(
+            generate_content_with_llm(
+                model=req.llm_model,
+                prompt=contents_to_send,
+                system_instruction=formatted_prompt,
+                temperature=req.llm_temperature,
+                max_output_tokens=req.llm_max_tokens,
+                tools=tools
+            ),
             timeout=35.0
         )
         latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
         
-        raw_response_text = response.text or ""
+        raw_response_text = llm_result.text or ""
         output_text = raw_response_text
         if output_text.startswith("```json"):
             output_text = output_text[7:]
@@ -1767,11 +1791,8 @@ Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown."""
             output_text = output_text[:-3]
         output_text = output_text.strip()
 
-        input_tokens = 0
-        output_tokens = 0
-        if hasattr(response, 'usage_metadata') and response.usage_metadata:
-            input_tokens = getattr(response.usage_metadata, 'prompt_token_count', getattr(response.usage_metadata, 'input_token_count', 0)) or 0
-            output_tokens = getattr(response.usage_metadata, 'candidates_token_count', getattr(response.usage_metadata, 'output_token_count', 0)) or 0
+        input_tokens = llm_result.input_tokens
+        output_tokens = llm_result.output_tokens
 
         debug_info = {
             "system_instruction": formatted_prompt,

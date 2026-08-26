@@ -1414,8 +1414,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 id: "ai",
                 title: "Sztuczna Inteligencja (AI)",
                 icon: "fa-brain",
-                keys: ["GEMINI_API_KEY", "GOOGLE_LLM_MODEL"],
-                hint: "Konfiguracja połączenia z modelami LLM Google Gemini."
+                keys: ["GEMINI_API_KEY", "OPENROUTER_API_KEY", "GOOGLE_LLM_MODEL"],
+                hint: "Konfiguracja połączenia z modelami LLM Google Gemini i OpenRouter."
             },
             {
                 id: "odoo",
@@ -1443,6 +1443,7 @@ document.addEventListener("DOMContentLoaded", () => {
         function renderField(key, value) {
             const labelMap = {
                 "GEMINI_API_KEY": "Klucz API Gemini (Google Cloud)",
+                "OPENROUTER_API_KEY": "Klucz API OpenRouter (openrouter.ai)",
                 "GOOGLE_LLM_MODEL": "Model AI dla Google Search Grounding",
                 "ODOO_URL": "Adres URL serwera Odoo",
                 "ODOO_DB": "Nazwa bazy danych Odoo",
@@ -1458,18 +1459,65 @@ document.addEventListener("DOMContentLoaded", () => {
             const label = labelMap[key] || key;
 
             if (key === "GOOGLE_LLM_MODEL") {
-                const fallbackModels = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"];
+                const fallbackModels = [
+                    { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", provider: "Gemini" },
+                    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", provider: "Gemini" },
+                    { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", provider: "Gemini" },
+                    { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", provider: "Gemini" }
+                ];
                 const modelsToUse = (availableModelsList && availableModelsList.length > 0) ? availableModelsList : fallbackModels;
-                const optionsHtml = modelsToUse.map(m => {
-                    const selected = m === value ? " selected" : "";
-                    return `<option value="${m}"${selected}>${prettyModelName(m)}</option>`;
-                }).join("");
+                
+                let optionsHtml = "";
+                const hasProviderInfo = modelsToUse.length > 0 && typeof modelsToUse[0] === 'object' && modelsToUse[0].provider;
+                if (hasProviderInfo) {
+                    const geminiModels = modelsToUse.filter(m => m.provider === "Gemini");
+                    const openrouterModels = modelsToUse.filter(m => m.provider === "OpenRouter");
+                    
+                    if (geminiModels.length > 0) {
+                        optionsHtml += `<optgroup label="Google Gemini">`;
+                        geminiModels.forEach(m => {
+                            const sel = (m.id === value) ? " selected" : "";
+                            optionsHtml += `<option value="${m.id}"${sel}>${m.name || prettyModelName(m.id)}</option>`;
+                        });
+                        optionsHtml += `</optgroup>`;
+                    }
+                    if (openrouterModels.length > 0) {
+                        optionsHtml += `<optgroup label="OpenRouter">`;
+                        openrouterModels.forEach(m => {
+                            const sel = (m.id === value) ? " selected" : "";
+                            optionsHtml += `<option value="${m.id}"${sel}>${m.name || prettyModelName(m.id)}</option>`;
+                        });
+                        optionsHtml += `</optgroup>`;
+                    }
+                } else {
+                    optionsHtml = modelsToUse.map(m => {
+                        const mId = (typeof m === 'object' && m.id) ? m.id : m;
+                        const selected = mId === value ? " selected" : "";
+                        return `<option value="${mId}"${selected}>${prettyModelName(mId)}</option>`;
+                    }).join("");
+                }
+
                 return `
                     <div class="form-group">
                         <label for="setting-${key}"><code>${key}</code> — ${label}</label>
                         <select id="setting-${key}" data-key="${key}">
                             ${optionsHtml}
                         </select>
+                    </div>
+                `;
+            }
+
+            if (key === "GEMINI_API_KEY" || key === "OPENROUTER_API_KEY") {
+                const scraperType = key === "GEMINI_API_KEY" ? "Gemini" : "OpenRouter";
+                return `
+                    <div class="form-group">
+                        <label for="setting-${key}"><code>${key}</code> — ${label}</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input type="password" id="setting-${key}" data-key="${key}" value="${value || ''}" placeholder="Podaj klucz API dla ${key}" style="flex: 1;">
+                            <button type="button" class="btn-secondary btn-test-auth" data-scraper="${scraperType}" style="padding: 8px 14px; font-size: 0.85rem; border-radius: 6px; white-space: nowrap;">
+                                <i class="fa-solid fa-vial"></i> Testuj Autoryzację
+                            </button>
+                        </div>
                     </div>
                 `;
             }
@@ -1820,20 +1868,61 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (!selectEl) return;
                 const currentVal = selectEl.value;
                 selectEl.innerHTML = "";
-                models.forEach(model => {
-                    const opt = document.createElement("option");
-                    opt.value = model;
-                    opt.textContent = prettyModelName(model);
-                    if (currentVal && currentVal === model) {
-                        opt.selected = true;
+                
+                const hasProviderInfo = availableModelsList.length > 0 && typeof availableModelsList[0] === 'object' && availableModelsList[0].provider;
+                
+                if (hasProviderInfo) {
+                    const geminiModels = availableModelsList.filter(m => m.provider === "Gemini");
+                    const openrouterModels = availableModelsList.filter(m => m.provider === "OpenRouter");
+                    
+                    if (geminiModels.length > 0) {
+                        const optgroupG = document.createElement("optgroup");
+                        optgroupG.label = "Google Gemini";
+                        geminiModels.forEach(m => {
+                            const opt = document.createElement("option");
+                            opt.value = m.id;
+                            opt.textContent = m.name || prettyModelName(m.id);
+                            if (currentVal && currentVal === m.id) {
+                                opt.selected = true;
+                            }
+                            optgroupG.appendChild(opt);
+                        });
+                        selectEl.appendChild(optgroupG);
                     }
-                    selectEl.appendChild(opt);
-                });
+                    
+                    if (openrouterModels.length > 0) {
+                        const optgroupO = document.createElement("optgroup");
+                        optgroupO.label = "OpenRouter";
+                        openrouterModels.forEach(m => {
+                            const opt = document.createElement("option");
+                            opt.value = m.id;
+                            opt.textContent = m.name || prettyModelName(m.id);
+                            if (currentVal && currentVal === m.id) {
+                                opt.selected = true;
+                            }
+                            optgroupO.appendChild(opt);
+                        });
+                        selectEl.appendChild(optgroupO);
+                    }
+                } else {
+                    availableModelsList.forEach(model => {
+                        const mId = (typeof model === 'object' && model.id) ? model.id : model;
+                        const mName = (typeof model === 'object' && model.name) ? model.name : prettyModelName(mId);
+                        const opt = document.createElement("option");
+                        opt.value = mId;
+                        opt.textContent = mName;
+                        if (currentVal && currentVal === mId) {
+                            opt.selected = true;
+                        }
+                        selectEl.appendChild(opt);
+                    });
+                }
             };
             
             renderOptions(sandboxModelSelect);
             renderOptions(accModelSelect);
             renderOptions(googleLlmModelSelect);
+            checkCampaignModelsIntegrity();
         } catch (e) {
             console.error("Failed to load available models:", e);
         }
@@ -1841,7 +1930,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function checkCampaignModelsIntegrity() {
         if (!availableModelsList || availableModelsList.length === 0) return;
-        const badAccounts = accountsList.filter(acc => acc.is_active && !availableModelsList.includes(acc.llm_model));
+        const validIds = availableModelsList.map(m => (typeof m === 'object' && m.id) ? m.id : m);
+        const badAccounts = accountsList.filter(acc => acc.is_active && !validIds.includes(acc.llm_model));
         const banner = document.getElementById("model-failure-banner");
         if (badAccounts.length > 0) {
             const badNames = badAccounts.map(a => `'${a.name}' (${a.llm_model})`).join(", ");
