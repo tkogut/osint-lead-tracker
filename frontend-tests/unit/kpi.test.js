@@ -38,11 +38,31 @@ describe('Frontend Logic & Math Unit Tests', () => {
       window.document.dispatchEvent(new window.Event('DOMContentLoaded'));
       
       appModule = {
+        populateModelSelect: window.populateModelSelect,
         prettyModelName: window.prettyModelName,
         checkCampaignModelsIntegrity: window.checkCampaignModelsIntegrity,
         renderAnalyticsChart: window.renderAnalyticsChart
       };
     }
+  });
+
+  describe('populateModelSelect()', () => {
+    it('should correctly populate select with optgroups and select active value', () => {
+      const selectEl = document.createElement('select');
+      expect(typeof appModule.populateModelSelect).toBe('function');
+      appModule.populateModelSelect(selectEl, 'gemini-2.5-flash');
+      expect(selectEl.options.length).toBeGreaterThan(0);
+      expect(selectEl.value).toBe('gemini-2.5-flash');
+    });
+
+    it('should add inactive option if selected model does not exist in available list', () => {
+      const selectEl = document.createElement('select');
+      appModule.populateModelSelect(selectEl, 'custom/deprecated-model');
+      expect(selectEl.value).toBe('custom/deprecated-model');
+      const opt = Array.from(selectEl.querySelectorAll('option')).find(o => o.value === 'custom/deprecated-model');
+      expect(opt).toBeDefined();
+      expect(opt.textContent).toContain('(nieaktywny/nieobsługiwany)');
+    });
   });
 
   describe('prettyModelName()', () => {

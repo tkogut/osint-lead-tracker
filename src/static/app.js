@@ -740,7 +740,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 
             const userIdDisplay = acc.odoo_user_id !== null ? acc.odoo_user_id : "<i>Nieprzypisane (Puste)</i>";
 
-            const isModelValid = availableModelsList.length === 0 || availableModelsList.includes(acc.llm_model);
+            const validIds = availableModelsList.map(m => (typeof m === 'object' && m.id) ? m.id : m);
+            const isModelValid = validIds.length === 0 || validIds.includes(acc.llm_model);
             const modelDisplay = isModelValid
                 ? `${acc.llm_model}`
                 : `<span class="text-error" style="color: var(--error); font-weight: bold;"><i class="fa-solid fa-triangle-exclamation"></i> ${acc.llm_model} (Nieobsługiwany!)</span>`;
@@ -850,23 +851,19 @@ document.addEventListener("DOMContentLoaded", () => {
         accountForm.reset();
         accountIdInput.value = "";
         
+        if (availableModelsList.length === 0) {
+            await loadAvailableModels();
+        }
+
+        const accModelSelect = document.getElementById("acc-model");
+        
         if (accountId) {
             const acc = accountsList.find(a => a.id === accountId);
             if (acc) {
                 modalTitle.textContent = "Edytuj Kampanię";
                 accountIdInput.value = acc.id;
                 document.getElementById("acc-name").value = acc.name;
-                const accModelSelect = document.getElementById("acc-model");
-                if (accModelSelect) {
-                    const modelExists = Array.from(accModelSelect.options).some(opt => opt.value === acc.llm_model);
-                    if (!modelExists && acc.llm_model) {
-                        const opt = document.createElement("option");
-                        opt.value = acc.llm_model;
-                        opt.textContent = `${acc.llm_model} (nieaktywny/nieobsługiwany)`;
-                        accModelSelect.appendChild(opt);
-                    }
-                    accModelSelect.value = acc.llm_model;
-                }
+                populateModelSelect(accModelSelect, acc.llm_model || "gemini-2.5-flash");
                 document.getElementById("acc-temperature").value = acc.llm_temperature;
                 document.getElementById("acc-max-tokens").value = acc.llm_max_tokens;
                 document.getElementById("acc-cpvs").value = acc.target_cpvs.join(", ");
@@ -894,6 +891,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         } else {
             modalTitle.textContent = "Dodaj Nową Kampanię";
+            populateModelSelect(accModelSelect, "gemini-2.5-flash");
             await renderSourcesCheckboxes(null);
             const defaultPromptData = await apiRequest("/api/settings/default-prompt");
             document.getElementById("acc-prompt").value = defaultPromptData ? formatPromptDates(defaultPromptData.default_prompt) : "";
@@ -1853,6 +1851,72 @@ document.addEventListener("DOMContentLoaded", () => {
     const logModalOkBtn = document.getElementById("log-modal-ok-btn");
     if (logModalOkBtn) logModalOkBtn.addEventListener("click", closeLogDetailsModal);
 
+    function populateModelSelect(selectEl, selectedValue) {
+        if (!selectEl) return;
+        selectEl.innerHTML = "";
+        
+        const hasProviderInfo = availableModelsList.length > 0 && typeof availableModelsList[0] === 'object' && availableModelsList[0].provider;
+        
+        if (hasProviderInfo) {
+            const geminiModels = availableModelsList.filter(m => m.provider === "Gemini");
+            const openrouterModels = availableModelsList.filter(m => m.provider === "OpenRouter");
+            
+            if (geminiModels.length > 0) {
+                const optgroupG = document.createElement("optgroup");
+                optgroupG.label = "Google Gemini";
+                geminiModels.forEach(m => {
+                    const opt = document.createElement("option");
+                    opt.value = m.id;
+                    opt.textContent = m.name || prettyModelName(m.id);
+                    if (selectedValue && selectedValue === m.id) {
+                        opt.selected = true;
+                    }
+                    optgroupG.appendChild(opt);
+                });
+                selectEl.appendChild(optgroupG);
+            }
+            
+            if (openrouterModels.length > 0) {
+                const optgroupO = document.createElement("optgroup");
+                optgroupO.label = "OpenRouter";
+                openrouterModels.forEach(m => {
+                    const opt = document.createElement("option");
+                    opt.value = m.id;
+                    opt.textContent = m.name || prettyModelName(m.id);
+                    if (selectedValue && selectedValue === m.id) {
+                        opt.selected = true;
+                    }
+                    optgroupO.appendChild(opt);
+                });
+                selectEl.appendChild(optgroupO);
+            }
+        } else {
+            availableModelsList.forEach(model => {
+                const mId = (typeof model === 'object' && model.id) ? model.id : model;
+                const mName = (typeof model === 'object' && model.name) ? model.name : prettyModelName(mId);
+                const opt = document.createElement("option");
+                opt.value = mId;
+                opt.textContent = mName;
+                if (selectedValue && selectedValue === mId) {
+                    opt.selected = true;
+                }
+                selectEl.appendChild(opt);
+            });
+        }
+        
+        if (selectedValue) {
+            const exists = Array.from(selectEl.querySelectorAll("option")).some(opt => opt.value === selectedValue);
+            if (!exists) {
+                const opt = document.createElement("option");
+                opt.value = selectedValue;
+                opt.textContent = `${selectedValue} (nieaktywny/nieobsługiwany)`;
+                opt.selected = true;
+                selectEl.appendChild(opt);
+            }
+            selectEl.value = selectedValue;
+        }
+    }
+
     async function loadAvailableModels() {
         try {
             const res = await fetch("/api/available-models");
@@ -1864,64 +1928,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const accModelSelect = document.getElementById("acc-model");
             const googleLlmModelSelect = document.getElementById("setting-GOOGLE_LLM_MODEL");
             
-            const renderOptions = (selectEl) => {
-                if (!selectEl) return;
-                const currentVal = selectEl.value;
-                selectEl.innerHTML = "";
-                
-                const hasProviderInfo = availableModelsList.length > 0 && typeof availableModelsList[0] === 'object' && availableModelsList[0].provider;
-                
-                if (hasProviderInfo) {
-                    const geminiModels = availableModelsList.filter(m => m.provider === "Gemini");
-                    const openrouterModels = availableModelsList.filter(m => m.provider === "OpenRouter");
-                    
-                    if (geminiModels.length > 0) {
-                        const optgroupG = document.createElement("optgroup");
-                        optgroupG.label = "Google Gemini";
-                        geminiModels.forEach(m => {
-                            const opt = document.createElement("option");
-                            opt.value = m.id;
-                            opt.textContent = m.name || prettyModelName(m.id);
-                            if (currentVal && currentVal === m.id) {
-                                opt.selected = true;
-                            }
-                            optgroupG.appendChild(opt);
-                        });
-                        selectEl.appendChild(optgroupG);
-                    }
-                    
-                    if (openrouterModels.length > 0) {
-                        const optgroupO = document.createElement("optgroup");
-                        optgroupO.label = "OpenRouter";
-                        openrouterModels.forEach(m => {
-                            const opt = document.createElement("option");
-                            opt.value = m.id;
-                            opt.textContent = m.name || prettyModelName(m.id);
-                            if (currentVal && currentVal === m.id) {
-                                opt.selected = true;
-                            }
-                            optgroupO.appendChild(opt);
-                        });
-                        selectEl.appendChild(optgroupO);
-                    }
-                } else {
-                    availableModelsList.forEach(model => {
-                        const mId = (typeof model === 'object' && model.id) ? model.id : model;
-                        const mName = (typeof model === 'object' && model.name) ? model.name : prettyModelName(mId);
-                        const opt = document.createElement("option");
-                        opt.value = mId;
-                        opt.textContent = mName;
-                        if (currentVal && currentVal === mId) {
-                            opt.selected = true;
-                        }
-                        selectEl.appendChild(opt);
-                    });
-                }
-            };
-            
-            renderOptions(sandboxModelSelect);
-            renderOptions(accModelSelect);
-            renderOptions(googleLlmModelSelect);
+            if (sandboxModelSelect) populateModelSelect(sandboxModelSelect, sandboxModelSelect.value);
+            if (accModelSelect) populateModelSelect(accModelSelect, accModelSelect.value);
+            if (googleLlmModelSelect) populateModelSelect(googleLlmModelSelect, googleLlmModelSelect.value);
             checkCampaignModelsIntegrity();
         } catch (e) {
             console.error("Failed to load available models:", e);
@@ -1964,12 +1973,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Expose for testing environments
     if (typeof window !== "undefined") {
+        window.populateModelSelect = populateModelSelect;
         window.prettyModelName = prettyModelName;
         window.checkCampaignModelsIntegrity = checkCampaignModelsIntegrity;
         window.renderAnalyticsChart = renderAnalyticsChart;
     }
     if (typeof module !== "undefined" && module.exports) {
         module.exports = {
+            populateModelSelect,
             prettyModelName,
             checkCampaignModelsIntegrity,
             renderAnalyticsChart
