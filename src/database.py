@@ -4,6 +4,7 @@ Kompatybilne wstecznie z dotychczasową strukturą bazy danych.
 """
 
 import logging
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -130,8 +131,46 @@ async def url_exists(url: str) -> bool:
         return lead is not None
 
 
+def normalize_title(title: str) -> str:
+    """
+    Normalizuje tytuł postępowania/leada:
+    - usuwa cudzysłowy typograficzne i standardowe
+    - zamienia myślniki i znaki interpunkcyjne na spacje
+    - konwertuje na małe litery
+    - redukuje wielokrotne białe znaki do pojedynczych spacji
+    """
+    if not title:
+        return ""
+    cleaned = re.sub(r'[^\w\s]|_', ' ', title.lower())
+    return ' '.join(cleaned.split()).strip()
+
+
+def is_title_duplicate(title1: str, title2: str) -> bool:
+    """
+    Sprawdza, czy dwa tytuły stanowią duplikat:
+    1. Identyczność po normalizacji.
+    2. Pokrycie tokenów słownych (Jaccard similarity >= 85%) dla tytułów o długości >= 4 słów.
+    """
+    norm1 = normalize_title(title1)
+    norm2 = normalize_title(title2)
+    if not norm1 or not norm2:
+        return False
+    if norm1 == norm2:
+        return True
+
+    tokens1 = set(norm1.split())
+    tokens2 = set(norm2.split())
+    if len(tokens1) >= 4 and len(tokens2) >= 4:
+        intersection = tokens1 & tokens2
+        union = tokens1 | tokens2
+        if len(union) > 0 and (len(intersection) / len(union)) >= 0.85:
+            return True
+
+    return False
+
+
 async def lead_exists(url: str, title: str = "", account_id: Optional[int] = None) -> bool:
-    """Deduplikacja leadów zapobiegająca kolizjom na ogólnych adresach URL platform."""
+    """Deduplikacja leadów zapobiegająca kolizjom na ogólnych adresach URL oraz wariantach tytułów."""
     url_clean = (url or "").strip()
     title_clean = (title or "").strip()
     if not url_clean and not title_clean:
@@ -139,14 +178,16 @@ async def lead_exists(url: str, title: str = "", account_id: Optional[int] = Non
 
     async with AsyncSessionLocal() as session:
         if title_clean and len(title_clean) > 5:
-            query = select(Lead).filter(Lead.tytul == title_clean)
+            query = select(Lead.tytul).order_by(Lead.id.desc())
             if account_id:
                 query = query.outerjoin(PromptVersion, Lead.prompt_version_id == PromptVersion.id).filter(
                     (PromptVersion.account_id == account_id) | (Lead.prompt_version_id == None)
                 )
-            res = await session.execute(query.limit(1))
-            if res.scalar_one_or_none():
-                return True
+            res = await session.execute(query.limit(300))
+            existing_titles = res.scalars().all()
+            for existing_title in existing_titles:
+                if existing_title and is_title_duplicate(title_clean, existing_title):
+                    return True
 
         if url_clean and len(url_clean) > 20 and not url_clean.rstrip("/").endswith((".pl", ".com", ".net", ".gov.pl")):
             query = select(Lead).filter(Lead.url == url_clean)
