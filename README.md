@@ -237,13 +237,45 @@ automatycznie przy każdym `push` do gałęzi `main` (oraz ręcznie przez
    z działającego kontenera, a w ostateczności kopiuje `.env.example` i wyświetla
    ostrzeżenie.
 
-### Wymagany sekret w repozytorium
+### Sekrety w repozytorium
 
-| Nazwa | Opis |
-|-------|------|
-| `VPS_SSH_KEY` | Prywatny klucz SSH autoryzowany dla użytkownika z `VPS_USER` na serwerze. |
+| Nazwa | Wymagany | Opis |
+|-------|----------|------|
+| `VPS_SSH_KEY` | ✅ tak | **Prywatny** klucz SSH autoryzowany dla użytkownika z `VPS_USER` na serwerze (np. `~/.ssh/tkogut_ssh_key`). |
+| `VPS_SSH_PASSPHRASE` | ⬜ opcjonalny | Hasło (passphrase) klucza `VPS_SSH_KEY` — ustaw **tylko** jeśli klucz jest nim zabezpieczony. Dla klucza bez hasła pozostaw nieustawiony. |
 
-Ustaw go w **Settings → Secrets and variables → Actions → New repository secret**.
+Dodanie sekretu przez interfejs GitHub:
+
+1. Wejdź na stronę repozytorium → **Settings**.
+2. W menu po lewej: **Secrets and variables → Actions**.
+3. Kliknij **New repository secret**.
+4. **Name:** `VPS_SSH_KEY`.
+5. **Secret:** wklej **całą zawartość klucza prywatnego**, razem z liniami
+   `-----BEGIN ... KEY-----` i `-----END ... KEY-----` (nie plik `.pub`!).
+6. Kliknij **Add secret**. Jeśli klucz ma hasło — powtórz kroki 3–6 dla
+   `VPS_SSH_PASSPHRASE`.
+
+To samo z linii poleceń (`gh` CLI):
+
+```bash
+# klucz bez hasła
+tkogut@local:~$ gh secret set VPS_SSH_KEY --repo tkogut/osint-lead-tracker < ~/.ssh/tkogut_ssh_key
+
+# klucz z hasłem — dodatkowo:
+tkogut@local:~$ gh secret set VPS_SSH_PASSPHRASE --repo tkogut/osint-lead-tracker
+```
+
+> 💡 **Zalecane (i prostsze):** zamiast używać osobistego klucza z hasłem, wygeneruj
+> dedykowany klucz dla CI bez passphrase i dodaj jego klucz publiczny do
+> `~/.ssh/authorized_keys` na VPS:
+>
+> ```bash
+> ssh-keygen -t ed25519 -f ~/.ssh/osint_deploy -N "" -C "github-actions-osint"
+> ssh-copy-id -i ~/.ssh/osint_deploy.pub root@srv1490214.hstgr.cloud
+> gh secret set VPS_SSH_KEY --repo tkogut/osint-lead-tracker < ~/.ssh/osint_deploy
+> ```
+>
+> Wtedy `VPS_SSH_PASSPHRASE` nie jest potrzebny.
 
 ### Opcjonalne zmienne repozytorium
 

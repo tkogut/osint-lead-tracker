@@ -96,3 +96,4 @@ stack). The workflow must be safe to run repeatedly, must not clobber the server
 - [x] 2.1 Document the deploy workflow, `VPS_SSH_KEY` secret and optional variables in `README.md` — 243efb0
 - [x] 2.2 Run the configured validation gate (`py_compile`, handshake validation, pytest) — 36 passed
 - [x] Post-review fix (om-auto-review-pr): POSIX-safe `set -eu`, container HEALTHCHECK probe, job timeout, comment/README wording — 6d9461e
+- [x] Follow-up: optional `VPS_SSH_PASSPHRASE` secret support + GitHub secret setup instructions in README

@@ -8,6 +8,10 @@
 # Required repository secret:
 #   VPS_SSH_KEY  — private SSH key authorized for root@<VPS_HOST>
 #
+# Optional repository secret:
+#   VPS_SSH_PASSPHRASE — passphrase of VPS_SSH_KEY, only when the key is
+#                        passphrase-protected (leave unset for a key without one)
+#
 # Optional repository variables (sensible defaults below):
 #   VPS_HOST     — default srv1490214.hstgr.cloud
 #   VPS_USER     — default root
@@ -59,6 +63,7 @@ jobs:
           host: ${{ env.VPS_HOST }}
           username: ${{ env.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
           port: ${{ env.VPS_PORT }}
           source: "**"
           target: ${{ env.DEPLOY_PATH }}
@@ -72,6 +77,7 @@ jobs:
           host: ${{ env.VPS_HOST }}
           username: ${{ env.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
           port: ${{ env.VPS_PORT }}
           command_timeout: 20m
           script: |
