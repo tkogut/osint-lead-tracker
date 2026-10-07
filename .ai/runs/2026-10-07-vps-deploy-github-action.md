@@ -84,12 +84,14 @@ stack). The workflow must be safe to run repeatedly, must not clobber the server
 
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
 
+**PR:** #1
+
 ### Phase 1: Deploy workflow
 
-- [ ] 1.1 Author `.github/workflows/deploy.yml` (triggers, concurrency, scp step, ssh rebuild + health check)
-- [ ] 1.2 Validate the YAML parses and review trigger/secret wiring
+- [x] 1.1 Author `.github/workflows/deploy.yml` (triggers, concurrency, scp step, ssh rebuild + health check) — c5c00df
+- [x] 1.2 Validate the YAML parses and review trigger/secret wiring — c5c00df
 
 ### Phase 2: Documentation and validation
 
-- [ ] 2.1 Document the deploy workflow, `VPS_SSH_KEY` secret and optional variables in `README.md`
+- [x] 2.1 Document the deploy workflow, `VPS_SSH_KEY` secret and optional variables in `README.md` — 243efb0
 - [ ] 2.2 Run the configured validation gate (`py_compile`, handshake validation, pytest)
