@@ -217,3 +217,48 @@ docker compose up -d --build
 ```bash
 docker exec osint-lead-tracker python3 -c "import sqlite3; [print(r) for r in sqlite3.connect('./data/leads.db').cursor().execute('SELECT id, tytul, priorytet, created_at FROM leads ORDER BY id DESC LIMIT 10')]"
 ```
+
+---
+
+## 🚀 Automatyczny deploy na VPS (GitHub Actions)
+
+Workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) wdraża aplikację
+automatycznie przy każdym `push` do gałęzi `main` (oraz ręcznie przez
+`workflow_dispatch`). Działanie odwzorowuje workflow z projektu `linkedin-tracker`:
+
+1. **Checkout** repozytorium na runnerze GitHub.
+2. **SCP** — kopia repozytorium na serwer (`appleboy/scp-action`). Katalog `.env`
+   nie jest wysyłany (jest w `.gitignore`), więc plik środowiskowy na serwerze
+   pozostaje nienaruszony.
+3. **Rebuild & restart** przez SSH (`appleboy/ssh-action`):
+   `docker compose up -d --build`, a następnie pętla oczekująca na
+   `GET /health` (do 30 prób co 5 s). Przy braku `.env` skrypt odtwarza zmienne
+   z działającego kontenera, a w ostateczności kopiuje `.env.example` i wyświetla
+   ostrzeżenie.
+
+### Wymagany sekret w repozytorium
+
+| Nazwa | Opis |
+|-------|------|
+| `VPS_SSH_KEY` | Prywatny klucz SSH autoryzowany dla użytkownika z `VPS_USER` na serwerze. |
+
+Ustaw go w **Settings → Secrets and variables → Actions → New repository secret**.
+
+### Opcjonalne zmienne repozytorium
+
+Domyślne wartości odpowiadają konfiguracji produkcyjnej i są zgodne z
+`docker-compose.yml`. Można je nadpisać w **Settings → Secrets and variables →
+Actions → Variables**:
+
+| Zmienna | Domyślnie | Opis |
+|---------|-----------|------|
+| `VPS_HOST` | `srv1490214.hstgr.cloud` | Host serwera VPS. |
+| `VPS_USER` | `root` | Użytkownik SSH. |
+| `VPS_PORT` | `22` | Port SSH. |
+| `DEPLOY_PATH` | `/opt/osint-lead-tracker` | Katalog docelowy na serwerze. |
+
+> ⚠️ **Przed pierwszym uruchomieniem** upewnij się, że `DEPLOY_PATH` wskazuje
+> katalog, z którego aktualnie działa stack. Kontener ma stałą nazwę
+> (`osint-lead-tracker`), więc deploy z innego katalogu odtworzy kontener i może
+> podłączyć pusty wolumen `./data`. W razie potrzeby ustaw `DEPLOY_PATH` na
+> właściwą ścieżkę.
