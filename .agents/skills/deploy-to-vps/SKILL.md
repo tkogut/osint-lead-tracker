@@ -50,6 +50,8 @@ Workflow `.github/workflows/deploy.yml`:
    `__DEFAULT_DEPLOY_PATH__` (domyślny katalog, np. `/opt/<projekt>`).
 2. Ustaw sekrety (najlepiej skryptem — patrz niżej):
    `bash .agents/skills/deploy-to-vps/scripts/setup-deploy-secrets.sh <owner>/<repo>`
+   (opcje: `--host`, `--port`, `--user`, `--key`, `--deploy-path`, `--passphrase`, `--yes`;
+   `--help` wypisuje pełną listę).
 3. Sprawdź, czy `DEPLOY_PATH` wskazuje katalog, z którego **aktualnie działa** stack
    (kontener ma stałą nazwę — deploy z innego katalogu odtworzy kontener i może
    podłączyć pusty wolumen `./data`).

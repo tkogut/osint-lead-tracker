@@ -9,6 +9,7 @@
 #
 # Opcje:
 #   --host HOST          host VPS            (default: srv1490214.hstgr.cloud)
+#   --port PORT          port SSH            (default: 22)
 #   --user USER          użytkownik SSH      (default: root)
 #   --key PATH           ścieżka klucza      (default: ~/.ssh/<repo>_deploy)
 #   --deploy-path PATH   DEPLOY_PATH na VPS  (default: /opt/<repo>)
@@ -21,6 +22,7 @@
 set -euo pipefail
 
 HOST="srv1490214.hstgr.cloud"
+PORT="22"
 VPS_USER="root"
 KEY_PATH=""
 DEPLOY_PATH=""
@@ -33,12 +35,17 @@ usage() {
   exit "${1:-0}"
 }
 
+need_val() {
+  [ "$#" -ge 2 ] || { echo "BŁĄD: opcja $1 wymaga wartości." >&2; usage 1; }
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --host)        HOST="$2"; shift ;;
-    --user)        VPS_USER="$2"; shift ;;
-    --key)         KEY_PATH="$2"; shift ;;
-    --deploy-path) DEPLOY_PATH="$2"; shift ;;
+    --host)        need_val "$@"; HOST="$2"; shift ;;
+    --port)        need_val "$@"; PORT="$2"; shift ;;
+    --user)        need_val "$@"; VPS_USER="$2"; shift ;;
+    --key)         need_val "$@"; KEY_PATH="$2"; shift ;;
+    --deploy-path) need_val "$@"; DEPLOY_PATH="$2"; shift ;;
     --passphrase)  USE_PASSPHRASE=1 ;;
     --yes|-y)      ASSUME_YES=1 ;;
     -h|--help)     usage 0 ;;
@@ -64,12 +71,12 @@ gh auth status >/dev/null 2>&1   || { echo "BŁĄD: gh nie jest zalogowany (gh a
 confirm() {
   [ "$ASSUME_YES" -eq 1 ] && return 0
   printf '%s [t/N] ' "$1"
-  read -r ans
+  read -r ans || true
   case "$ans" in [tT][aA][kK]|[tT]|[yY][eE][sS]|[yY]) return 0 ;; *) return 1 ;; esac
 }
 
 echo "▶ Repozytorium : $REPO"
-echo "▶ VPS          : ${VPS_USER}@${HOST}"
+echo "▶ VPS          : ${VPS_USER}@${HOST}:${PORT}"
 echo "▶ Klucz        : $KEY_PATH"
 echo "▶ DEPLOY_PATH  : $DEPLOY_PATH"
 echo "▶ Passphrase   : $([ "$USE_PASSPHRASE" -eq 1 ] && echo tak || echo nie)"
@@ -92,12 +99,12 @@ fi
 # --- 2. Wgranie klucza publicznego na VPS ------------------------------------
 echo
 confirm "Wgrać klucz publiczny na ${VPS_USER}@${HOST} (ssh-copy-id)?" || { echo "Przerwano."; exit 1; }
-ssh-copy-id -i "${KEY_PATH}.pub" "${VPS_USER}@${HOST}"
+ssh-copy-id -p "$PORT" -i "${KEY_PATH}.pub" "${VPS_USER}@${HOST}"
 
 # --- 3. Weryfikacja -----------------------------------------------------------
 echo
 echo "🧪 Weryfikuję połączenie SSH..."
-if ssh -i "$KEY_PATH" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 \
+if ssh -p "$PORT" -i "$KEY_PATH" -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15 \
       "${VPS_USER}@${HOST}" "echo OK && (docker --version || true)"; then
   echo "✅ Połączenie działa."
 else
