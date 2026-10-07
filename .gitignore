@@ -18,3 +18,4 @@ venv/
 # Agent pipeline QA artifacts
 .ai/qa/artifacts_*/
 .ai/qa/test-env.json
+test-results/

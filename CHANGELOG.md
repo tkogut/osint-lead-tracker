@@ -2,6 +2,16 @@
 > **OSINT Lead Tracker**
 
 Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w tym pliku. Format jest oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/) i projekt jest zgodny z [SemVer](https://semver.org/spec/v2.0.0.html).
+## [1.7.63] - 2026-10-07
+
+### Added
+- fix(ci): fix SQLite volume permissions on VPS
+
+## [1.7.62] - 2026-10-07
+
+### Added
+- fix(ci): fix SQLite volume permissions on VPS
+
 ## [1.7.61] - 2026-10-07
 
 ### Added
