@@ -94,4 +94,4 @@ stack). The workflow must be safe to run repeatedly, must not clobber the server
 ### Phase 2: Documentation and validation
 
 - [x] 2.1 Document the deploy workflow, `VPS_SSH_KEY` secret and optional variables in `README.md` — 243efb0
-- [ ] 2.2 Run the configured validation gate (`py_compile`, handshake validation, pytest)
+- [x] 2.2 Run the configured validation gate (`py_compile`, handshake validation, pytest) — 36 passed
