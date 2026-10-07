@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "baseBranch": "auto",
+  "tracker": "github",
+  "browser": {
+    "provider": "agent-browser"
+  },
+  "validation": {
+    "commands": [
+      "python3 -m py_compile src/*.py",
+      "python3 scripts/validate-handshakes.py",
+      "GEMINI_API_KEY=test ODOO_URL=http://test ODOO_DB=test ODOO_USER=test ODOO_API_KEY=test API_TOKEN=test PYTHONPATH=.:src pytest"
+    ]
+  },
+  "labels": {
+    "enabled": true,
+    "pipeline": [
+      "review",
+      "changes-requested",
+      "qa",
+      "qa-failed",
+      "merge-queue",
+      "blocked",
+      "do-not-merge"
+    ],
+    "category": [
+      "bug",
+      "feature",
+      "refactor",
+      "security",
+      "dependencies",
+      "documentation"
+    ],
+    "meta": [
+      "needs-qa",
+      "skip-qa",
+      "qa-approved",
+      "qa-self-verified",
+      "in-progress",
+      "ci-monitoring"
+    ],
+    "priority": [
+      "priority-low",
+      "priority-medium",
+      "priority-high",
+      "priority-extreme"
+    ],
+    "risk": [
+      "risk-low",
+      "risk-medium",
+      "risk-high"
+    ]
+  },
+  "qaGate": true,
+  "ci": {
+    "maxWaitMinutes": 40
+  },
+  "engine": {
+    "loopStepThreshold": 20,
+    "executorTier": "standard",
+    "stepReview": "final"
+  },
+  "paths": {
+    "runs": ".ai/runs",
+    "analysis": ".ai/analysis",
+    "specs": ".ai/specs",
+    "scripts": ".ai/scripts",
+    "qa": ".ai/qa"
+  },
+  "reviewChecklist": null
+}
