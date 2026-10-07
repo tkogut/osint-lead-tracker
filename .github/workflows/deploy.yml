@@ -88,6 +88,8 @@ jobs:
 
             # Persistent SQLite volume, bind-mounted by docker-compose.yml.
             mkdir -p data
+            chown -R 1001:1001 data 2>/dev/null || true
+            chmod -R 777 data 2>/dev/null || true
 
             # .env is gitignored, so it is never shipped by the SCP step: the
             # server copy stays untouched. Only when it is missing do we try to

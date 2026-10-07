@@ -3,11 +3,9 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/static/index.html",
-    "src/static/app.js",
-    "frontend-tests/unit/kpi.test.js"
+    ".github/workflows/deploy.yml"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-08-27T17:49:05Z",
-  "notes": "fix: campaign modal model selector dynamically populated with OpenRouter optgroups and fixed card validation"
+  "timestamp": "2026-10-07T15:59:53Z",
+  "notes": "fix(ci): fix SQLite volume permissions for appuser 1001 in deploy.yml"
 }
