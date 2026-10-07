@@ -231,8 +231,9 @@ automatycznie przy każdym `push` do gałęzi `main` (oraz ręcznie przez
    nie jest wysyłany (jest w `.gitignore`), więc plik środowiskowy na serwerze
    pozostaje nienaruszony.
 3. **Rebuild & restart** przez SSH (`appleboy/ssh-action`):
-   `docker compose up -d --build`, a następnie pętla oczekująca na
-   `GET /health` (do 30 prób co 5 s). Przy braku `.env` skrypt odtwarza zmienne
+   `docker compose up -d --build`, a następnie pętla oczekująca na stan
+   `healthy` z `HEALTHCHECK` kontenera (GET `/health`, do 30 prób co 5 s; brak
+   stanu health = brak blokady). Przy braku `.env` skrypt odtwarza zmienne
    z działającego kontenera, a w ostateczności kopiuje `.env.example` i wyświetla
    ostrzeżenie.
 

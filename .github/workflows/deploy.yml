@@ -35,6 +35,7 @@ jobs:
   deploy:
     name: Build & deploy on VPS
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     env:
       VPS_HOST: ${{ vars.VPS_HOST || 'srv1490214.hstgr.cloud' }}
@@ -46,8 +47,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # The deployment only needs the working tree; dropping .git keeps the
-      # runner's git metadata from being tarred over the server checkout.
+      # The deployment only needs the working tree: dropping .git keeps the
+      # runner's git metadata from being tarred over the server checkout, and
+      # .github is not needed at runtime on the VPS.
       - name: Prepare workspace for upload
         run: rm -rf .git .github
 
@@ -73,7 +75,9 @@ jobs:
           port: ${{ env.VPS_PORT }}
           command_timeout: 20m
           script: |
-            set -euo pipefail
+            # POSIX sh only: `set -o pipefail` is a bash-ism that dash rejects,
+            # which would abort the deploy before it starts.
+            set -eu
             cd "${{ env.DEPLOY_PATH }}"
 
             # Persistent SQLite volume, bind-mounted by docker-compose.yml.
@@ -97,14 +101,23 @@ jobs:
 
             docker compose up -d --build
 
-            # Wait for the rebuilt container to report healthy.
+            # Wait for the rebuilt container's own Docker HEALTHCHECK to report
+            # healthy — this needs no tooling on the host.
             for i in $(seq 1 30); do
-              if curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1; then
-                echo "Health check passed after ${i} attempt(s)."
-                break
-              fi
+              status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' osint-lead-tracker 2>/dev/null || echo missing)"
+              case "$status" in
+                healthy|none)
+                  echo "Container health: ${status} after ${i} attempt(s)."
+                  break
+                  ;;
+                unhealthy)
+                  echo "Container reported unhealthy — recent logs:"
+                  docker compose logs --tail=50
+                  exit 1
+                  ;;
+              esac
               if [ "$i" -eq 30 ]; then
-                echo "Health check failed after 30 attempts — recent logs:"
+                echo "Container never became healthy after 30 attempts — recent logs:"
                 docker compose logs --tail=50
                 exit 1
               fi
