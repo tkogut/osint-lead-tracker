@@ -8,6 +8,7 @@
 #   __PROJECT__              repository / project name (e.g. osint-lead-tracker)
 #   __CONTAINER__            docker-compose.yml `container_name`
 #   __DEFAULT_DEPLOY_PATH__  default target dir on the VPS (e.g. /opt/__PROJECT__)
+#   __DATA_UID__             UID:GID of the container's non-root user (Dockerfile `USER`), e.g. 1001
 #
 # Required repository secret:
 #   VPS_SSH_KEY  — private SSH key authorized for VPS_USER@VPS_HOST
@@ -88,7 +89,13 @@ jobs:
             cd "${{ env.DEPLOY_PATH }}"
 
             # Persistent volume directory, bind-mounted by docker-compose.yml.
+            # A bind mount replaces the image's /app/data ownership, so a host
+            # directory created by root is NOT writable by the container's
+            # non-root user (Dockerfile `USER`) and SQLite fails to open the DB.
+            # Give the directory to that user and make it writable.
             mkdir -p data
+            chown -R __DATA_UID__:__DATA_UID__ data 2>/dev/null || true
+            chmod -R 777 data 2>/dev/null || true
 
             # .env is gitignored, so it is never shipped by the SCP step: the
             # server copy stays untouched. Only when it is missing do we try to

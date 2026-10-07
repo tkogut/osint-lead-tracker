@@ -82,3 +82,4 @@ convention so every project can adopt it consistently, and make the existing
 - [x] 2.1 Repo-local override `.ai/skills/om-setup-agent-pipeline/SKILL.md` — d780583
 - [x] 2.2 Pointer in `vps-ops/SKILL.md` + decision entry in `.agents/MEMORY.md` — d780583
 - [x] 2.3 Run the configured validation gate — 36 passed
+- [x] Post-merge fix (from main `3b1af37`): bind-mounted `data/` ownership for the container's non-root user — `chown`/`chmod` in the template + `__DATA_UID__` placeholder documented

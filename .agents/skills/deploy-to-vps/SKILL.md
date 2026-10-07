@@ -21,12 +21,18 @@ Workflow `.github/workflows/deploy.yml`:
 2. `concurrency` (jeden deploy na raz) i `permissions: contents: read`;
 3. `actions/checkout` → usunięcie `.git`/`.github` → `appleboy/scp-action` kopiuje
    drzewo na VPS do `DEPLOY_PATH`;
-4. `appleboy/ssh-action` uruchamia `docker compose up -d --build`, czeka na
-   `HEALTHCHECK` kontenera (max 30 × 5 s), potem `docker compose ps` i `docker system prune -f`;
-5. `.env` **nigdy** nie jest wysyłany (jest w `.gitignore`) — plik na serwerze
+4. `appleboy/ssh-action` uruchamia `docker compose up -d --build`, ustawia
+   uprawnienia bind-mountowanego katalogu danych, czeka na `HEALTHCHECK`
+   kontenera (max 30 × 5 s), potem `docker compose ps` i `docker system prune -f`;
+5. **uprawnienia wolumenu danych** — bind mount (`./data:/app/data`) nadpisuje
+   właściciela `/app/data` z obrazu, więc katalog utworzony na hoście przez
+   roota nie jest zapisywalny dla nieuprzywilejowanego użytkownika kontenera
+   (Dockerfile `USER`) i SQLite nie otworzy bazy. Dlatego po `mkdir -p data`:
+   `chown -R <UID>:<UID> data` oraz `chmod -R 777 data` (UID kontenera — np. 1001);
+6. `.env` **nigdy** nie jest wysyłany (jest w `.gitignore`) — plik na serwerze
    pozostaje nietknięty. Gdy go brak, skrypt odtwarza zmienne z działającego
    kontenera, a w ostateczności kopiuje `.env.example` z ostrzeżeniem;
-6. `set -eu` (nie `pipefail` — POSIX `sh`/dash go nie zna), brak zależności od
+7. `set -eu` (nie `pipefail` — POSIX `sh`/dash go nie zna), brak zależności od
    `curl` na hoście (stan zdrowia czytany z `docker inspect`).
 
 ### Sekrety i zmienne repozytorium
@@ -47,7 +53,9 @@ Workflow `.github/workflows/deploy.yml`:
 
 1. Skopiuj `assets/deploy.yml` → `.github/workflows/deploy.yml` i podmień placeholdery:
    `__PROJECT__` (nazwa repo), `__CONTAINER__` (`container_name` z `docker-compose.yml`),
-   `__DEFAULT_DEPLOY_PATH__` (domyślny katalog, np. `/opt/<projekt>`).
+   `__DEFAULT_DEPLOY_PATH__` (domyślny katalog, np. `/opt/<projekt>`),
+   `__DATA_UID__` (UID:GID użytkownika kontenera z `USER` w `Dockerfile`, np. `1001`;
+   gdy nie wiesz, zostaw `1001` + `chmod 777` i tak rozwiązuje problem).
 2. Ustaw sekrety (najlepiej skryptem — patrz niżej):
    `bash .agents/skills/deploy-to-vps/scripts/setup-deploy-secrets.sh <owner>/<repo>`
    (opcje: `--host`, `--port`, `--user`, `--key`, `--deploy-path`, `--passphrase`, `--yes`;
