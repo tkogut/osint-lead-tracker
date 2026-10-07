@@ -22,6 +22,10 @@ last_sync: init
 ## 📝 Decisions & Key Milestones
 - [INIT] Project upgraded to AGENTS-OS v6.5 Swarm Edition.
 - [SYNC] Conflict-free distributed auto-sync enabled for `MEMORY.md` and `task.md`.
+- [DECISION] Automatyczny deploy na VPS (GitHub Actions) jest standardem workspace w skillu
+  `deploy-to-vps` (`.agents/skills/deploy-to-vps/`) — szablon `deploy.yml` + skrypt
+  `setup-deploy-secrets.sh`. Setup pipeline'u rozszerzamy lokalnie przez
+  `.ai/skills/om-setup-agent-pipeline/SKILL.md`; upstreamowego skilla `om-*` nie edytujemy.
 
 ## 🔄 Machine Session Log
 <!-- Format: - [YYYY-MM-DD HH:MM UTC] [Node] [Role] Description -->

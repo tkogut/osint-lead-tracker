@@ -333,6 +333,15 @@ bash .agents/skills/vps-ops/scripts/deploy-helper.sh
 bash .agents/skills/vps-ops/scripts/deploy-helper.sh -b production
 ```
 
+### Automatyczny deploy przez GitHub Actions
+
+Dla wdrożeń automatycznych (push do `main`) używaj osobnego skilla
+[`deploy-to-vps`](../deploy-to-vps/SKILL.md): dostarcza szablon
+`.github/workflows/deploy.yml`, skrypt `scripts/setup-deploy-secrets.sh`
+(generacja klucza SSH + `ssh-copy-id` + `gh secret set VPS_SSH_KEY`) i instrukcję.
+Sekrety ustawiane raz per projekt; workflow NIE jest uruchamiany na PR — tylko na
+`push` do gałęzi domyślnej lub przez `workflow_dispatch`.
+
 ### Weryfikacja po deployu
 
 ```bash
