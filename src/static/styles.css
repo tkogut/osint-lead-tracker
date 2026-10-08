@@ -91,6 +91,14 @@ body {
     color: var(--primary);
 }
 
+img.logo-icon, .sidebar-logo {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
 .sidebar-header h1 {
     font-family: var(--font-heading);
     font-size: 18px;
@@ -464,6 +472,14 @@ input:focus, select:focus, textarea:focus {
 .login-header .logo-icon {
     font-size: 48px;
     margin-bottom: 16px;
+}
+
+.login-header img.logo-icon, .login-logo {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 16px;
+    border-radius: 14px;
+    display: inline-block;
 }
 
 .login-header h2 {
