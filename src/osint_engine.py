@@ -587,7 +587,9 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
         """Przeszukuje publiczny internet za pomocą Google Search Grounding."""
         logger.info("Google Search Grounding: start skanowania…")
         
-        llm_model = get_db_setting_sync("GOOGLE_LLM_MODEL", "gemini-2.5-flash")
+        llm_model = getattr(account, "grounding_llm_model", None) or get_db_setting_sync("GOOGLE_LLM_MODEL", "gemini-2.5-flash")
+        if llm_model and isinstance(llm_model, str):
+            llm_model = llm_model.lstrip("~")
         llm_temp = 0.1
         llm_max_tokens = 8192
         instruction = get_system_instruction(today_date, start_date, account=account)
@@ -618,7 +620,7 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
             except RuntimeError:
                 loop = None
 
-            tools = [types.Tool(google_search=types.GoogleSearch())] if not ("/" in llm_model or llm_model.startswith("openrouter/")) else None
+            tools = [types.Tool(google_search=types.GoogleSearch())]
 
             if loop and loop.is_running():
                 import concurrent.futures

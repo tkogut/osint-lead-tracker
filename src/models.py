@@ -49,6 +49,7 @@ class Account(Base):
     # Konfiguracja LLM per konto
     custom_prompt = Column(Text, nullable=True)
     llm_model = Column(String(100), nullable=False, default="gemini-2.5-flash")
+    grounding_llm_model = Column(String(100), default="gemini-2.5-flash", nullable=False)
     llm_temperature = Column(Float, nullable=False, default=0.1)
     llm_max_tokens = Column(Integer, nullable=False, default=4096)
     

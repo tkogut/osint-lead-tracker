@@ -746,6 +746,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 ? `${acc.llm_model}`
                 : `<span class="text-error" style="color: var(--error); font-weight: bold;"><i class="fa-solid fa-triangle-exclamation"></i> ${acc.llm_model} (Nieobsługiwany!)</span>`;
 
+            const groundingModelVal = acc.grounding_llm_model || 'gemini-2.5-flash';
+            const groundingBadge = `<span class="badge badge-grounding" title="Model Google Search Grounding"><i class="fa-brands fa-google"></i> ${groundingModelVal}</span>`;
+
             return `
                 <div class="account-card glass-card">
                     <div class="account-card-header">
@@ -757,6 +760,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                     
                     <div class="account-details">
+                        <div class="detail-row">
+                            <span>Google Grounding:</span>
+                            <span>${groundingBadge}</span>
+                        </div>
                         <div class="detail-row">
                             <span>Kody CPV:</span>
                             <span title="${cpvs}">${cpvs.length > 25 ? cpvs.slice(0, 25) + "..." : cpvs}</span>
@@ -864,6 +871,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 accountIdInput.value = acc.id;
                 document.getElementById("acc-name").value = acc.name;
                 populateModelSelect(accModelSelect, acc.llm_model || "gemini-2.5-flash");
+                const accGroundingSelect = document.getElementById("acc-grounding-model");
+                if (accGroundingSelect) {
+                    accGroundingSelect.value = acc.grounding_llm_model || "gemini-2.5-flash";
+                }
                 document.getElementById("acc-temperature").value = acc.llm_temperature;
                 document.getElementById("acc-max-tokens").value = acc.llm_max_tokens;
                 document.getElementById("acc-cpvs").value = acc.target_cpvs.join(", ");
@@ -892,6 +903,10 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
             modalTitle.textContent = "Dodaj Nową Kampanię";
             populateModelSelect(accModelSelect, "gemini-2.5-flash");
+            const accGroundingSelect = document.getElementById("acc-grounding-model");
+            if (accGroundingSelect) {
+                accGroundingSelect.value = "gemini-2.5-flash";
+            }
             await renderSourcesCheckboxes(null);
             const defaultPromptData = await apiRequest("/api/settings/default-prompt");
             document.getElementById("acc-prompt").value = defaultPromptData ? formatPromptDates(defaultPromptData.default_prompt) : "";
@@ -982,6 +997,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const userIdVal = document.getElementById("acc-user-id").value;
         const teamIdVal = document.getElementById("acc-team-id").value;
         const sourceIdVal = document.getElementById("acc-source-id").value;
+        const groundingModelEl = document.getElementById("acc-grounding-model");
+        const groundingModelVal = groundingModelEl ? groundingModelEl.value : "gemini-2.5-flash";
 
         const payload = {
             name: document.getElementById("acc-name").value,
@@ -990,6 +1007,7 @@ document.addEventListener("DOMContentLoaded", () => {
             enabled_sources: enabledSources,
             custom_prompt: document.getElementById("acc-prompt").value || null,
             llm_model: document.getElementById("acc-model").value,
+            grounding_llm_model: groundingModelVal || "gemini-2.5-flash",
             llm_temperature: parseFloat(document.getElementById("acc-temperature").value),
             llm_max_tokens: parseInt(document.getElementById("acc-max-tokens").value),
             odoo_company_id: companyIdVal ? parseInt(companyIdVal) : null,

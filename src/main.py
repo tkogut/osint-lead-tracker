@@ -484,6 +484,7 @@ async def get_available_models() -> Any:
         fallback_list = [
             {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "provider": "Gemini"},
             {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "provider": "Gemini"},
+            {"id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash", "provider": "Gemini"},
             {"id": "gemini-1.5-flash", "name": "Gemini 1.5 Flash", "provider": "Gemini"},
             {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro", "provider": "Gemini"},
             {"id": "anthropic/claude-3.7-sonnet", "name": "Claude 3.7 Sonnet", "provider": "OpenRouter"},
@@ -883,6 +884,7 @@ async def get_accounts(
             enabled_sources=_parse_enabled_sources(acc.enabled_sources),
             custom_prompt=formatted_prompt,
             llm_model=acc.llm_model,
+            grounding_llm_model=acc.grounding_llm_model or "gemini-2.5-flash",
             llm_temperature=acc.llm_temperature,
             llm_max_tokens=acc.llm_max_tokens,
             odoo_company_id=acc.odoo_company_id,
@@ -944,6 +946,7 @@ async def create_account(
         enabled_sources=json.dumps(req.enabled_sources),
         custom_prompt=req.custom_prompt,
         llm_model=req.llm_model,
+        grounding_llm_model=req.grounding_llm_model,
         llm_temperature=req.llm_temperature,
         llm_max_tokens=req.llm_max_tokens,
         odoo_company_id=req.odoo_company_id,
@@ -973,6 +976,7 @@ async def create_account(
         enabled_sources=_parse_enabled_sources(new_acc.enabled_sources),
         custom_prompt=formatted_prompt,
         llm_model=new_acc.llm_model,
+        grounding_llm_model=new_acc.grounding_llm_model or "gemini-2.5-flash",
         llm_temperature=new_acc.llm_temperature,
         llm_max_tokens=new_acc.llm_max_tokens,
         odoo_company_id=new_acc.odoo_company_id,
@@ -1016,6 +1020,7 @@ async def update_account(
         db.add(new_pv)
     acc.custom_prompt = req.custom_prompt
     acc.llm_model = req.llm_model
+    acc.grounding_llm_model = req.grounding_llm_model
     acc.llm_temperature = req.llm_temperature
     acc.llm_max_tokens = req.llm_max_tokens
     acc.odoo_company_id = req.odoo_company_id
@@ -1038,6 +1043,7 @@ async def update_account(
         enabled_sources=_parse_enabled_sources(acc.enabled_sources),
         custom_prompt=formatted_prompt,
         llm_model=acc.llm_model,
+        grounding_llm_model=acc.grounding_llm_model or "gemini-2.5-flash",
         llm_temperature=acc.llm_temperature,
         llm_max_tokens=acc.llm_max_tokens,
         odoo_company_id=acc.odoo_company_id,
