@@ -19,7 +19,7 @@ from typing import Annotated, Any, List, Optional
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from fastapi import Depends, FastAPI, HTTPException, Security, status, Response, Cookie
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, delete, func, Integer as SAInteger, case
@@ -424,7 +424,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.64",
+    version="1.7.65",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -447,7 +447,7 @@ async def health() -> dict:
         "status": "ok",
         "system_status": dep_report["status"],
         "service": "osint-lead-tracker",
-        "version": "1.7.64",
+        "version": "1.7.65",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
         "sanitizer": DOMSanitizer.get_status(),
@@ -1837,3 +1837,9 @@ async def serve_dashboard():
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 os.makedirs(static_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse(os.path.join(static_dir, "favicon.svg"), media_type="image/svg+xml")
+
