@@ -27,6 +27,7 @@ class AccountCreate(BaseModel):
     enabled_sources: List[str] = Field(default_factory=lambda: ["BZP", "Google", "GUNB"])
     custom_prompt: Optional[str] = None
     llm_model: str = "gemini-2.5-flash"
+    grounding_llm_model: str = "gemini-2.5-flash"
     llm_temperature: float = Field(0.1, ge=0.0, le=2.0)
     llm_max_tokens: int = Field(4096, gt=0)
     
@@ -56,6 +57,7 @@ class AccountResponse(BaseModel):
     enabled_sources: List[str]
     custom_prompt: Optional[str]
     llm_model: str
+    grounding_llm_model: str = "gemini-2.5-flash"
     llm_temperature: float
     llm_max_tokens: int
     odoo_company_id: Optional[int]

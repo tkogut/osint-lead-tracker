@@ -3,13 +3,16 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    ".github/workflows/deploy.yml",
-    "README.md",
-    ".agents/skills/deploy-to-vps/SKILL.md",
-    ".agents/skills/deploy-to-vps/assets/deploy.yml",
-    ".agents/skills/deploy-to-vps/scripts/setup-deploy-secrets.sh"
+    "src/models.py",
+    "src/database.py",
+    "src/schemas.py",
+    "src/main.py",
+    "src/osint_engine.py",
+    "src/static/index.html",
+    "src/static/app.js",
+    "tests/test_grounding_model.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-10-08T10:25:17Z",
-  "notes": "Unifikacja domyślnej ścieżki wdrożenia z /opt na /docker w deploy.yml, README i skillu deploy-to-vps"
+  "timestamp": "2026-10-08T12:23:38Z",
+  "notes": "Wdrożono dedykowany selektor modeli Gemini dla Google Search Grounding w kontach (Plan 057)"
 }
