@@ -134,7 +134,7 @@ Liveness probe zwracający stan działania mikroserwisu, datę kolejnego automat
     "status": "ok",
     "system_status": "OK",
     "service": "osint-lead-tracker",
-    "version": "1.7.63",
+    "version": "1.7.64",
     "scheduler": "running",
     "next_run": "2026-08-01T06:00:00+02:00",
     "sanitizer": {
@@ -288,7 +288,7 @@ Actions → Variables**:
 | `VPS_HOST` | `srv1490214.hstgr.cloud` | Host serwera VPS. |
 | `VPS_USER` | `root` | Użytkownik SSH. |
 | `VPS_PORT` | `22` | Port SSH. |
-| `DEPLOY_PATH` | `/opt/osint-lead-tracker` | Katalog docelowy na serwerze. |
+| `DEPLOY_PATH` | `/docker/osint-lead-tracker` | Katalog docelowy na serwerze. |
 
 > ⚠️ **Przed pierwszym uruchomieniem** upewnij się, że `DEPLOY_PATH` wskazuje
 > katalog, z którego aktualnie działa stack. Kontener ma stałą nazwę

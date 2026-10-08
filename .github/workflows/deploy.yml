@@ -16,7 +16,7 @@
 #   VPS_HOST     — default srv1490214.hstgr.cloud
 #   VPS_USER     — default root
 #   VPS_PORT     — default 22
-#   DEPLOY_PATH  — default /opt/osint-lead-tracker
+#   DEPLOY_PATH  — default /docker/osint-lead-tracker
 # ============================================================
 
 name: Deploy to VPS
@@ -45,7 +45,7 @@ jobs:
       VPS_HOST: ${{ vars.VPS_HOST || 'srv1490214.hstgr.cloud' }}
       VPS_USER: ${{ vars.VPS_USER || 'root' }}
       VPS_PORT: ${{ vars.VPS_PORT || '22' }}
-      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/osint-lead-tracker' }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/docker/osint-lead-tracker' }}
 
     steps:
       - name: Checkout code
