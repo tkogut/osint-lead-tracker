@@ -1,7 +1,8 @@
 # PLAN 057: Dedykowany selektor modeli Gemini dla Google Search Grounding w kontach
 
-**Status:** IN_PROGRESS
+**Status:** COMPLETE
 **Issue:** #3 (https://github.com/tkogut/osint-lead-tracker/issues/3)
+**PR:** #4 (https://github.com/tkogut/osint-lead-tracker/pull/4)
 **Date:** 2026-10-08
 
 ## 1. Cel
@@ -20,9 +21,8 @@ Rozdzielenie konfiguracji modelu do ekstrakcji treści od modelu dedykowanego dl
    - Dedykowany select w modalu edycji konta: `Model Google Search Grounding (Tylko Gemini)`.
    - Obsługa ładowania i zapisu w JS oraz prezentacja na kafelkach kont.
 5. **Testy jednostkowe (`tests/test_grounding_model.py`)**:
-   - Weryfikacja migracji, zapisu i routingu silnika.
+   - 5 dedykowanych testów (migracja, model, Pydantic, routing osint_engine, API CRUD). 41/41 testów w projekcie przechodzi (100% green).
 
-## 3. Podział Zadań (Triada)
-- **Coordinator:** Git flow, PR management, weryfikacja handshake.
-- **Builder:** Implementacja w kodzie produkcyjnym.
-- **Auditor:** Weryfikacja bezpieczeństwa, brak regresji, audyt zgodności matematycznej i typów.
+## 3. Handshake
+- Builder Handshake: PASSED
+- Auditor Handshake: PASSED

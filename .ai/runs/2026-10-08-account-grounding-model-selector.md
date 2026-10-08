@@ -25,25 +25,27 @@
 
 ## Progress
 
+PR: #4 (link: https://github.com/tkogut/osint-lead-tracker/pull/4)
+
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles.
 
 ### Phase 1: Database and Schema Migration
 
-- [ ] 1.1 Add grounding_llm_model column to Account model in src/models.py
-- [ ] 1.2 Implement idempotent SQLite migration in src/database.py
-- [ ] 1.3 Update AccountCreate and AccountResponse schemas in src/schemas.py
+- [x] 1.1 Add grounding_llm_model column to Account model in src/models.py — ca66d87
+- [x] 1.2 Implement idempotent SQLite migration in src/database.py — ca66d87
+- [x] 1.3 Update AccountCreate and AccountResponse schemas in src/schemas.py — ca66d87
 
 ### Phase 2: Backend API and Engine Routing
 
-- [ ] 2.1 Update account CRUD endpoints in src/main.py
-- [ ] 2.2 Route Google Search Grounding to grounding_llm_model in src/osint_engine.py
+- [x] 2.1 Update account CRUD endpoints in src/main.py — ca66d87
+- [x] 2.2 Route Google Search Grounding to grounding_llm_model in src/osint_engine.py — ca66d87
 
 ### Phase 3: Frontend UI Integration
 
-- [ ] 3.1 Add Gemini grounding model selector in src/static/index.html
-- [ ] 3.2 Wire grounding model in modal logic and cards in src/static/app.js
+- [x] 3.1 Add Gemini grounding model selector in src/static/index.html — ca66d87
+- [x] 3.2 Wire grounding model in modal logic and cards in src/static/app.js — ca66d87
 
 ### Phase 4: Validation and Tests
 
-- [ ] 4.1 Implement unit tests in tests/test_grounding_model.py
-- [ ] 4.2 Run full validation gate and test suite
+- [x] 4.1 Implement unit tests in tests/test_grounding_model.py — ca66d87
+- [x] 4.2 Run full validation gate and test suite — ca66d87
