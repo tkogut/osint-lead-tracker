@@ -2,6 +2,11 @@
 > **OSINT Lead Tracker**
 
 Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w tym pliku. Format jest oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/) i projekt jest zgodny z [SemVer](https://semver.org/spec/v2.0.0.html).
+## [1.7.67] - 2026-10-08
+
+### Added
+- feat(ui): enlarge sidebar and login logo to 48px
+
 ## [1.7.66] - 2026-10-08
 
 ### Added
