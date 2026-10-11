@@ -4,9 +4,9 @@
   "status": "SUCCESS",
   "files_modified": [
     "src/seed.py",
-    "tests/test_truck_seed.py"
+    "tests/test_calibration_seed.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-10-11T11:46:53Z",
-  "notes": "QA Audit: Verified Wagi Samochodowe prompt update, keywords, CPV expansion, and test suite."
+  "timestamp": "2026-10-11T12:22:03Z",
+  "notes": "QA Audit: Verified Wzorcowanie Wag i Wzorców Masy campaign seed, PromptVersion integrity, CPV merging, and pytest suite passed."
 }

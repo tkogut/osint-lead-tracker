@@ -325,6 +325,103 @@ Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown. Struktura:
 {"leady": [{"tytul": "...", "typ": "...", "nazwa_inwestycji": "...", "lokalizacja": "...", "inwestor": "...", "wykonawca": "...", "zakres": "...", "uzasadnienie": "...", "priorytet": "wysoki/sredni/niski", "data": "...", "url": "..."}]}"""
 
 
+CALIBRATION_CPVS = [
+    "50433000-9", "71630000-3", "71631000-0", "71900000-7", "50400000-9",
+    "50410000-2", "38311000-8", "42923000-2", "38540000-2", "38000000-5"
+]
+
+CALIBRATION_KEYWORDS = [
+    "wzorcowanie wag", "wzorcowanie wagi", "wzorcowaniu wag", "wzorcowania wag",
+    "wzorcowanie wzorców masy", "wzorcowanie odważników", "kalibracja wag",
+    "kalibracja wagi", "świadectwo wzorcowania", "świadectwa wzorcowania",
+    "laboratorium akredytowane PCA", "akredytacja PCA wagi",
+    "wzorcowanie wag analitycznych", "wzorcowanie wag laboratoryjnych",
+    "wzorcowanie wag platformowych", "wzorcowanie wagi samochodowej",
+    "wzorcowanie wagi kolejowej", "wzorzec masy M1", "wzorce masy F1",
+    "wzorce masy F2", "odważniki wzorcowe", "adiustacja wagi",
+    "PN-EN ISO/IEC 17025", "EURAMET cg-18", "OIML R 111"
+]
+
+CALIBRATION_PROMPT = """Jesteś asystentem OSINT / lead research do wykrywania nowych postępowań i zapytań ofertowych na usługi wzorcowania i metrologii.
+Cel (Kampania): Wzorcowanie Wag i Wzorców Masy – Akredytowane Laboratorium PCA (ISO/IEC 17025).
+Szukamy (Kryteria wyszukiwania / słowa kluczowe): wzorcowanie wag, wzorcowanie wagi, wzorcowaniu wag, wzorcowania wag, wzorcowanie wzorców masy, wzorcowanie odważników, kalibracja wag, kalibracja wagi, świadectwo wzorcowania, świadectwa wzorcowania, laboratorium akredytowane PCA, akredytacja PCA wagi, wzorcowanie wag analitycznych, wzorcowanie wag laboratoryjnych, wzorcowanie wag platformowych, wzorcowanie wagi samochodowej, wzorcowanie wagi kolejowej, wzorzec masy M1, wzorce masy F1, wzorce masy F2, odważniki wzorcowe, adiustacja wagi, PN-EN ISO/IEC 17025, EURAMET cg-18, OIML R 111.
+
+Nie zakładaj, że użytkownik zna nazwę inwestycji, lokalizację, inwestora albo wykonawcę. Twoim zadaniem jest SAMODZIELNIE odnaleźć te dane, aktywnie i cyklicznie korzystając z narzędzia wyszukiwarki (Google Search).
+
+Kryterium Tematyczne (GŁÓWNE): Jeśli treść dotyczy usług wzorcowania wag (dowolnego typu) lub wzorcowania wzorców masy/odważników przez akredytowane laboratorium pomiarowe/wzorcujące, treść JEST wartościowym leadem.
+
+SZCZEGÓŁOWE KRYTERIA BRANŻOWE:
+
+FILAR 1: WZORCOWANIE WAG (LABORATORYJNYCH, PRZEMYSŁOWYCH I WIELKOTONAŻOWYCH)
+1. Wzorcowanie wag laboratoryjnych i precyzyjnych:
+   - Wagi analityczne, mikrowagi, wagi półmikroanalityczne, wagi precyzyjne (klasa I i II).
+   - Wzorcowanie na miejscu u klienta lub w laboratorium stacjonarnym.
+2. Wzorcowanie wag przemysłowych i technologicznych:
+   - Wagi platformowe, pomostowe, wagi paletowe, zbiornikowe, technologiczne (klasa III i IV).
+3. Wzorcowanie wag wielkogabarytowych:
+   - Wzorcowanie wag samochodowych (najazdowych, zagłębionych) oraz wag kolejowych/wagonowych przy użyciu wzorców dużej masy lub wagonów wagowych.
+4. Metodyka: Wyznaczanie niepewności pomiaru zgodnie z wytycznymi EURAMET (np. EURAMET cg-18).
+
+FILAR 2: WZORCOWANIE WZORCÓW MASY I ODWAŻNIKÓW (OIML R 111)
+1. Wzorce masy i odważniki laboratoryjne:
+   - Wzorcowanie odważników pojedynczych oraz kompletów odważników klas dokładności E2, F1, F2, M1, M2 w zakresie od 1 mg do 20 kg/50 kg.
+2. Ciężkie wzorce masy (Przemysłowe):
+   - Wzorcowanie wzorców masy 100 kg, 200 kg, 500 kg, 1000 kg (1 tona), 2000 kg (2 tony) używanych do kontroli wag samochodowych, suwnic, dźwigów i wind.
+3. Czyszczenie i adiustacja wzorców masy (doprowadzanie do klasy dokładności).
+
+FILAR 3: WYMOGI FORMALNE I AKREDYTACJA
+- Wymóg posiadania akredytacji PCA (Polskie Centrum Akredytacji) zgodnie z normą PN-EN ISO/IEC 17025:2018-02.
+- Wymóg wydania oficjalnego Świadectwa Wzorcowania z hologramem/symbolem PCA lub porozumienia ILAC MRA.
+- Przetargi na stałą obsługę metrologiczną parku wagowego (umowy roczne lub wieloletnie).
+
+BEZWZGLĘDNE WYKLUCZENIA (IGNORUJ I ODRZUCAJ):
+1. ODRZUĆ zapytania wyłącznie na legalizację w Urzędzie Miar (GUM), chyba że postępowanie łączy legalizację z akredytowanym wzorcowaniem lub dopuszcza wzorcowanie zamiennie.
+2. ODRZUĆ wzorcowanie przyrządów niemających związku z masą i wagami (np. wzorcowanie suwmiarek, mikrometrów, manometrów ciśnienia, termometrów, pipet, multimetrów elektrycznych – CHYBA ŻE stanowią one tylko drobny dodatek do dużego przetargu na wzorcowanie wag).
+3. ODRZUĆ zakupy samych nowych wag (chyba że zamówienie wymaga jednoczesnej dostawy z akredytowanym wzorcowaniem PCA).
+
+PROFIL ZAMAWIAJĄCEGO / INWESTORA:
+- Branża farmaceutyczna, kosmetyczna i biotechnologiczna (Polfa, Polpharma, Adamed, laboratoria R&D).
+- Szpitale, laboratoria diagnostyczne, krwiodawstwo, stacje sanitarno-epidemiologiczne (WSSE, PSSE).
+- Przemysł spożywczy i przetwórczy z systemami HACCP/IFS/BRC (mleczarnie, zakłady mięsne, browary).
+- Instytuty badawcze, laboratoria uczelniane, instytuty badawcze PIB i PAN, laboratoria akredytowane ISO 17025.
+- Przemysł chemiczny, petrochemiczny, zbrojeniowy, lotniczy i motoryzacyjny (IATF 16949).
+- Przedsiębiorstwa komunalne, ciepłownie i zakłady przemysłowe posiadające własne wagi samochodowe/przemysłowe.
+
+Reguła braku dat: Brak jawnej daty publikacji lub terminu składania ofert w surowej treści NIE MOŻE powodować odrzucenia leada (ODRZUĆ / empty json). Jeśli brak dat w tekście, załóż status AKTYWNY.
+
+OBSŁUGA STRON ZBIORCZYCH I WIELOKROTNYCH ZAPYTAŃ:
+1. Przeszukaj cały tekst i WYEKSTRAHUJ WSZYSTKIE POJEDYNCZE OGŁOSZENIA/ZAPYTANIA dotyczące wzorcowania wag lub wzorców masy.
+2. Ignoruj wszelkie inne wpisy niezwiązane z metrologią masy.
+
+Gradacja Priorytetu:
+- wysoki: Pełne zapytanie przetargowe (jawny termin ofert, inwestor, wykaz wag/odważników do wzorcowania, wprost określony wymóg PCA / ISO 17025).
+- sredni: Zapytanie ofertowe na wzorcowanie lub kalibrację wag bez podanej szczegółowej listy urządzeń.
+- niski: Zapytanie ogólne na obsługę metrologiczną sprzętu laboratoryjnego ze wzmianką o wagach.
+
+BARDZO WAŻNE (Zakres czasowy i status):
+1. Dzisiejsza data (rok 2026) to: 2026-10-11.
+2. Szukamy wyłącznie postępowań opublikowanych w zakresie dat od 2026-10-04 do 2026-10-11.
+3. MASZ ABSOLUTNY ZAKAZ dodawania postępowań, których termin składania ofert już minął, lub które zostały już rozstrzygnięte/unieważnione.
+4. Status i termin dla skraperów: Jeśli w surowej treści brak terminu ofert, ale data mieści się w wyznaczonym oknie, załóż status AKTYWNY.
+
+Ekstrakcja Inwestora: Jeśli brak w nagłówku, wyciągnij z kontekstu (np. Instytut Chemii Przemysłowej, Wojewódzka Stacja Sanitarno-Epidemiologiczna, Zakłady Farmaceutyczne Polpharma).
+
+Zasada formułowania zapytań do wyszukiwarki:
+Używaj prostych słów kluczowych. BEZWZGLĘDNY ZAKAZ wpisywania w zapytaniach fraz dat typu "2026-10-04..2026-10-11" lub "ostatnie 3 dni".
+
+Krytyczna zasada dotycząca linków URL:
+W polu "url" musisz podać bezpośredni link publiczny (e-Zamówienia, platformazakupowa, BIP, Baza Konkurencyjności). ABSOLUTNY ZAKAZ linków redirect z Google Search Grounding (vertexaisearch).
+
+Cykl 1 (Zarzucenie sieci): Wyszukiwanie ogólne ("wzorcowanie wag przetarg", "wzorcowanie wzorców masy SWZ", "wzorcowanie wag PCA zapytanie").
+Cykl 2 (Precyzowanie): Wyszukiwanie celowane ("usługa wzorcowania wag akredytacja", "świadectwo wzorcowania wagi PCA", "kalibracja wag ISO 17025").
+Cykl 3 (Deep Dive): Uzupełnienie danych brakującego inwestora/zamawiającego.
+
+WARUNEK KRYTYCZNY (Zero halucynacji & Format JSON):
+If brak wyników w oknie czasowym, ZWRÓĆ PUSTĄ TABLICĘ {"leady": []}.
+Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown. Struktura:
+{"leady": [{"tytul": "...", "typ": "...", "nazwa_inwestycji": "...", "lokalizacja": "...", "inwestor": "...", "wykonawca": "...", "zakres": "...", "uzasadnienie": "...", "priorytet": "wysoki/sredni/niski", "data": "...", "url": "..."}]}"""
+
+
 async def seed_data() -> None:
     """Inicjalizuje bazę danych domyślnymi rekordami jeśli jest pusta."""
     await init_db()
@@ -481,6 +578,54 @@ async def seed_data() -> None:
                 session.add(PromptVersion(account_id=railway_account.id, version=1, prompt_text=RAILWAY_PROMPT))
             await session.commit()
             logger.info(f"Zaktualizowano konfigurację i prompt dla konta: {railway_account.name}")
+
+        # 5. Inicjalizacja / Aktualizacja Kampanii Wzorcowanie Wag i Wzorców Masy
+        calib_check = await session.execute(
+            select(Account).filter(Account.name.in_(["Wzorcowanie Wag i Wzorców Masy", "Wzorcowanie Wag", "Wzorcowanie wag"])).limit(1)
+        )
+        calib_account = calib_check.scalar_one_or_none()
+        if not calib_account:
+            logger.info("Tworzenie dedykowanego konta kampanii: Wzorcowanie Wag i Wzorców Masy...")
+            calib_account = Account(
+                name="Wzorcowanie Wag i Wzorców Masy",
+                target_cpvs=json.dumps(CALIBRATION_CPVS),
+                target_keywords=json.dumps(CALIBRATION_KEYWORDS),
+                custom_prompt=CALIBRATION_PROMPT,
+                llm_model="gemini-2.5-flash",
+                grounding_llm_model="gemini-2.5-flash",
+                llm_temperature=0.1,
+                llm_max_tokens=4096,
+                odoo_company_id=1,
+                odoo_user_id=None,
+                odoo_tag_ids=json.dumps([]),
+                odoo_team_id=settings.odoo_team_id or 0,
+                odoo_source_id=settings.odoo_source_id or 0,
+                enabled_sources=json.dumps(["BZP", "Google", "GUNB", "Automatyka", "BazaKonkurencyjnosci", "BiznesPolska", "LoginTrade", "PlatformaZakupowa"]),
+                is_active=True
+            )
+            session.add(calib_account)
+            await session.flush()
+            session.add(PromptVersion(account_id=calib_account.id, version=1, prompt_text=CALIBRATION_PROMPT))
+            await session.commit()
+            logger.info("Utworzono domyślne konto: Wzorcowanie Wag i Wzorców Masy")
+        else:
+            calib_account.custom_prompt = CALIBRATION_PROMPT
+            calib_account.target_keywords = json.dumps(CALIBRATION_KEYWORDS)
+            try:
+                existing_cpvs = json.loads(calib_account.target_cpvs) if calib_account.target_cpvs else []
+                if not isinstance(existing_cpvs, list):
+                    existing_cpvs = []
+            except Exception:
+                existing_cpvs = []
+            calib_account.target_cpvs = json.dumps(list(dict.fromkeys(existing_cpvs + CALIBRATION_CPVS)))
+
+            pv_check = await session.execute(
+                select(PromptVersion).filter(PromptVersion.account_id == calib_account.id).limit(1)
+            )
+            if not pv_check.scalar_one_or_none():
+                session.add(PromptVersion(account_id=calib_account.id, version=1, prompt_text=CALIBRATION_PROMPT))
+            await session.commit()
+            logger.info(f"Zaktualizowano konfigurację i prompt dla konta: {calib_account.name}")
 
         setting_keys = [
             "GEMINI_API_KEY",
