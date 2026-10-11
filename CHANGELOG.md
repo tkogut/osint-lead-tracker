@@ -2,6 +2,16 @@
 > **OSINT Lead Tracker**
 
 Wszystkie istotne zmiany w projekcie osint-lead-tracker będą dokumentowane w tym pliku. Format jest oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.0.0/) i projekt jest zgodny z [SemVer](https://semver.org/spec/v2.0.0.html).
+## [1.7.69] - 2026-10-11
+
+### Added
+- feat(agro): auto-seed Agro campaign OSINT prompt
+
+## [1.7.68] - 2026-10-11
+
+### Added
+- feat(agro): auto-seed Agro campaign OSINT prompt
+
 ## [1.7.67] - 2026-10-08
 
 ### Added
