@@ -4,9 +4,9 @@
   "status": "SUCCESS",
   "files_modified": [
     "src/seed.py",
-    "tests/test_railway_seed.py"
+    "tests/test_truck_seed.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-10-11T10:56:18Z",
-  "notes": "feat(seed): add Wagi Kolejowe prompt and CPV expansion"
+  "timestamp": "2026-10-11T11:46:09Z",
+  "notes": "feat(seed): update Wagi Samochodowe prompt, keywords, and CPVs"
 }
