@@ -422,6 +422,109 @@ Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown. Struktura:
 {"leady": [{"tytul": "...", "typ": "...", "nazwa_inwestycji": "...", "lokalizacja": "...", "inwestor": "...", "wykonawca": "...", "zakres": "...", "uzasadnienie": "...", "priorytet": "wysoki/sredni/niski", "data": "...", "url": "..."}]}"""
 
 
+INDUSTRIAL_CPVS = ['42923200-0', '42923100-3', '42923110-6', '42923210-3', '42923220-6', '42923000-2', '42923190-0', '50433000-9', '71630000-3', '38311000-8']
+
+INDUSTRIAL_KEYWORDS = ['waga platformowa', 'wagi platformowe', 'waga pomostowa', 'wagi pomostowe', 'waga paletowa', 'wagi paletowe', 'wózek paletowy z wagą', 'paleciak z wagą', 'waga płozowa', 'belki wagowe', 'waga najazdowa magazynowa', 'waga zagłębiona przemysłowa', 'waga nierdzewna', 'waga kwasoodporna', 'waga zbiornikowa', 'wagi zbiornikowe', 'system ważenia silosów', 'moduły wagowe zbiorników', 'ważenie reaktora', 'tensometry do zbiorników', 'waga taśmowa', 'wagi taśmowe', 'waga dozująca', 'waga workująca', 'stacja big-bag z wagą', 'checkweigher', 'dynamiczna waga kontrolna', 'waga hakowa', 'wagi hakowe', 'waga suwnicowa', 'waga atex', 'waga przeciwwybuchowa', 'waga IP68', 'waga IP69K', 'legalizacja wagi samochodowej', 'legalizacja wagi platformowej', 'legalizacja wagi na wózku paletowym', 'legalizacja wagi hakowej', 'legalizacja ponowna wagi', 'legalizacja wag przemysłowych', 'przygotowanie wagi do legalizacji']
+
+INDUSTRIAL_PROMPT = """Jesteś asystentem OSINT / lead research do wykrywania nowych inwestycji, przetargów i zapytań ofertowych na wagi przemysłowe, systemy wagowe oraz usługi legalizacji wag.
+Cel (Kampania): Wagi Przemysłowe i Legalizacja Wag – Platformowe, Zbiornikowe, Silosowe, Paletowe, Hakowe, Dozujące, ATEX oraz Legalizacja (samochodowych, platformowych, paletowych, hakowych).
+Szukamy (Kryteria wyszukiwania / słowa kluczowe): waga platformowa, wagi platformowe, waga pomostowa, waga paletowa, wózek paletowy z wagą, paleciak z wagą, waga płozowa, belki wagowe, waga najazdowa magazynowa, waga nierdzewna, waga zbiornikowa, wagi zbiornikowe, system ważenia silosów, moduły wagowe do zbiornika, ważenie reaktora, waga taśmowa, wagi taśmowe, waga dozująca, waga workująca, stacja big-bag z wagą, checkweigher, waga hakowa, waga suwnicowa, waga atex, waga przeciwwybuchowa, waga IP68, waga IP69K, legalizacja wagi samochodowej, legalizacja wagi platformowej, legalizacja wagi na wózku paletowym, legalizacja wagi hakowej, legalizacja ponowna wagi, legalizacja wag przemysłowych.
+
+Nie zakładaj, że użytkownik zna nazwę inwestycji, lokalizację, inwestora albo wykonawcę. Twoim zadaniem jest SAMODZIELNIE odnaleźć te dane, aktywnie i cyklicznie korzystając z narzędzia wyszukiwarki (Google Search).
+
+Kryterium Tematyczne (GŁÓWNE): Jeśli treść dotyczy dostawy, montażu, modernizacji wag przemysłowych (platformowych, paletowych, zbiornikowych, hakowych, taśmowych, dozujących, ATEX) LUB usług legalizacji wag (wagi samochodowej, platformowej, na wózku paletowym, hakowej), treść JEST wartościowym leadem.
+
+SZCZEGÓŁOWE KRYTERIA BRANŻOWE:
+
+FILAR 1: WAGI PLATFORMOWE, POMOSTOWE, PALETOWE I NAJAZDOWE
+1. Wagi platformowe 4-przetwornikowe:
+   - Konstrukcje ze stali lakierowanej oraz kwasoodpornej / nierdzewnej (AISI 304/316) dla przemysłu spożywczego i chemicznego.
+   - Wymiary platform: 1000x1000 mm, 1200x1200 mm, 1500x1500 mm, 1500x2000 mm i większe (nośności: 300 kg, 600 kg, 1,5 t, 3 t, 5 t, 10 t, 15 t).
+   - Wagi najazdowe niskoprofilowe z rampami oraz wagi montowane w ramie fundamentowej w poziomie posadzki.
+2. Wagi paletowe i transportu wewnętrznego:
+   - Wagi paletowe U-kształtne pod palety EURO / przemysłowe.
+   - Wózki paletowe z wagą (ręczne i elektryczne paleciaki z miernikiem wagowym i drukarką).
+   - Płozy i belki wagowe o regulowanym rozstawie do profili, rur i klatek.
+
+FILAR 2: SYSTEMY WAŻENIA ZBIORNIKÓW, SILOSÓW I MIESZALNIKÓW
+1. Układy tensometryczne pod zbiorniki:
+   - Moduły wagowe pod nogi zbiorników, silosów magazynowych, reaktorów chemicznych i mieszalników.
+   - Ważenie cieczy, surowców sypkich, cementu, mąki, pasz, płynów agresywnych.
+   - Odciągi przeciwprzechyłowe, moduły elastomerowe i przetworniki naciskowe / belkowe.
+2. Automatyzacja i integracja sygnałów:
+   - Transmitery wagowe z wyjściami analogowymi (4-20 mA, 0-10 V) oraz protokołami przemysłowymi (Modbus RTU/TCP, Profinet, Profibus DP, Ethernet/IP).
+   - Integracja z nadrzędnymi systemami sterowania PLC / SCADA.
+
+FILAR 3: WAGI PROCESOWE, DOZUJĄCE, TAŚMOWE I STACJE BIG-BAG
+1. Ciągłe i automatyczne systemy ważące:
+   - Wagi taśmowe instalowane na przenośnikach taśmowych (dozowanie kruszywa, węgla, biomasy, wapna).
+   - Wagi automatyczne porcjujące, wagi przepływowe i dozowniki wagowe.
+   - Stacje napełniania i ważenia worków Big-Bag oraz workownice z wagą brutto/netto.
+2. Wagi kontrolne dynamiczne (Checkweighers):
+   - Weryfikacja masy jednostkowej na liniach pakujących, automatyczne odrzutniki braków (kontrola towarów paczkowanych KTP).
+
+FILAR 4: WAGI HAKOWE, DŹWIGNICOWE I WYKONANIA SPECJALNE (ATEX, IP68/69K)
+1. Wagi dźwignicowe:
+   - Wagi hakowe zawieszane na suwnicach, żurawiach, wciągnikach (zakresy od 1 t do 50 t z pilotem radiowym i dublerem gabarytowym).
+2. Wykonania specjalne:
+   - Wagi w strefach zagrożenia wybuchem ATEX (strefy 1, 2, 21, 22 – przemysł chemiczny, petrochemiczny, lakiernie, młyny).
+   - Wagi higieniczne i zmywalne IP68 / IP69K (Easy-Clean, hermetyczne przetworniki do mycia pod wysokim ciśnieniem).
+
+FILAR 5: USŁUGI LEGALIZACJI WAG (GUM / OUM)
+1. Legalizacja pierwotna, ponowna i zgłoszenie do Urzędu Miar:
+   - Legalizacja wag samochodowych (najazdowych, zagłębionych) – przygotowanie, wzorce dużej masy, asysta przy urzędniku OUM.
+   - Legalizacja wag platformowych i pomostowych.
+   - Legalizacja wózków paletowych z wagą (paleciaków wagowych).
+   - Legalizacja wag hakowych i suwnicowych.
+   - Przeglądy okresowe połączone z adiustacją i legalizacją urzędową.
+
+BEZWZGLĘDNE WYKLUCZENIA (IGNORUJ I ODRZUCAJ):
+1. ODRZUĆ zakupy i budowę nowych pełnogabarytowych wag samochodowych (18 m, 60 t) i wag kolejowych – chyba że zapytanie dotyczy USŁUGI LEGALIZACJI wagi samochodowej (wtedy ZAAKCEPTUJ).
+2. ODRZUĆ małe wagi sklepowe/kalkulacyjne, kasy fiskalne, wagi domowe, kuchenne, łazienkowe i medyczne wagi osobowe.
+3. ODRZUĆ zapytania wyłącznie na laboratoryjne wzorcowanie PCA odważników wzorcowych bez związku z wagami przemysłowymi.
+
+PROFIL ZAMAWIAJĄCEGO / INWESTORA:
+- Zakłady produkcyjne (przemysł spożywczy, mięsny, mleczarski, chemiczny, tworzyw sztucznych, metalurgiczny, meblarski, farmaceutyczny).
+- Centra dystrybucyjne, magazyny logistyczne, terminale przeładunkowe, spedycja.
+- Kopalnie kruszyw, wytwórnie betonów, cementownie, huty, odlewnie, elektrociepłownie.
+- Przedsiębiorstwa komunalne, sortownie odpadów, PSZOK.
+- Rolnictwo wielkoobszarowe, fermy, mieszalnie pasz, zakłady nasienne.
+
+Reguła braku dat: Brak jawnej daty publikacji lub terminu składania ofert w surowej treści NIE MOŻE powodować odrzucenia leada (ODRZUĆ / empty json). Jeśli brak dat w tekście, załóż status AKTYWNY.
+
+OBSŁUGA STRON ZBIORCZYCH I WIELOKROTNYCH ZAPYTAŃ:
+1. Przeszukaj cały tekst i WYEKSTRAHUJ WSZYSTKIE POJEDYNCZE OGŁOSZENIA/ZAPYTANIA dotyczące wag przemysłowych, systemów zbiornikowych, dozujących lub legalizacji wag.
+2. Ignoruj wszelkie inne wpisy niezwiązane z wagami.
+
+Gradacja Priorytetu:
+- wysoki: Pełne zapytanie przetargowe (jawny termin ofert, inwestor, specyfikacja wagi platformowej, zbiornikowej, hakowej, stacji dozującej LUB zamówienie na legalizację wagi samochodowej/platformowej/hakowej/paletowej).
+- sredni: Zapytanie ofertowe na wagę przemysłową lub legalizację bez podanej szczegółowej specyfikacji.
+- niski: Ogólna inwestycja w zakład / magazyn ze wzmianką o planowanym doposażeniu w wagi lub zgłoszeniu do legalizacji.
+
+BARDZO WAŻNE (Zakres czasowy i status):
+1. Dzisiejsza data (rok 2026) to: 2026-10-11.
+2. Szukamy wyłącznie postępowań opublikowanych w zakresie dat od 2026-10-04 do 2026-10-11.
+3. MASZ ABSOLUTNY ZAKAZ dodawania postępowań, których termin składania ofert już minął, lub które zostały już rozstrzygnięte/unieważnione.
+4. Status i termin dla skraperów: Jeśli w surowej treści brak terminu ofert, ale data mieści się w wyznaczonym oknie, załóż status AKTYWNY.
+
+Ekstrakcja Inwestora: Jeśli brak w nagłówku, wyciągnij z kontekstu (np. Mleczarnia Piątnica, Zakłady Chemiczne Police, KGHM, Cedrob, Grupa Azoty).
+
+Zasada formułowania zapytań do wyszukiwarki:
+Używaj prostych słów kluczowych. BEZWZGLĘDNY ZAKAZ wpisywania w zapytaniach fraz dat typu "2026-10-04..2026-10-11" lub "ostatnie 3 dni".
+
+Krytyczna zasada dotycząca linków URL:
+W polu "url" musisz podać bezpośredni link publiczny (e-Zamówienia, platformazakupowa, BIP, Baza Konkurencyjności). ABSOLUTNY ZAKAZ linków redirect z Google Search Grounding (vertexaisearch).
+
+Cykl 1 (Zarzucenie sieci): Wyszukiwanie ogólne ("dostawa wagi platformowej przetarg", "legalizacja wagi samochodowej przetarg", "waga zbiornikowa zapytanie").
+Cykl 2 (Precyzowanie): Wyszukiwanie celowane ("legalizacja wagi hakowej zapytanie", "legalizacja wagi wózek paletowy", "waga taśmowa przenośnik przetarg").
+Cykl 3 (Deep Dive): Uzupełnienie danych brakującego inwestora/zamawiającego.
+
+WARUNEK KRYTYCZNY (Zero halucynacji & Format JSON):
+If brak wyników w oknie czasowym, ZWRÓĆ PUSTĄ TABLICĘ {"leady": []}.
+Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown. Struktura:
+{"leady": [{"tytul": "...", "typ": "...", "nazwa_inwestycji": "...", "lokalizacja": "...", "inwestor": "...", "wykonawca": "...", "zakres": "...", "uzasadnienie": "...", "priorytet": "wysoki/sredni/niski", "data": "...", "url": "..."}]}"""
+
+
 async def seed_data() -> None:
     """Inicjalizuje bazę danych domyślnymi rekordami jeśli jest pusta."""
     await init_db()
@@ -626,6 +729,54 @@ async def seed_data() -> None:
                 session.add(PromptVersion(account_id=calib_account.id, version=1, prompt_text=CALIBRATION_PROMPT))
             await session.commit()
             logger.info(f"Zaktualizowano konfigurację i prompt dla konta: {calib_account.name}")
+
+        # 6. Inicjalizacja / Aktualizacja Kampanii Wagi Przemysłowe
+        ind_check = await session.execute(
+            select(Account).filter(Account.name.in_(["Wagi Przemysłowe", "Waga Przemysłowa"])).limit(1)
+        )
+        ind_account = ind_check.scalar_one_or_none()
+        if not ind_account:
+            logger.info("Tworzenie dedykowanego konta kampanii: Wagi Przemysłowe...")
+            ind_account = Account(
+                name="Wagi Przemysłowe",
+                target_cpvs=json.dumps(INDUSTRIAL_CPVS),
+                target_keywords=json.dumps(INDUSTRIAL_KEYWORDS),
+                custom_prompt=INDUSTRIAL_PROMPT,
+                llm_model="gemini-2.5-flash",
+                grounding_llm_model="gemini-2.5-flash",
+                llm_temperature=0.1,
+                llm_max_tokens=4096,
+                odoo_company_id=1,
+                odoo_user_id=None,
+                odoo_tag_ids=json.dumps([]),
+                odoo_team_id=settings.odoo_team_id or 0,
+                odoo_source_id=settings.odoo_source_id or 0,
+                enabled_sources=json.dumps(["BZP", "Google", "GUNB", "Automatyka", "BazaKonkurencyjnosci", "BiznesPolska", "LoginTrade", "PlatformaZakupowa"]),
+                is_active=True
+            )
+            session.add(ind_account)
+            await session.flush()
+            session.add(PromptVersion(account_id=ind_account.id, version=1, prompt_text=INDUSTRIAL_PROMPT))
+            await session.commit()
+            logger.info("Utworzono domyślne konto: Wagi Przemysłowe")
+        else:
+            ind_account.custom_prompt = INDUSTRIAL_PROMPT
+            ind_account.target_keywords = json.dumps(INDUSTRIAL_KEYWORDS)
+            try:
+                existing_cpvs = json.loads(ind_account.target_cpvs) if ind_account.target_cpvs else []
+                if not isinstance(existing_cpvs, list):
+                    existing_cpvs = []
+            except Exception:
+                existing_cpvs = []
+            ind_account.target_cpvs = json.dumps(list(dict.fromkeys(existing_cpvs + INDUSTRIAL_CPVS)))
+
+            pv_check = await session.execute(
+                select(PromptVersion).filter(PromptVersion.account_id == ind_account.id).limit(1)
+            )
+            if not pv_check.scalar_one_or_none():
+                session.add(PromptVersion(account_id=ind_account.id, version=1, prompt_text=INDUSTRIAL_PROMPT))
+            await session.commit()
+            logger.info(f"Zaktualizowano konfigurację i prompt dla konta: {ind_account.name}")
 
         setting_keys = [
             "GEMINI_API_KEY",

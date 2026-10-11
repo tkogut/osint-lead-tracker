@@ -4,9 +4,9 @@
   "status": "SUCCESS",
   "files_modified": [
     "src/seed.py",
-    "tests/test_calibration_seed.py"
+    "tests/test_industrial_seed.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-10-11T12:21:05Z",
-  "notes": "feat(seed): add Wzorcowanie Wag i Wzorców Masy campaign, prompt, keywords, and CPVs"
+  "timestamp": "2026-10-11T12:51:58Z",
+  "notes": "feat(seed): add Wagi Przemysłowe campaign, prompt, keywords, and CPVs"
 }
