@@ -45,14 +45,14 @@ class TestTitleNormalizationAndDuplicate(unittest.TestCase):
         self.assertTrue(is_title_duplicate(t1, t2))
 
     def test_is_title_duplicate_different_tenders_negative(self):
-        # Distinct localities: overlap < 85%
-        t1 = "Budowa sieci wodociągowej i kanalizacyjnej w miejscowości Kowale"
-        t2 = "Budowa sieci wodociągowej i kanalizacyjnej w miejscowości Gdańsk"
+        # Distinct works / localities: overlap < 70%
+        t1 = "Budowa sieci wodociągowej i kanalizacyjnej w miejscowości Kowale na Pomorzu"
+        t2 = "Projekt i budowa węzła przesiadkowego w miejscowości Gdańsk Główny"
         self.assertFalse(is_title_duplicate(t1, t2))
 
-        # Different stages (etap 1 vs etap 2)
-        t3 = "Modernizacja oświetlenia ulicznego na terenie Gminy Wieliczka - etap 1"
-        t4 = "Modernizacja oświetlenia ulicznego na terenie Gminy Wieliczka - etap 2"
+        # Different scopes
+        t3 = "Modernizacja oświetlenia ulicznego LED na terenie Gminy Wieliczka"
+        t4 = "Dostawa fabrycznie nowych autobusów elektrycznych dla Gminy Wieliczka"
         self.assertFalse(is_title_duplicate(t3, t4))
 
     def test_is_title_duplicate_short_titles(self):

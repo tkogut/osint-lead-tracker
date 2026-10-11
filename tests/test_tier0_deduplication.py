@@ -80,11 +80,9 @@ class TestTier0Deduplication(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await lead_exists(url="", title=test_title, account_id=None))
 
         # 3. Querying by url (length > 20 and not ending with domain suffix)
-        # Matching account_id: should exist
+        # Plan 063: URL is unique table-wide (Lead.url UNIQUE), so lead_exists returns True across all accounts
         self.assertTrue(await lead_exists(url=test_url, title="", account_id=acc1_id))
-        # Non-matching account_id: should not exist
-        self.assertFalse(await lead_exists(url=test_url, title="", account_id=acc2_id))
-        # None account_id: should exist
+        self.assertTrue(await lead_exists(url=test_url, title="", account_id=acc2_id))
         self.assertTrue(await lead_exists(url=test_url, title="", account_id=None))
 
         # 4. Global lead (prompt_version_id is None)

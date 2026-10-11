@@ -155,7 +155,7 @@ def is_title_duplicate(title1: str, title2: str) -> bool:
     """
     Sprawdza, czy dwa tytuły stanowią duplikat:
     1. Identyczność po normalizacji.
-    2. Pokrycie tokenów słownych (Jaccard similarity >= 85%) dla tytułów o długości >= 4 słów.
+    2. Pokrycie tokenów słownych (Jaccard similarity >= 70% lub containment/overlap >= 80%) dla tytułów o długości >= 4 słów.
     """
     norm1 = normalize_title(title1)
     norm2 = normalize_title(title2)
@@ -166,10 +166,13 @@ def is_title_duplicate(title1: str, title2: str) -> bool:
 
     tokens1 = set(norm1.split())
     tokens2 = set(norm2.split())
-    if len(tokens1) >= 4 and len(tokens2) >= 4:
+    min_len = min(len(tokens1), len(tokens2))
+    if min_len >= 4:
         intersection = tokens1 & tokens2
         union = tokens1 | tokens2
-        if len(union) > 0 and (len(intersection) / len(union)) >= 0.85:
+        if len(union) > 0 and (len(intersection) / len(union)) >= 0.70:
+            return True
+        if (len(intersection) / min_len) >= 0.80:
             return True
 
     return False
@@ -196,16 +199,31 @@ async def lead_exists(url: str, title: str = "", account_id: Optional[int] = Non
                     return True
 
         if url_clean and len(url_clean) > 20 and not url_clean.rstrip("/").endswith((".pl", ".com", ".net", ".gov.pl")):
-            query = select(Lead).filter(Lead.url == url_clean)
-            if account_id:
-                query = query.outerjoin(PromptVersion, Lead.prompt_version_id == PromptVersion.id).filter(
-                    (PromptVersion.account_id == account_id) | (Lead.prompt_version_id == None)
-                )
-            res = await session.execute(query.limit(1))
+            # Global URL check (bez account_id, ponieważ tabela leads ma unikalny Lead.url na poziomie całej bazy)
+            res = await session.execute(select(Lead).filter(Lead.url == url_clean).limit(1))
             if res.scalar_one_or_none():
                 return True
 
+            # BZP notice number extraction check
+            bzp_match = re.search(r'(?:BZP(?:%20|\s+)|/notice-details/.*?)(\d{6,8})', url_clean, re.IGNORECASE)
+            if bzp_match:
+                bzp_num = bzp_match.group(1)
+                res_bzp = await session.execute(select(Lead).filter(Lead.url.like(f"%{bzp_num}%")).limit(1))
+                if res_bzp.scalar_one_or_none():
+                    return True
+
     return False
+
+
+async def update_lead_odoo_id(lead_id: int, odoo_id: int) -> None:
+    """Aktualizuje odoo_id dla zapisanego wcześniej leada w SQLite."""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Lead).filter(Lead.id == lead_id).limit(1))
+        lead = result.scalar_one_or_none()
+        if lead:
+            lead.odoo_id = odoo_id
+            await session.commit()
+            logger.info("Updated lead id=%s with odoo_id=%s", lead_id, odoo_id)
 
 
 

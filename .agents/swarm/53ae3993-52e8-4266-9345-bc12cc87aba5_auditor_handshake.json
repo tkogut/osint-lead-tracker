@@ -3,10 +3,12 @@
   "role": "Auditor Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/seed.py",
-    "tests/test_industrial_seed.py"
+    "src/database.py",
+    "src/odoo_integration.py",
+    "src/main.py",
+    "tests/test_deduplication.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-10-11T12:52:56Z",
-  "notes": "QA Audit: Verified Wagi Przemysłowe campaign seed, PromptVersion integrity, CPV merging, and pytest suite passed."
+  "timestamp": "2026-10-11T18:34:33Z",
+  "notes": "QA Audit: Verified global URL deduplication, title containment, BZP number matching, SQLite-first order, and Odoo pre-check. All tests pass."
 }

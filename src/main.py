@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
 from config import get_settings
-from database import get_recent_leads, init_db, save_lead, url_exists, lead_exists, AsyncSessionLocal, get_db_setting_sync
+from database import get_recent_leads, init_db, save_lead, url_exists, lead_exists, update_lead_odoo_id, AsyncSessionLocal, get_db_setting_sync
 from odoo_integration import get_odoo_client
 from osint_engine import get_engine, get_date_limits, get_system_instruction, format_prompt_dates
 from scrapers.factory import SCRAPER_REGISTRY
@@ -248,7 +248,20 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
                             logger.info("[%s] Duplikat URL pomijam: %s", source, url)
                             continue
                             
-                        # Zapis do Odoo - nieblokująco dla Event Loop
+                        # Zapis do SQLite najpierw (zabezpieczenie przed osieroconymi rekordami w Odoo)
+                        lead_id = None
+                        try:
+                            lead_id = await save_lead(lead, odoo_id=None, prompt_version_id=active_prompt_version_id, pending_approval=False)
+                            leads_created_count += 1
+                            stats["leads_new"] += 1
+                        except IntegrityError:
+                            logger.warning("[%s] IntegrityError (duplikat URL w bazie): %s", source, url)
+                            continue
+                        except Exception as e:
+                            logger.warning("[%s] Błąd zapisu leada w SQLite: %s", source, e)
+                            continue
+
+                        # Zapis do Odoo po udanym zapisie w SQLite - nieblokująco dla Event Loop
                         odoo_id = None
                         try:
                             # Przekazujemy parametry z konta
@@ -264,19 +277,12 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
                             if odoo_id:
                                 stats["odoo_ok"] += 1
                                 logger.info("[%s] Odoo OK → id=%s", source, odoo_id)
+                                await update_lead_odoo_id(lead_id, odoo_id)
                             else:
                                 stats["odoo_fail"] += 1
                         except Exception as exc:
                             logger.error("[%s] Błąd Odoo: %s", source, exc)
                             stats["odoo_fail"] += 1
-                            
-                        # Zapis do SQLite
-                        try:
-                            await save_lead(lead, odoo_id=odoo_id, prompt_version_id=active_prompt_version_id, pending_approval=False)
-                            leads_created_count += 1
-                            stats["leads_new"] += 1
-                        except IntegrityError:
-                            logger.warning("[%s] IntegrityError dla URL: %s", source, url)
                         
                 stats["leads_found"] += leads_found_count
                 
@@ -424,7 +430,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.73",
+    version="1.7.74",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -447,7 +453,7 @@ async def health() -> dict:
         "status": "ok",
         "system_status": dep_report["status"],
         "service": "osint-lead-tracker",
-        "version": "1.7.73",
+        "version": "1.7.74",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
         "sanitizer": DOMSanitizer.get_status(),

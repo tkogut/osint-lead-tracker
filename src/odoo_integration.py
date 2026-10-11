@@ -178,6 +178,22 @@ class OdooClient:
         try:
             uid = self._authenticate()
             models = self._models_proxy()
+
+            # Pre-check: Sprawdź czy lead dla danego URL już istnieje w Odoo
+            if url and len(url) > 20 and not url.startswith("#"):
+                try:
+                    existing_ids = models.execute_kw(
+                        odoo_db, uid, odoo_api_key,
+                        "crm.lead", "search",
+                        [[["description", "ilike", url]]],
+                        {"limit": 1}
+                    )
+                    if existing_ids:
+                        logger.info("Odoo: Lead dla URL %s już istnieje (id=%s) - pomijam duplikat", url, existing_ids[0])
+                        return existing_ids[0]
+                except Exception as exc:
+                    logger.warning("Odoo: Błąd podczas sprawdzania duplikatu URL: %s", exc)
+
             record_id: int = models.execute_kw(
                 odoo_db,
                 uid,

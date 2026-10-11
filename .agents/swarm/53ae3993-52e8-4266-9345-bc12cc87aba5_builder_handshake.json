@@ -3,10 +3,12 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/seed.py",
-    "tests/test_industrial_seed.py"
+    "src/database.py",
+    "src/odoo_integration.py",
+    "src/main.py",
+    "tests/test_deduplication.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-10-11T12:51:58Z",
-  "notes": "feat(seed): add Wagi Przemysłowe campaign, prompt, keywords, and CPVs"
+  "timestamp": "2026-10-11T18:33:15Z",
+  "notes": "feat(dedup): implement global url dedup, containment title match, odoo pre-check, and sqlite-first ordering"
 }
