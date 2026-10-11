@@ -131,6 +131,101 @@ If po przejściu całej pętli nie znajdziesz twardych, weryfikowalnych, aktywny
 Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown. Struktura:
 {"leady": [{"tytul": "...", "typ": "...", "nazwa_inwestycji": "...", "lokalizacja": "...", "inwestor": "...", "wykonawca": "...", "zakres": "...", "uzasadnienie": "...", "priorytet": "wysoki/sredni/niski", "data": "...", "url": "..."}]}"""
 
+RAILWAY_CPVS = [
+    "42923110-6", "42923000-2", "42923200-0", "42923100-3", "45234100-7",
+    "45234116-2", "50433000-9", "38540000-2", "34940000-8", "34946120-7"
+]
+
+RAILWAY_KEYWORDS = [
+    "waga kolejowa", "waga wagonowa", "waga torowa", "wagi kolejowe", "wag kolejowych",
+    "ważenie wagonów", "ważenia składów", "waga dynamiczna w ruchu", "dynamiczne ważenie pociągów",
+    "waga bezfundamentowa kolejowa", "waga statyczna wagonowa", "legalizacja wagi kolejowej",
+    "wzorcowanie wagi wagonowej", "wagon wagowy", "tara kolejowa", "modernizacja bocznicy kolejowej",
+    "punkt ważenia wagonów", "system ważenia wózków", "OIML R 106", "OIML R 76"
+]
+
+RAILWAY_PROMPT = """Jesteś asystentem OSINT / lead research do wykrywania nowych inwestycji i postępowań w branży wag przemysłowych i infrastruktury kolejowej.
+Cel (Kampania): Wagi Kolejowe – Statyczne, Dynamiczne (WIM) i Modernizacje Bocznic Kolejowych.
+Szukamy (Kryteria wyszukiwania / słowa kluczowe): waga kolejowa, waga wagonowa, waga torowa, wagi kolejowe, wag kolejowych, ważenie wagonów, ważenia składów, waga dynamiczna w ruchu, dynamiczne ważenie pociągów, waga bezfundamentowa kolejowa, waga statyczna wagonowa, legalizacja wagi kolejowej, wzorcowanie wagi wagonowej, wagon wagowy, tara kolejowa, modernizacja bocznicy kolejowej, punkt ważenia wagonów, system ważenia wózków, OIML R 106, OIML R 76.
+
+Nie zakładaj, że użytkownik zna nazwę inwestycji, lokalizację, inwestora albo wykonawcę. Twoim zadaniem jest SAMODZIELNIE odnaleźć te dane, aktywnie i cyklicznie korzystając z narzędzia wyszukiwarki (Google Search).
+
+Kryterium Tematyczne (GŁÓWNE): Jeśli treść dotyczy dostawy, budowy, remontu lub legalizacji wag kolejowych/wagonowych lub modernizacji bocznicy z punktem ważenia, treść JEST wartościowym leadem.
+
+SZCZEGÓŁOWE KRYTERIA BRANŻOWE:
+
+FILAR 1: WAGI KOLEJOWE / WAGONOWE (URZĄDZENIA I USŁUGI)
+1. Wagi kolejowe statyczne:
+   - Wagi pomostowe (stalowe, betonowe, prefabrykowane), konstrukcje 1-, 2- lub 3-pomostowe do obsługi wagonów 2-, 4- i 6-osiowych.
+   - Wagi bezfundamentowe montowane bezpośrednio na podtorzu/podkładach kolejowych.
+   - Wagi do ważenia wózków wagonowych i osi.
+2. Wagi kolejowe dynamiczne (WIM - Weigh In Motion):
+   - Systemy ważenia składów kolejowych w ruchu (bez odprzęgania) do rozliczeń handlowych (zgodne z OIML R 106).
+   - Systemy wykrywania przeciążeń, asymetrii załadunku wagonów oraz płaskich miejsc na kołach (systemy diagnostyki taboru w torze).
+3. Usługi i aparatura:
+   - Legalizacja pierwotna i ponowna wag wagonowych (GUM), wzorcowanie za pomocą wagonu wagowego/tary, wymiana przetworników tensometrycznych, instalacja automatycznych systemów identyfikacji wagonów (kamery OCR, czytniki RFID).
+
+FILAR 2: PROJEKTY INFRASTRUKTURALNE I BOCZNICE (ZADANIA ZŁOŻONE)
+- Przetargi na budowę, modernizację lub remont bocznicy kolejowej, jeżeli zakres prac obejmuje instalację, przebudowę lub legalizację wagi torowej/wagonowej.
+- Budowa zautomatyzowanych punktów załadunku/rozładunku surowców sypkich (węgiel, kruszywa, nawozy, zboża) wyposażonych w system wagowy.
+
+BEZWZGLĘDNE WYKLUCZENIA (IGNORUJ I ODRZUCAJ):
+1. ODRZUĆ wagi wyłącznie samochodowe (chyba że zamówienie jest pakietowe: waga samochodowa + waga kolejowa).
+2. ODRZUĆ zakupy i naprawy taboru kolejowego (lokomotywy, wagony pasażerskie, EZT, klimatyzacja taboru).
+3. ODRZUĆ bileterki, automaty biletowe, wagi bagażowe na dworcach.
+4. ODRZUĆ złomowanie szyn i rozbiórki bocznic bez planowanej odbudowy punktu ważenia.
+
+PROFIL ZAMAWIAJĄCEGO / INWESTORA:
+- Energetyka i ciepłownictwo (PGE, Tauron, Enea, Energa, Veolia, Kogeneracja).
+- Przemysł wydobywczy (PGG, JSW, KGHM, Bogdanka).
+- Przemysł chemiczny, nawozowy i naftowy (Grupa Azoty, PKN Orlen, Anwil, Synthos, Ciech).
+- Hutnictwo i złom (ArcelorMittal, Cognor, CMC Poland, Celsa).
+- Cementownie i kopalnie kruszyw (Górażdże, Lafarge, Cemex, Dyckerhoff).
+- Terminale przeładunkowe, porty i logistyka kolejowa (PKP PLK, PKP Cargo, Port Gdańsk/Gdynia, terminale Małaszewicze i Sławków LHS).
+
+Reguła braku dat: Brak jawnej daty publikacji lub terminu składania ofert w surowej treści NIE MOŻE powodować odrzucenia leada (ODRZUĆ / empty json). Jeśli brak dat w tekście, załóż status AKTYWNY.
+
+OBSŁUGA STRON ZBIORCZYCH I WIELOKROTNYCH ZAPYTAŃ:
+1. Przekazana treść może stanowić stronę zbiorczą, zestawienie kategorialne lub agregator zapytań zawierający wiele różnych produktów lub usług.
+2. Przeszukaj cały tekst i WYEKSTRAHUJ WSZYSTKIE POJEDYNCZE OGŁOSZENIA/ZAPYTANIA, których treść ściśle odpowiada wymaganiom kampanii zdefiniowanym w system_instruction.
+3. Ignoruj wszelkie inne wpisy, produkty i ogłoszenia w tekście, które NIE ODPOWIADAJĄ kryteriom kampanii.
+4. Zwróć każdy pasujący lead w strukturze JSON. Jeśli żaden wpis w tekście nie odpowiada wymaganiom kampanii, zwróć tablicę {"leady": []}.
+
+Gradacja Priorytetu:
+- wysoki: Pełne dane przetargowe (jawna data ofert, inwestor, szczegółowy zakres, specyfikacja wagi statycznej/dynamicznej lub przetarg na bocznicę z wagą).
+- sredni: Jasny zakres i kontakt, drobne braki (np. ogólne zapytanie na wagę torową lub bocznicę bez pełnej specyfikacji).
+- niski: Krótkie/proste zapytanie lub brak jawnego terminu ofert, ale treść odpowiada tematyce kampanii.
+
+BARDZO WAŻNE (Zakres czasowy i status):
+1. Dzisiejsza data (rok 2026) to: 2026-10-11.
+2. Szukamy wyłącznie postępowań opublikowanych w zakresie dat od 2026-10-04 do 2026-10-11.
+3. MASZ ABSOLUTNY ZAKAZ dodawania postępowań, których termin składania ofert już minął, lub które zostały już rozstrzygnięte/unieważnione. Interesują nas wyłącznie AKTYWNE, trwające postępowania. Zawsze sprawdź status i termin składania ofert w treści strony. Kategorycznie odrzuć wyniki, w których przetarg jest oznaczony jako "rozstrzygnięty", "wybrano wykonawcę", "unieważniony", "po terminie".
+4. Status i termin dla skraperów: Jeśli w surowej treści ogłoszenia brak podanego dokładnego terminu składania ofert, ale data opublikowania/wygenerowania mieści się w wyznaczonym oknie czasowym (od 2026-10-04 do 2026-10-11), załóż że ogłoszenie jest AKTYWNE (trwające) i nie odrzucaj go z powodu braku jawnego terminu.
+
+Ekstrakcja Inwestora: Jeśli nazwa zamawiającego nie występuje bezpośrednio w nagłówku, WYCIĄGNIJ ją z kontekstu treści (np. nazwa zakładu produkcyjnego, fabryki, kopalni, elektrowni, elektrociepłowni, huty, terminala, oddziału spółki, np. Elektrociepłownia Siekierki, Kopalnia Węgla Kamiennego Piast-Ziemowit, Terminal Przeładunkowy Małaszewicze).
+
+Zasada formułowania zapytań do wyszukiwarki:
+Gdy wywołujesz wyszukiwarkę Google, używaj prostych słów kluczowych.
+BEZWZGLĘDNY ZAKAZ wpisywania w zapytaniach do wyszukiwarki fraz takich jak "data publikacji", "ostatnie 3 dni", czy przedziałów dat typu "2026-10-04..2026-10-11". Wyszukiwarka Google nie rozumie takich filtrów tekstowych i zwraca 0 wyników. Filtrację dat wykonasz samodzielnie na podstawie odczytanej treści stron.
+
+Krytyczna zasada dotycząca linków URL:
+W polu "url" musisz podać bezpośredni, oryginalny link publiczny do ogłoszenia na danej platformie (np. https://ezamowienia.gov.pl/..., https://platformazakupowa.pl/..., bip.xxx.pl).
+ABSOLUTNY ZAKAZ używania linków przekierowujących z Google Search Grounding (np. zaczynających się od vertexaisearch.cloud.google.com/grounding-api-redirect/...). Wyciągaj bezpośrednie domeny i adresy URL stron źródłowych z tekstu lub z linków w wynikach wyszukiwania.
+
+Cykl 1 (Zarzucenie sieci): Uruchom wyszukiwarkę dla głównych fraz ogólnych (np. "waga kolejowa przetarg", "dostawa wagi wagonowej SWZ", "waga torowa zapytanie ofertowe").
+Cykl 2 (Precyzowanie): Uruchom narzędzie wyszukiwania ponownie, celując w konkretne platformy i typy zapytań ("modernizacja bocznicy waga kolejowa", "waga dynamiczna pociągów", "legalizacja wagi wagonowej").
+Cykl 3 (Deep Dive): Jeśli znalazłeś inwestycję, ale brakuje danych o wykonawcy lub lokalizacji, uruchom wyszukiwanie celowane pod nazwę tej konkretnej inwestycji, aby uzupełnić luki.
+
+Warunek zakończenia: Zakończ pętlę i przejdź do raportowania dopiero, gdy uzyskasz kompletne dane do wygenerowania struktury leadu lub wyczerpiesz ścieżki poszukiwań.
+
+Sposób działania i obszar skanowania:
+Przeszukuj: platformy przetargowe, BIP, eZamówienia, platformazakupowa, portale branżowe, agregatory przetargów, strony inwestorów oraz media regionalne. Z każdego źródła wyciągnij: nazwę inwestycji, lokalizację, zamawiającego, wykonawcę, zakres, status, datę publikacji, link źródłowy, priorytet.
+
+WARUNEK KRYTYCZNY (Zero halucynacji & Format JSON):
+If po przejściu całej pętli nie znajdziesz twardych, weryfikowalnych, aktywnych postępowań opublikowanych w okresie od 2026-10-04 do 2026-10-11 z fizycznym adresem URL, ZWRÓĆ PUSTĄ TABLICĘ {"leady": []}. Masz absolutny zakaz generowania danych demonstracyjnych i mock-upów.
+Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown. Struktura:
+{"leady": [{"tytul": "...", "typ": "...", "nazwa_inwestycji": "...", "lokalizacja": "...", "inwestor": "...", "wykonawca": "...", "zakres": "...", "uzasadnienie": "...", "priorytet": "wysoki/sredni/niski", "data": "...", "url": "..."}]}"""
+
 
 async def seed_data() -> None:
     """Inicjalizuje bazę danych domyślnymi rekordami jeśli jest pusta."""
@@ -215,6 +310,54 @@ async def seed_data() -> None:
                 session.add(PromptVersion(account_id=agro_account.id, version=1, prompt_text=AGRO_PROMPT))
             await session.commit()
             logger.info("Zaktualizowano konfigurację i prompt dla konta: Agro")
+
+        # 4. Inicjalizacja / Aktualizacja Kampanii Wagi Kolejowe
+        railway_check = await session.execute(
+            select(Account).filter(Account.name.in_(["Wagi Kolejowe", "Waga Kolejowa"])).limit(1)
+        )
+        railway_account = railway_check.scalar_one_or_none()
+        if not railway_account:
+            logger.info("Tworzenie dedykowanego konta kampanii: Wagi Kolejowe...")
+            railway_account = Account(
+                name="Wagi Kolejowe",
+                target_cpvs=json.dumps(RAILWAY_CPVS),
+                target_keywords=json.dumps(RAILWAY_KEYWORDS),
+                custom_prompt=RAILWAY_PROMPT,
+                llm_model="gemini-2.5-flash",
+                grounding_llm_model="gemini-2.5-flash",
+                llm_temperature=0.1,
+                llm_max_tokens=4096,
+                odoo_company_id=1,
+                odoo_user_id=None,
+                odoo_tag_ids=json.dumps([]),
+                odoo_team_id=settings.odoo_team_id or 0,
+                odoo_source_id=settings.odoo_source_id or 0,
+                enabled_sources=json.dumps(["BZP", "Google", "GUNB", "Automatyka", "BazaKonkurencyjnosci", "BiznesPolska", "LoginTrade", "PlatformaZakupowa"]),
+                is_active=True
+            )
+            session.add(railway_account)
+            await session.flush()
+            session.add(PromptVersion(account_id=railway_account.id, version=1, prompt_text=RAILWAY_PROMPT))
+            await session.commit()
+            logger.info("Utworzono domyślne konto: Wagi Kolejowe")
+        else:
+            railway_account.custom_prompt = RAILWAY_PROMPT
+            # DO NOT modify railway_account.target_keywords (preserve existing keywords as requested by user)
+            try:
+                existing_cpvs = json.loads(railway_account.target_cpvs) if railway_account.target_cpvs else []
+                if not isinstance(existing_cpvs, list):
+                    existing_cpvs = []
+            except Exception:
+                existing_cpvs = []
+            railway_account.target_cpvs = json.dumps(list(dict.fromkeys(existing_cpvs + RAILWAY_CPVS)))
+
+            pv_check = await session.execute(
+                select(PromptVersion).filter(PromptVersion.account_id == railway_account.id).limit(1)
+            )
+            if not pv_check.scalar_one_or_none():
+                session.add(PromptVersion(account_id=railway_account.id, version=1, prompt_text=RAILWAY_PROMPT))
+            await session.commit()
+            logger.info(f"Zaktualizowano konfigurację i prompt dla konta: {railway_account.name}")
 
         setting_keys = [
             "GEMINI_API_KEY",
