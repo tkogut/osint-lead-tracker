@@ -39,7 +39,7 @@ from auth import verify_password, create_user_session, validate_session_token
 from seed import seed_data
 from dependency_checker import audit_dependencies, log_dependency_banner
 from src.llm_client import generate_content_with_llm, fetch_available_models, OPENROUTER_AUTH_URL
-from src.url_validator import validate_and_resolve_url
+from src.url_validator import validate_and_resolve_url, attempt_url_recovery
 
 
 # ---------------------------------------------------------------------------
@@ -245,13 +245,29 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
 
                         # Walidacja URL i rozwijanie ewentualnych przekierowań
                         is_valid, resolved_url, reason = await validate_and_resolve_url(url)
+                        if not is_valid:
+                            logger.info(
+                                "[%s] Błędny URL leada (%s, powód: %s). Uruchamianie ponownej próby wyszukiwania (Search Recovery)...",
+                                source, url, reason
+                            )
+                            is_valid, resolved_url, reason = await attempt_url_recovery(lead, account=account)
+
                         if is_valid:
                             lead["url"] = resolved_url
+                            lead["url_status"] = "valid"
+                            lead["url_error"] = ""
                             url = resolved_url
                         else:
-                            logger.warning("[%s] Niepoprawny URL leada: %s (powód: %s) -> Kwarantanna", source, url, reason)
+                            lead["url"] = resolved_url
+                            lead["url_status"] = "invalid"
+                            lead["url_error"] = reason
+                            url = resolved_url
+                            logger.warning(
+                                "[%s] URL leada nieodwracalnie niepoprawny: %s (powód: %s) -> Oznaczenie do weryfikacji ręcznej",
+                                source, url, reason
+                            )
                             orig_uzasadnienie = lead.get("uzasadnienie", "") or ""
-                            lead["uzasadnienie"] = f"[OSTRZEŻENIE: Niepoprawny URL - {reason}] {orig_uzasadnienie}".strip()
+                            lead["uzasadnienie"] = f"{orig_uzasadnienie} [⚠️ LINK WYMAGA WERYFIKACJI RĘCZNEJ: {reason}]".strip()
                             
                         # Deduplikacja w SQLite
                         title = lead.get("tytul", "").strip()
@@ -259,14 +275,14 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
                             logger.info("[%s] Duplikat URL pomijam: %s", source, url)
                             continue
                             
-                        # Zapis do SQLite najpierw (jeśli URL niepoprawny -> pending_approval=True)
+                        # Zapis do SQLite najpierw (zgodnie z Planem 065: pending_approval=False, aby umożliwić push do Odoo)
                         lead_id = None
                         try:
                             lead_id = await save_lead(
                                 lead,
                                 odoo_id=None,
                                 prompt_version_id=active_prompt_version_id,
-                                pending_approval=(not is_valid)
+                                pending_approval=False
                             )
                             leads_created_count += 1
                             stats["leads_new"] += 1
@@ -277,12 +293,8 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
                             logger.warning("[%s] Błąd zapisu leada w SQLite: %s", source, e)
                             continue
 
-                        # Jeśli URL jest niepoprawny, pomijamy wysyłkę do Odoo (ochrona CRM)
-                        if not is_valid:
-                            logger.info("[%s] Pominięto push do Odoo ze względu na kwarantannę URL: %s", source, url)
-                            continue
-
                         # Zapis do Odoo po udanym zapisie w SQLite - nieblokująco dla Event Loop
+                        # Przekazujemy url_status i url_error dla generowania ostrzeżenia w Odoo
                         odoo_id = None
                         try:
                             # Przekazujemy parametry z konta
@@ -293,11 +305,13 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
                                 user_id=account.odoo_user_id,
                                 tag_ids=json.loads(account.odoo_tag_ids),
                                 team_id=account.odoo_team_id,
-                                source_id=account.odoo_source_id
+                                source_id=account.odoo_source_id,
+                                url_status=lead.get("url_status", "valid"),
+                                url_error=lead.get("url_error", "")
                             )
                             if odoo_id:
                                 stats["odoo_ok"] += 1
-                                logger.info("[%s] Odoo OK → id=%s", source, odoo_id)
+                                logger.info("[%s] Odoo OK → id=%s (url_status=%s)", source, odoo_id, lead.get("url_status"))
                                 await update_lead_odoo_id(lead_id, odoo_id)
                             else:
                                 stats["odoo_fail"] += 1
@@ -451,7 +465,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.75",
+    version="1.7.76",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -474,7 +488,7 @@ async def health() -> dict:
         "status": "ok",
         "system_status": dep_report["status"],
         "service": "osint-lead-tracker",
-        "version": "1.7.75",
+        "version": "1.7.76",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
         "sanitizer": DOMSanitizer.get_status(),

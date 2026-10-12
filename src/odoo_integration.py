@@ -64,11 +64,13 @@ class OdooClient:
         user_id: Optional[int] = None,
         tag_ids: Optional[List[int]] = None,
         team_id: Optional[int] = None,
-        source_id: Optional[int] = None
+        source_id: Optional[int] = None,
+        url_status: str = "valid",
+        url_error: str = ""
     ) -> Optional[int]:
         """
         Tworzy nową szansę sprzedaży w modelu crm.lead.
-        Wspiera parametry wielofirmowości (company_id, user_id, tag_ids).
+        Wspiera parametry wielofirmowości (company_id, user_id, tag_ids) oraz ostrzeżenie o weryfikacji URL.
         """
         odoo_db = get_db_setting_sync("ODOO_DB", self._settings.odoo_db)
         odoo_api_key = get_db_setting_sync("ODOO_API_KEY", self._settings.odoo_api_key)
@@ -85,11 +87,28 @@ class OdooClient:
         url = lead.get("url") or "#"
         opis_szczeg = lead.get("opis_szczegolowy") or ""
 
+        # Pobierz url_status i url_error z argumentu lub bezpośrednio ze słownika leada
+        status_check = url_status or lead.get("url_status") or "valid"
+        error_msg = url_error or lead.get("url_error") or ""
+
         table_style = "width: 100%; border-collapse: collapse; margin-bottom: 15px;"
         td_label_style = "padding: 6px 10px; font-weight: bold; border-bottom: 1px solid #eeeeee; width: 30%; text-align: left;"
         td_val_style = "padding: 6px 10px; border-bottom: 1px solid #eeeeee; text-align: left;"
 
-        description = f"""<h3>📋 SZCZEGÓŁY ZAPYTANIA OSINT</h3>
+        warning_banner = ""
+        url_source_suffix = ""
+        if status_check == "invalid":
+            warning_banner = (
+                f'<div style="background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; padding: 12px; margin-bottom: 15px; border-radius: 4px; font-family: sans-serif;">'
+                f'<h4 style="margin: 0 0 8px 0; color: #856404;">⚠️ UWAGA: Link źródłowy wymaga weryfikacji ręcznej!</h4>'
+                f'<p style="margin: 0 0 6px 0;">Automatyczny weryfikator linków wykrył problem z adresem URL: <strong>{error_msg}</strong></p>'
+                f'<p style="margin: 0 0 6px 0;">Zarejestrowany link: <code>{url}</code></p>'
+                f'<p style="margin: 0;"><strong>Zalecenie dla handlowca:</strong> Wyszukaj postępowanie bezpośrednio na platformie zamawiającego (<strong>{inwestor}</strong>).</p>'
+                f'</div>'
+            )
+            url_source_suffix = ' <span style="color: #dc3545; font-weight: bold;">(⚠️ Link może być nieaktywny — wymagana weryfikacja ręczna)</span>'
+
+        description = f"""{warning_banner}<h3>📋 SZCZEGÓŁY ZAPYTANIA OSINT</h3>
 <table style="{table_style}">
   <tr>
     <td style="{td_label_style}">Kategoria zamówienia:</td>
@@ -131,7 +150,7 @@ class OdooClient:
 
         description += f"""
 <hr/>
-<p>🔗 <strong>Źródło zamówienia:</strong> <a href="{url}" target="_blank">Otwórz oficjalne ogłoszenie w nowej karcie</a></p>
+<p>🔗 <strong>Źródło zamówienia:</strong> <a href="{url}" target="_blank">Otwórz oficjalne ogłoszenie w nowej karcie</a>{url_source_suffix}</p>
 """
 
         # --- nazwa leada ---
@@ -140,6 +159,8 @@ class OdooClient:
             or lead.get("tytul")
             or "OSINT Lead"
         )
+        if status_check == "invalid":
+            name = f"[⚠️ WERYFIKACJA LINKU] {name}"
 
         # --- mapowanie pól Odoo ---
         vals: dict = {

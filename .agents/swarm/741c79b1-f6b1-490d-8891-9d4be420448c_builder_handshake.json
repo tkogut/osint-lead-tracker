@@ -4,11 +4,11 @@
   "status": "SUCCESS",
   "files_modified": [
     "src/url_validator.py",
-    "src/osint_engine.py",
     "src/main.py",
-    "tests/test_url_validator.py"
+    "src/odoo_integration.py",
+    "tests/test_url_recovery_and_odoo.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-10-12T09:14:27Z",
-  "notes": "Wdrożono automatyczny walidator linków i resolver przekierowań URL Validator (Plan 064)"
+  "timestamp": "2026-10-12T10:31:18Z",
+  "notes": "Wdrożono ponowną próbę wyszukania URL (Search Recovery) oraz ostrzeżenie o weryfikacji ręcznej w Odoo (Plan 065)"
 }

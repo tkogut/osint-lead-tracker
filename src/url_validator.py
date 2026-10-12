@@ -7,10 +7,13 @@ import asyncio
 import logging
 import re
 import socket
-from typing import Tuple
+import json
+from typing import Tuple, Optional, Any
 from urllib.parse import urlparse
 
 import httpx
+
+from llm_client import generate_content_with_llm
 
 logger = logging.getLogger(__name__)
 
@@ -140,3 +143,107 @@ async def validate_and_resolve_url(url: str, timeout: float = 5.0) -> Tuple[bool
         return True, resolved_url, "OK (Host reachable)"
 
     return True, resolved_url, "OK"
+
+
+async def attempt_url_recovery(
+    lead: dict,
+    account: Optional[Any] = None,
+    timeout: float = 12.0
+) -> Tuple[bool, str, str]:
+    """
+    Podejmuje próbę ponownego celowanego wyszukania poprawnego URL w Google (Search Recovery).
+
+    Zwraca krotkę:
+        (is_valid: bool, recovered_or_orig_url: str, reason: str)
+    """
+    orig_url = (lead.get("url") or "").strip()
+    investor = (
+        lead.get("inwestor")
+        or lead.get("nazwa_inwestora")
+        or ""
+    ).strip()
+    title = (
+        lead.get("tytul")
+        or lead.get("tytul_generowany")
+        or lead.get("nazwa_inwestycji")
+        or ""
+    ).strip()
+    scope = (
+        lead.get("zakres")
+        or lead.get("opis_szczegolowy")
+        or ""
+    ).strip()
+
+    search_parts = [p for p in [investor, title, scope[:80], "przetarg zapytanie ofertowe"] if p]
+    query = " ".join(search_parts).strip()
+    if not query:
+        return False, orig_url, "Brak danych leada do ponownego wyszukania"
+
+    prompt = (
+        f"Odszukaj oficjalny, bezpośredni i publicznie dostępny adres URL ogłoszenia przetargowego lub zapytania ofertowego dla:\n"
+        f"Inwestor: {investor}\n"
+        f"Tytuł: {title}\n"
+        f"Zakres: {scope[:200]}\n\n"
+        f"Zwróć WYŁĄCZNIE poprawny JSON w formacie: {{\"url\": \"<bezpośredni_url>\"}} lub {{\"url\": null}} jeśli nie znaleziono.\n"
+        f"Nie dodawaj żadnego komentarza ani tekstu poza blokiem JSON."
+    )
+
+    try:
+        from google.genai import types
+
+        search_tool = types.Tool(google_search=types.GoogleSearch())
+
+        model = "gemini-2.5-flash"
+        if account and hasattr(account, "grounding_llm_model") and account.grounding_llm_model:
+            model = account.grounding_llm_model
+
+        res_obj = await asyncio.wait_for(
+            generate_content_with_llm(
+                model=model,
+                prompt=prompt,
+                temperature=0.1,
+                tools=[search_tool],
+                timeout=timeout
+            ),
+            timeout=timeout
+        )
+
+        raw_text = (res_obj.text or "").strip()
+        # Wyciągamy blok json
+        json_match = re.search(r'\{[^{}]*"url"\s*:\s*(?:null|"[^"]*")\s*\}', raw_text, re.DOTALL)
+        candidate_url = None
+        if json_match:
+            try:
+                data = json.loads(json_match.group(0))
+                candidate_url = data.get("url")
+            except Exception as j_exc:
+                logger.debug("Błąd dekodowania JSON z odpowiedzi LLM: %s", j_exc)
+        else:
+            # Fallback regex bezpośrednio na URL w tekście jeśli model nie zwrócił czystego jsona
+            url_match = re.search(r'https?://[^\s"\'<>]+', raw_text)
+            if url_match:
+                candidate_url = url_match.group(0)
+
+        if candidate_url and isinstance(candidate_url, str):
+            candidate_url = candidate_url.strip()
+            # Przepuszczamy kandydata przez walidator
+            is_valid, resolved_url, reason = await validate_and_resolve_url(candidate_url)
+            if is_valid:
+                logger.info(
+                    "[Search Recovery] Sukces! Odzyskano poprawny URL: %s dla leada '%s'",
+                    resolved_url, title[:50]
+                )
+                return True, resolved_url, "Odzyskano przez ponowne wyszukiwanie"
+            else:
+                logger.warning(
+                    "[Search Recovery] Kandydat URL (%s) odrzucony: %s",
+                    candidate_url, reason
+                )
+                return False, orig_url, f"Kandydat z ponownego wyszukania niepoprawny ({reason})"
+
+        logger.info("[Search Recovery] Nie odnaleziono poprawnego URL dla: %s", query[:60])
+        return False, orig_url, "Nie znaleziono linku w ponownym wyszukiwaniu"
+
+    except Exception as exc:
+        logger.warning("[Search Recovery] Błąd podczas próby odzyskania URL: %s", exc)
+        return False, orig_url, f"Błąd ponownego wyszukiwania: {exc}"
