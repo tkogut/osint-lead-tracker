@@ -25,6 +25,7 @@ from database import get_db_setting_sync, is_url_visited, mark_url_visited
 from scrapers.factory import get_scraper_for_source, SCRAPER_REGISTRY
 from src.utils import match_polish_keywords
 from src.llm_client import generate_content_with_llm
+from src.url_validator import validate_and_resolve_url
 import asyncio
 
 logger = logging.getLogger(__name__)
@@ -208,7 +209,7 @@ def _parse_leads(raw_text: str) -> list[dict]:
             if not isinstance(item, dict):
                 continue
             url = item.get("url", "").strip()
-            if not url or url in ("...", "N/A", "") or "grounding-api-redirect" in url or "vertexaisearch" in url:
+            if not url or url in ("...", "N/A", "brak", "-") or len(url) < 5:
                 logger.debug("Pominięto lead bez bezpośredniego URL: %s", item.get("tytul"))
                 continue
             valid.append(item)
@@ -649,8 +650,38 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
                 )
 
             raw_text = result.text or ""
-            leads = _parse_leads(raw_text)
+            parsed_leads = _parse_leads(raw_text)
             response_hash = hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
+
+            # Walidacja URL i rozwijanie ewentualnych linków vertexaisearch / grounding-api-redirect
+            leads = []
+            for item in parsed_leads:
+                lead_url = item.get("url", "").strip()
+                if not lead_url:
+                    continue
+
+                try:
+                    if loop and loop.is_running():
+                        import concurrent.futures
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            is_valid, resolved_url, reason = executor.submit(
+                                asyncio.run,
+                                validate_and_resolve_url(lead_url)
+                            ).result()
+                    else:
+                        is_valid, resolved_url, reason = asyncio.run(validate_and_resolve_url(lead_url))
+
+                    if is_valid:
+                        item["url"] = resolved_url
+                        leads.append(item)
+                    else:
+                        logger.warning(
+                            "Odrzucono lead z niepoprawnym/martwym URL w Google Search Grounding: %s (powód: %s)",
+                            lead_url, reason
+                        )
+                except Exception as val_exc:
+                    logger.warning("Błąd walidacji URL leada %s: %s", lead_url, val_exc)
+                    leads.append(item)
 
             # Extract grounding metadata and token usage
             grounding_chunks = 0
@@ -669,7 +700,7 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
                     grounding_queries = len(queries)
 
             logger.info(
-                "Google Search Grounding: ukończono. Znaleziono %d lead(ów), chunks=%d, queries=%d, in_tok=%d, out_tok=%d",
+                "Google Search Grounding: ukończono. Znaleziono %d lead(ów) (po walidacji URL), chunks=%d, queries=%d, in_tok=%d, out_tok=%d",
                 len(leads), grounding_chunks, grounding_queries, input_tokens, output_tokens
             )
             return leads, 200, response_hash, grounding_chunks, grounding_queries, input_tokens, output_tokens

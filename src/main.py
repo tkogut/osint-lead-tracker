@@ -39,6 +39,7 @@ from auth import verify_password, create_user_session, validate_session_token
 from seed import seed_data
 from dependency_checker import audit_dependencies, log_dependency_banner
 from src.llm_client import generate_content_with_llm, fetch_available_models, OPENROUTER_AUTH_URL
+from src.url_validator import validate_and_resolve_url
 
 
 # ---------------------------------------------------------------------------
@@ -241,6 +242,16 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
                         url = lead.get("url", "").strip()
                         if not url:
                             continue
+
+                        # Walidacja URL i rozwijanie ewentualnych przekierowań
+                        is_valid, resolved_url, reason = await validate_and_resolve_url(url)
+                        if is_valid:
+                            lead["url"] = resolved_url
+                            url = resolved_url
+                        else:
+                            logger.warning("[%s] Niepoprawny URL leada: %s (powód: %s) -> Kwarantanna", source, url, reason)
+                            orig_uzasadnienie = lead.get("uzasadnienie", "") or ""
+                            lead["uzasadnienie"] = f"[OSTRZEŻENIE: Niepoprawny URL - {reason}] {orig_uzasadnienie}".strip()
                             
                         # Deduplikacja w SQLite
                         title = lead.get("tytul", "").strip()
@@ -248,10 +259,15 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
                             logger.info("[%s] Duplikat URL pomijam: %s", source, url)
                             continue
                             
-                        # Zapis do SQLite najpierw (zabezpieczenie przed osieroconymi rekordami w Odoo)
+                        # Zapis do SQLite najpierw (jeśli URL niepoprawny -> pending_approval=True)
                         lead_id = None
                         try:
-                            lead_id = await save_lead(lead, odoo_id=None, prompt_version_id=active_prompt_version_id, pending_approval=False)
+                            lead_id = await save_lead(
+                                lead,
+                                odoo_id=None,
+                                prompt_version_id=active_prompt_version_id,
+                                pending_approval=(not is_valid)
+                            )
                             leads_created_count += 1
                             stats["leads_new"] += 1
                         except IntegrityError:
@@ -259,6 +275,11 @@ async def run_osint_pipeline(account_id: Optional[int] = None) -> dict[str, Any]
                             continue
                         except Exception as e:
                             logger.warning("[%s] Błąd zapisu leada w SQLite: %s", source, e)
+                            continue
+
+                        # Jeśli URL jest niepoprawny, pomijamy wysyłkę do Odoo (ochrona CRM)
+                        if not is_valid:
+                            logger.info("[%s] Pominięto push do Odoo ze względu na kwarantannę URL: %s", source, url)
                             continue
 
                         # Zapis do Odoo po udanym zapisie w SQLite - nieblokująco dla Event Loop
@@ -430,7 +451,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.74",
+    version="1.7.75",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -453,7 +474,7 @@ async def health() -> dict:
         "status": "ok",
         "system_status": dep_report["status"],
         "service": "osint-lead-tracker",
-        "version": "1.7.74",
+        "version": "1.7.75",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
         "sanitizer": DOMSanitizer.get_status(),
