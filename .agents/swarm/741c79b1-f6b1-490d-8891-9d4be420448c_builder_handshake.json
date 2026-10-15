@@ -3,12 +3,13 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/url_validator.py",
+    "src/scrapers/factory.py",
+    "src/osint_engine.py",
     "src/main.py",
-    "src/odoo_integration.py",
-    "tests/test_url_recovery_and_odoo.py"
+    "src/seed.py",
+    "tests/test_scraper_factory_aliases.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-10-12T10:31:18Z",
-  "notes": "Wdrożono ponowną próbę wyszukania URL (Search Recovery) oraz ostrzeżenie o weryfikacji ręcznej w Odoo (Plan 065)"
+  "timestamp": "2026-10-15T06:26:19Z",
+  "notes": "Wdrożono normalizację nazw źródeł skraperów i aliasy w fabryce oraz silniku OSINT (Plan 066 / Issue #5)"
 }
