@@ -123,6 +123,49 @@ async def init_db() -> None:
             logger.info("Migration OK: added grounding_llm_model to accounts")
         # Seed default SEARCH_WINDOW_DAYS if missing
         _cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('SEARCH_WINDOW_DAYS', '7')")
+        # Idempotent migration for legacy account enabled_sources
+        try:
+            import json as _json
+            from scrapers.factory import normalize_source_name
+            _cur.execute("SELECT id, enabled_sources FROM accounts")
+            _acc_rows = _cur.fetchall()
+            _canonical_map = {
+                "bazakonkurenconosci": "BazaKonkurencyjnosci",
+                "bazakonkurencyjnosci": "BazaKonkurencyjnosci",
+                "logintrade": "LoginTrade",
+                "biznespolska": "BiznesPolska",
+                "platformazakupowa": "PlatformaZakupowa",
+                "automatyka": "Automatyka",
+                "bzp": "BZP",
+                "google": "Google",
+                "gunb": "GUNB",
+            }
+            for _acc_id, _sources_str in _acc_rows:
+                if not _sources_str:
+                    continue
+                try:
+                    _sources = _json.loads(_sources_str)
+                    if isinstance(_sources, list):
+                        _updated_sources = []
+                        _changed = False
+                        for _s in _sources:
+                            _cleaned_s = _s.strip() if isinstance(_s, str) else str(_s)
+                            _norm = normalize_source_name(_cleaned_s)
+                            _canonical = _canonical_map.get(_norm, _cleaned_s)
+                            if _canonical != _s:
+                                _changed = True
+                            if _canonical not in _updated_sources:
+                                _updated_sources.append(_canonical)
+                        if _changed:
+                            _cur.execute(
+                                "UPDATE accounts SET enabled_sources = ? WHERE id = ?",
+                                (_json.dumps(_updated_sources), _acc_id)
+                            )
+                            logger.info("Migration OK: updated legacy enabled_sources for account id %s", _acc_id)
+                except Exception as _inner_e:
+                    logger.debug("Skip migrating account %s sources: %s", _acc_id, _inner_e)
+        except Exception as _acc_e:
+            logger.warning("Account source migration warning: %s", _acc_e)
         _con.commit()
         _con.close()
     except Exception as _e:

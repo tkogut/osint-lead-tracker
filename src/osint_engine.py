@@ -22,7 +22,7 @@ from google.genai import types
 
 from config import get_settings
 from database import get_db_setting_sync, is_url_visited, mark_url_visited
-from scrapers.factory import get_scraper_for_source, SCRAPER_REGISTRY
+from scrapers.factory import get_scraper_for_source, SCRAPER_REGISTRY, normalize_source_name
 from src.utils import match_polish_keywords
 from src.llm_client import generate_content_with_llm
 from src.url_validator import validate_and_resolve_url
@@ -882,12 +882,16 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
         logger.info("GUNB RWDZ: ukończono. Wykryto %d nowych lead(ów)", len(leads))
         return leads, last_status_code, response_hash, 0, 0, 0, 0
 
-    def run_search_for_account(
+    def scan_all_sources(
         self,
-        account: Any
+        account: Any,
+        search_window_days: Optional[int] = None
     ) -> dict[str, tuple[list[dict], int, str, int, int, int, int]]:
-        """Uruchamia wyszukiwanie dla konkretnego konta/kampanii."""
-        today_str, start_str = get_date_limits()
+        """Uruchamia wyszukiwanie dla konkretnego konta/kampanii we wszystkich włączonych źródłach."""
+        if search_window_days is not None:
+            today_str, start_str = get_date_limits(default_days=search_window_days)
+        else:
+            today_str, start_str = get_date_limits()
         logger.info("OSINT Account Search START for '%s' (%s do %s)", account.name, start_str, today_str)
 
         enabled_sources = ["BZP", "Google", "GUNB"]
@@ -905,17 +909,26 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
         results = {}
 
         for source in enabled_sources:
-            if source == "BZP":
+            norm = normalize_source_name(source)
+            if norm in ("bzp", "ezamowienia", "ezamowieniapl"):
                 results["BZP"] = self._search_bzp(start_str, today_str, account=account)
-            elif source == "Google":
+            elif norm in ("google", "googlesearch", "grounding"):
                 results["Google"] = self._search_google(start_str, today_str, account=account)
-            elif source == "GUNB":
+            elif norm in ("gunb", "gunbrwdz", "pozwoleniabudowlane"):
                 results["GUNB"] = self._search_gunb(start_str, today_str, account=account)
             else:
-                # Dedykowane wtyczki skraperów (np. Automatyka)
+                # Dedykowane wtyczki skraperów (np. Automatyka, Logintrade, BazaKonkurencyjnosci)
                 results[source] = self._search_plugin(source, start_str, today_str, account=account)
 
         return results
+
+    def run_search_for_account(
+        self,
+        account: Any,
+        search_window_days: Optional[int] = None
+    ) -> dict[str, tuple[list[dict], int, str, int, int, int, int]]:
+        """Uruchamia wyszukiwanie dla konkretnego konta/kampanii (kompatybilność wsteczna)."""
+        return self.scan_all_sources(account=account, search_window_days=search_window_days)
 
     def run_search(self) -> list[dict]:
         """Fallback kompatybilności wstecznej dla starszych skryptów."""

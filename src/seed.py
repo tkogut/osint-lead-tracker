@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime
+from typing import Any, List
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -547,6 +548,43 @@ async def seed_data() -> None:
             await session.commit()
             logger.info("Utworzono użytkownika: admin")
             
+        STANDARD_SOURCES = [
+            "BZP", "Google", "GUNB", "Automatyka", "BazaKonkurencyjnosci",
+            "BiznesPolska", "LoginTrade", "PlatformaZakupowa"
+        ]
+
+        def normalize_account_sources(sources_val: Any) -> list[str]:
+            from scrapers.factory import normalize_source_name
+            canonical_map = {
+                "bazakonkurenconosci": "BazaKonkurencyjnosci",
+                "bazakonkurencyjnosci": "BazaKonkurencyjnosci",
+                "logintrade": "LoginTrade",
+                "biznespolska": "BiznesPolska",
+                "platformazakupowa": "PlatformaZakupowa",
+                "automatyka": "Automatyka",
+                "bzp": "BZP",
+                "google": "Google",
+                "gunb": "GUNB",
+            }
+            raw = []
+            if isinstance(sources_val, list):
+                raw = sources_val
+            elif isinstance(sources_val, str) and sources_val.strip():
+                try:
+                    raw = json.loads(sources_val)
+                except Exception:
+                    raw = []
+            if not raw:
+                return STANDARD_SOURCES
+            normalized = []
+            for s in raw:
+                cleaned = s.strip() if isinstance(s, str) else str(s)
+                norm = normalize_source_name(cleaned)
+                canonical = canonical_map.get(norm, cleaned)
+                if canonical not in normalized:
+                    normalized.append(canonical)
+            return normalized
+
         # 2. Inicjalizacja / Aktualizacja Kampanii Wagi Samochodowe
         account_check = await session.execute(
             select(Account).filter(Account.name.in_(["Wagi Samochodowe", "Waga Samochodowa"])).limit(1)
@@ -568,7 +606,7 @@ async def seed_data() -> None:
                 odoo_tag_ids=json.dumps([]),
                 odoo_team_id=settings.odoo_team_id or 0,
                 odoo_source_id=settings.odoo_source_id or 0,
-                enabled_sources=json.dumps(["BZP", "Google", "GUNB", "Automatyka", "BazaKonkurencyjnosci", "BiznesPolska", "LoginTrade", "PlatformaZakupowa"]),
+                enabled_sources=json.dumps(STANDARD_SOURCES),
                 is_active=True
             )
             session.add(truck_account)
@@ -579,6 +617,7 @@ async def seed_data() -> None:
         else:
             truck_account.custom_prompt = TRUCK_PROMPT
             truck_account.target_keywords = json.dumps(TRUCK_KEYWORDS)
+            truck_account.enabled_sources = json.dumps(normalize_account_sources(truck_account.enabled_sources))
             try:
                 existing_cpvs = json.loads(truck_account.target_cpvs) if truck_account.target_cpvs else []
                 if not isinstance(existing_cpvs, list):
@@ -614,7 +653,7 @@ async def seed_data() -> None:
                 odoo_tag_ids=json.dumps([]),
                 odoo_team_id=settings.odoo_team_id or 0,
                 odoo_source_id=settings.odoo_source_id or 0,
-                enabled_sources=json.dumps(["BZP", "Google", "GUNB", "Automatyka", "BazaKonkurencyjnosci", "BiznesPolska", "LoginTrade", "PlatformaZakupowa"]),
+                enabled_sources=json.dumps(STANDARD_SOURCES),
                 is_active=True
             )
             session.add(agro_account)
@@ -626,6 +665,7 @@ async def seed_data() -> None:
             agro_account.custom_prompt = AGRO_PROMPT
             agro_account.target_keywords = json.dumps(AGRO_KEYWORDS)
             agro_account.target_cpvs = json.dumps(AGRO_CPVS)
+            agro_account.enabled_sources = json.dumps(normalize_account_sources(agro_account.enabled_sources))
             pv_check = await session.execute(
                 select(PromptVersion).filter(PromptVersion.account_id == agro_account.id).limit(1)
             )
@@ -655,7 +695,7 @@ async def seed_data() -> None:
                 odoo_tag_ids=json.dumps([]),
                 odoo_team_id=settings.odoo_team_id or 0,
                 odoo_source_id=settings.odoo_source_id or 0,
-                enabled_sources=json.dumps(["BZP", "Google", "GUNB", "Automatyka", "BazaKonkurencyjnosci", "BiznesPolska", "LoginTrade", "PlatformaZakupowa"]),
+                enabled_sources=json.dumps(STANDARD_SOURCES),
                 is_active=True
             )
             session.add(railway_account)
@@ -665,6 +705,7 @@ async def seed_data() -> None:
             logger.info("Utworzono domyślne konto: Wagi Kolejowe")
         else:
             railway_account.custom_prompt = RAILWAY_PROMPT
+            railway_account.enabled_sources = json.dumps(normalize_account_sources(railway_account.enabled_sources))
             # DO NOT modify railway_account.target_keywords (preserve existing keywords as requested by user)
             try:
                 existing_cpvs = json.loads(railway_account.target_cpvs) if railway_account.target_cpvs else []
@@ -703,7 +744,7 @@ async def seed_data() -> None:
                 odoo_tag_ids=json.dumps([]),
                 odoo_team_id=settings.odoo_team_id or 0,
                 odoo_source_id=settings.odoo_source_id or 0,
-                enabled_sources=json.dumps(["BZP", "Google", "GUNB", "Automatyka", "BazaKonkurencyjnosci", "BiznesPolska", "LoginTrade", "PlatformaZakupowa"]),
+                enabled_sources=json.dumps(STANDARD_SOURCES),
                 is_active=True
             )
             session.add(calib_account)
@@ -714,6 +755,7 @@ async def seed_data() -> None:
         else:
             calib_account.custom_prompt = CALIBRATION_PROMPT
             calib_account.target_keywords = json.dumps(CALIBRATION_KEYWORDS)
+            calib_account.enabled_sources = json.dumps(normalize_account_sources(calib_account.enabled_sources))
             try:
                 existing_cpvs = json.loads(calib_account.target_cpvs) if calib_account.target_cpvs else []
                 if not isinstance(existing_cpvs, list):
@@ -751,7 +793,7 @@ async def seed_data() -> None:
                 odoo_tag_ids=json.dumps([]),
                 odoo_team_id=settings.odoo_team_id or 0,
                 odoo_source_id=settings.odoo_source_id or 0,
-                enabled_sources=json.dumps(["BZP", "Google", "GUNB", "Automatyka", "BazaKonkurencyjnosci", "BiznesPolska", "LoginTrade", "PlatformaZakupowa"]),
+                enabled_sources=json.dumps(STANDARD_SOURCES),
                 is_active=True
             )
             session.add(ind_account)
@@ -762,6 +804,7 @@ async def seed_data() -> None:
         else:
             ind_account.custom_prompt = INDUSTRIAL_PROMPT
             ind_account.target_keywords = json.dumps(INDUSTRIAL_KEYWORDS)
+            ind_account.enabled_sources = json.dumps(normalize_account_sources(ind_account.enabled_sources))
             try:
                 existing_cpvs = json.loads(ind_account.target_cpvs) if ind_account.target_cpvs else []
                 if not isinstance(existing_cpvs, list):

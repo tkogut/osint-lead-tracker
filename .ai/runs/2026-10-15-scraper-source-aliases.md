@@ -32,15 +32,15 @@ Eliminate 404 scan errors caused by casing variations, domain suffixes, or typos
 
 ### Phase 1: Normalization & Factory Aliases
 
-- [ ] 1.1 Implement normalize_source_name and register aliases
-- [ ] 1.2 Implement fallback resolution in get_scraper_for_source
+- [x] 1.1 Implement normalize_source_name and register aliases
+- [x] 1.2 Implement fallback resolution in get_scraper_for_source
 
 ### Phase 2: Engine & Account Dispatch Resilience
 
-- [ ] 2.1 Update osint_engine source dispatching
-- [ ] 2.2 Update main.py source parsing and seed migration
+- [x] 2.1 Update osint_engine source dispatching
+- [x] 2.2 Update main.py source parsing and seed migration
 
 ### Phase 3: Testing & Validation
 
-- [ ] 3.1 Add comprehensive test suite in tests/test_scraper_factory_aliases.py
-- [ ] 3.2 Run full validation gate and audit
+- [x] 3.1 Add comprehensive test suite in tests/test_scraper_factory_aliases.py
+- [x] 3.2 Run full validation gate and audit

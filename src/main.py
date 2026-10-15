@@ -465,7 +465,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.76",
+    version="1.7.77",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -488,7 +488,7 @@ async def health() -> dict:
         "status": "ok",
         "system_status": dep_report["status"],
         "service": "osint-lead-tracker",
-        "version": "1.7.76",
+        "version": "1.7.77",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
         "sanitizer": DOMSanitizer.get_status(),
@@ -891,16 +891,24 @@ async def change_password(
 # ---------------------------------------------------------------------------
 # API Endpoints - Dashboard Accounts (Multi-tenancy CRUD)
 def _parse_enabled_sources(val: Any) -> List[str]:
+    raw_sources: List[Any] = []
     if isinstance(val, list):
-        return val
-    if isinstance(val, str) and val.strip():
+        raw_sources = val
+    elif isinstance(val, str) and val.strip():
         try:
             res = json.loads(val)
             if isinstance(res, list):
-                return res
+                raw_sources = res
         except Exception:
             pass
-    return ["BZP", "Google", "GUNB"]
+    if not raw_sources:
+        return ["BZP", "Google", "GUNB"]
+
+    cleaned: List[str] = []
+    for s in raw_sources:
+        if isinstance(s, str) and s.strip():
+            cleaned.append(s.strip())
+    return cleaned if cleaned else ["BZP", "Google", "GUNB"]
 
 
 # ---------------------------------------------------------------------------
@@ -984,7 +992,7 @@ async def create_account(
         name=req.name,
         target_cpvs=json.dumps(req.target_cpvs),
         target_keywords=json.dumps(clean_keywords),
-        enabled_sources=json.dumps(req.enabled_sources),
+        enabled_sources=json.dumps(_parse_enabled_sources(req.enabled_sources)),
         custom_prompt=req.custom_prompt,
         llm_model=req.llm_model,
         grounding_llm_model=req.grounding_llm_model,
@@ -1045,7 +1053,7 @@ async def update_account(
     acc.target_cpvs = json.dumps(req.target_cpvs)
     clean_keywords = list(set([k.lower().strip() for k in req.target_keywords if k and k.strip()]))
     acc.target_keywords = json.dumps(clean_keywords)
-    acc.enabled_sources = json.dumps(req.enabled_sources)
+    acc.enabled_sources = json.dumps(_parse_enabled_sources(req.enabled_sources))
     # Wersjonowanie promptu
     if req.custom_prompt and req.custom_prompt != acc.custom_prompt:
         last_ver_result = await db.execute(
