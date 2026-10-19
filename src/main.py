@@ -30,7 +30,7 @@ from config import get_settings
 from database import get_recent_leads, init_db, save_lead, url_exists, lead_exists, update_lead_odoo_id, AsyncSessionLocal, get_db_setting_sync
 from odoo_integration import get_odoo_client
 from osint_engine import get_engine, get_date_limits, get_system_instruction, format_prompt_dates
-from scrapers.factory import SCRAPER_REGISTRY
+from scrapers.factory import SCRAPER_REGISTRY, CANONICAL_SCRAPERS
 from scrapers.playwright_fetcher import fetch_with_playwright
 from scrapers.base import DOMSanitizer
 from models import User, Session as UserSession, Account, ResearchLog, Setting, PromptVersion, Lead, RunPerformanceSnapshot
@@ -465,7 +465,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.78",
+    version="1.7.79",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -488,7 +488,7 @@ async def health() -> dict:
         "status": "ok",
         "system_status": dep_report["status"],
         "service": "osint-lead-tracker",
-        "version": "1.7.78",
+        "version": "1.7.79",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
         "sanitizer": DOMSanitizer.get_status(),
@@ -500,18 +500,16 @@ async def health() -> dict:
 async def get_available_sources() -> List[dict]:
     sources = [
         {"id": "BZP", "name": "e-Zamówienia (BZP API)", "description": "Darmowe. Precyzyjne dla przetargów publicznych.", "is_plugin": False},
-        {"id": "GUNB", "name": "Pozwolenia budowlane (GUNB RWDZ)", "description": "Darmowe. Dobre tylko dla inwestycji budowlanych.", "is_plugin": False},
-        {"id": "Google", "name": "Wyszukiwarka Google (Grounding)", "description": "Bardzo drogie (Tokeny Gemini). Szeroki zakres (przetargi prywatne, zapytania).", "is_plugin": False},
-        {"id": "BiznesPolska", "name": "Biznes-Polska (Przetargi i Zlecenia)", "description": "Darmowe (wymagana subskrypcja). Agregacja zamówień publicznych i prywatnych.", "is_plugin": True}
+        {"id": "Google", "name": "Wyszukiwarka Google (Grounding)", "description": "Płatne (Tokeny Gemini). Otwarty internet, BIP-y gmin, portale regionalne.", "is_plugin": False},
+        {"id": "GUNB", "name": "Pozwolenia budowlane (GUNB RWDZ)", "description": "Darmowe. Wczesne sygnały o inwestycjach budowlanych.", "is_plugin": False},
     ]
-    for source_name in SCRAPER_REGISTRY.keys():
-        if not any(s["id"] == source_name for s in sources):
-            sources.append({
-                "id": source_name,
-                "name": f"{source_name} (Dedykowany Skraper)",
-                "description": "Darmowe. Sanitacja DOM + omijanie Cloudflare via TLS impersonate.",
-                "is_plugin": True
-            })
+    for source_id, meta in CANONICAL_SCRAPERS.items():
+        sources.append({
+            "id": source_id,
+            "name": meta["name"],
+            "description": meta["description"],
+            "is_plugin": True
+        })
     return sources
 
 

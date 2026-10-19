@@ -3,11 +3,11 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/seed.py",
-    "src/scrapers/automatyka.py",
-    "tests/test_tensometria_seed_and_scraper.py"
+    "src/scrapers/factory.py",
+    "src/main.py",
+    "tests/test_sources_cleanup.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-10-19T11:16:03Z",
-  "notes": "Wdrożono kampanię Tensometria i Podzespoły Wagowe (EW+WP) oraz usprawniono skraper Automatyka.pl dla stron marek (Plan 067)"
+  "timestamp": "2026-10-19T11:36:12Z",
+  "notes": "Oczyszczono listę źródeł w /api/sources do 8 unikalnych kanonicznych źródeł, eliminując powielanie aliasów w UI (Plan 068)"
 }

@@ -3,13 +3,14 @@ factory.py — Fabryka i rejestr wtyczek skraperów.
 """
 
 import re
-from typing import Dict, Type, Optional
+from typing import Dict, Type, Optional, Any
 from scrapers.base import BaseScraper
 from scrapers.automatyka import AutomatykaScraper
 from scrapers.logintrade import LogintradeScraper
 from scrapers.biznes_polska import BiznesPolskaScraper
 from scrapers.baza_konkurenconosci import BazaKonkurenconosciScraper
 from scrapers.platforma_zakupowa import PlatformaZakupowaScraper
+
 
 
 def normalize_source_name(name: str) -> str:
@@ -43,6 +44,36 @@ def normalize_source_name(name: str) -> str:
     # Usunięcie znaków niealfanumerycznych
     s = re.sub(r"[^a-z0-9]", "", s)
     return s
+
+
+# Kanoniczny rejestr wtyczek skraperów z metadanymi dla API i UI
+CANONICAL_SCRAPERS: Dict[str, Dict[str, Any]] = {
+    "Automatyka": {
+        "class": AutomatykaScraper,
+        "name": "Automatyka.pl (Zapytania B2B)",
+        "description": "Darmowe. Zapytania techniczne, komponenty, automatyka przemysłowa."
+    },
+    "BazaKonkurencyjnosci": {
+        "class": BazaKonkurenconosciScraper,
+        "name": "Baza Konkurencyjności (BK2021 / Dotacje UE)",
+        "description": "Darmowe. Zamówienia publiczne i prywatne z funduszy UE / KPO."
+    },
+    "BiznesPolska": {
+        "class": BiznesPolskaScraper,
+        "name": "Biznes-Polska (Przetargi i Inwestycje)",
+        "description": "Darmowe (wymagana subskrypcja). Agregacja zamówień publicznych i komercyjnych."
+    },
+    "LoginTrade": {
+        "class": LogintradeScraper,
+        "name": "LoginTrade (Przemysł i Spółki SP)",
+        "description": "Darmowe. Platforma zakupowa spółek skarbu państwa i przemysłu ciężkiego."
+    },
+    "PlatformaZakupowa": {
+        "class": PlatformaZakupowaScraper,
+        "name": "PlatformaZakupowa.pl (Gminy, PSZOK, Wodociągi)",
+        "description": "Darmowe. Przetargi i zapytania jednostek samorządowych i komunalnych."
+    }
+}
 
 
 # Rejestr dokładnych nazw (zachowuje wsteczną kompatybilność oraz popularne aliasy)
