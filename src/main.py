@@ -465,7 +465,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.77",
+    version="1.7.78",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -488,7 +488,7 @@ async def health() -> dict:
         "status": "ok",
         "system_status": dep_report["status"],
         "service": "osint-lead-tracker",
-        "version": "1.7.77",
+        "version": "1.7.78",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
         "sanitizer": DOMSanitizer.get_status(),

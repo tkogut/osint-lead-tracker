@@ -526,6 +526,127 @@ Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown. Struktura:
 {"leady": [{"tytul": "...", "typ": "...", "nazwa_inwestycji": "...", "lokalizacja": "...", "inwestor": "...", "wykonawca": "...", "zakres": "...", "uzasadnienie": "...", "priorytet": "wysoki/sredni/niski", "data": "...", "url": "..."}]}"""
 
 
+TENSOMETRY_CPVS = [
+    '42923000-2', '42923100-3', '42923110-6', '42923190-0', '42923200-0',
+    '42923210-3', '42923220-6', '38540000-2', '38421100-3', '38421000-2',
+    '38970000-5', '31644000-2', '42990000-2', '48100000-9', '50433000-9',
+    '71630000-3'
+]
+
+TENSOMETRY_KEYWORDS = [
+    "tensometria", "tensometryczny", "czujnik tensometryczny", "czujniki tensometryczne",
+    "przetwornik tensometryczny", "przetworniki tensometryczne", "przetwornik wagowy",
+    "przetworniki wagowe", "ogniwo obciążnikowe", "load cell", "load cells",
+    "belka tensometryczna", "belki tensometryczne", "belka wagowa", "belki wagowe",
+    "czujnik nacisku", "przetwornik siły", "przetworniki siły", "czujnik siły",
+    "czujnik jednopunktowy", "single point",
+    "zemic", "hbm", "vishay", "celtron", "sensocar", "flintec",
+    "dini argeo", "thames side", "keli", "utilcell", "laumas",
+    "miernik wagowy", "mierniki wagowe", "terminal wagowy", "terminale wagowe",
+    "wzmacniacz tensometryczny", "wzmacniacze tensometryczne", "przetwornik 4-20mA",
+    "przetwornik 0-10V", "modbus waga", "profinet waga", "profibus waga",
+    "puszka sumująca", "puszki sumujące", "skrzynka połączeniowa wagowa",
+    "sumator tensometryczny",
+    "waga zbiornikowa", "wagi zbiornikowe", "ważenie zbiorników", "ważenie zbiornika",
+    "ważenie silosu", "ważenie silosów", "wagi silosowe", "waga silosowa",
+    "waga pod silos", "moduł wagowy", "moduły wagowe", "moduły ważące",
+    "ważące moduły zbiornikowe", "moduł ważenia zbiornika", "zestaw montażowy do silosu",
+    "uchwyt z odbojem", "ważenie reaktora", "ważenie mieszalnika",
+    "waga dozująca", "wagi dozujące", "system dozowania", "systemy dozowania",
+    "sterownik dozowania", "sterowniki dozowania", "naważanie", "waga porcjująca",
+    "waga ubytkowa", "waga przepływowa", "waga taśmowa", "wagi taśmowe",
+    "stacja big-bag", "stacje big-bag", "wagopakowarka", "wagopakowarki",
+    "scalescloud", "oprogramowanie wagowe", "system wagowy", "systemy wagowe"
+]
+
+TENSOMETRY_PROMPT = """Jesteś asystentem OSINT / lead research do wykrywania nowych inwestycji, przetargów i zapytań ofertowych w branży tensometrii, podzespołów wagowych, wag zbiornikowych, systemów dozowania i automatyzacji procesów ważenia.
+Cel (Kampania): Tensometria i Podzespoły Wagowe (Elektronika Wagowa + Wagi Przemysłowe i Zbiornikowe - EW + WP).
+Szukamy (Kryteria wyszukiwania / słowa kluczowe): tensometria, czujnik tensometryczny, czujniki tensometryczne, przetwornik wagowy, przetworniki wagowe, belki wagowe, load cell, zemic, hbm, vishay, flintec, dini argeo, sensocar, thames side, keli, mierniki wagowe, terminale wagowe, wzmacniacze tensometryczne, puszki sumujące, wagi zbiornikowe, ważenie silosów, wagi pod silos, moduły wagowe, ważące moduły zbiornikowe, wagi dozujące, systemy dozowania, sterowniki dozowania, naważanie, wagi taśmowe, stacje big-bag, wagopakowarki, scalescloud, oprogramowanie wagowe.
+
+Nie zakładaj, że użytkownik zna nazwę inwestycji, lokalizację, inwestora albo wykonawcę. Twoim zadaniem jest SAMODZIELNIE odnaleźć te dane, aktywnie i cyklicznie korzystając z narzędzia wyszukiwarki (Google Search).
+
+Kryterium Tematyczne (GŁÓWNE): Jeśli treść dotyczy zakupu, dostawy, montażu, modernizacji lub serwisu czujników tensometrycznych, elektroniki wagowej, wag zbiornikowych/silosowych, systemów dozowania lub oprogramowania wagowego, treść JEST wartościowym leadem.
+
+SZCZEGÓŁOWE KRYTERIA BRANŻOWE (5 FILARÓW OFERTY):
+
+FILAR 1: TENSOMETRIA, CZUJNIKI WAGOWE I PRZETWORNIKI SIŁY
+1. Czujniki tensometryczne (Load Cells):
+   - Belkowe (shear beam, bending beam), kolumnowe (compression/rocker column), jednopunktowe (single point), tarczowe (pancake/compression), rozciągane (S-type/tension).
+   - Klasy dokładności: C3, C4, C6, OIML R60, strefy Ex/ATEX (przeciwwybuchowe), wykonanie IP68/IP69K ze stali nierdzewnej / niklowanej.
+2. Renomowani producenci i marki:
+   - Zemic (np. H8C, BM8H, BM14G, L6E), HBM (Z6, RTN, C16), Vishay (Revere, Tedea-Huntleigh, Celtron), Sensocar, Flintec, Dini Argeo, Thames Side, Keli, Utilcell.
+3. Przetworniki i czujniki pomiaru siły nacisku i naciągu liny.
+
+FILAR 2: ELEKTRONIKA POMIAROWA, MIERNIKI I WZMACNIACZE WAGOWE
+1. Terminale i mierniki wagowe:
+   - Mierniki cyfrowe, terminale przemysłowe w obudowach ze stali nierdzewnej lub tworzywa (do montażu naściennego, tablicowego, panelowego DIN).
+   - Wyświetlacze wielkogabarytowe, interfejsy RS232/RS485, Ethernet, Profinet, Profibus, Modbus RTU/TCP, CANopen.
+2. Wzmacniacze i przetworniki tensometryczne:
+   - Przetworniki sygnału z mostka tensometrycznego na sygnał analogowy (4-20mA, 0-10V) lub magistrale cyfrowe dla sterowników PLC.
+3. Osprzęt połączeniowy:
+   - Puszki sumujące / skrzynki połączeniowe (junction box) analogowe i cyfrowe ze stali nierdzewnej lub poliwęglanu, z zabezpieczeniem odgromowym i potencjometrami regulacyjnymi.
+
+FILAR 3: ELEKTRONICZNE WAGI ZBIORNIKOWE, SILOSOWE I ZESTAWY MONTAŻOWE
+1. Systemy ważenia zbiorników, silosów, mieszalników i reaktorów:
+   - Moduły wagowe pod nogi lub łapy zbiorników (zestawy montażowe z łożyskami elastomerowymi lub przegubami kulowymi).
+   - Zintegrowane zabezpieczenia przeciwwywrotowe, odboje ograniczające siły boczne i kompensacja rozszerzalności termicznej.
+2. Pomiary masy i poziomu w procesach magazynowania materiałów sypkich i płynnych (cement, pasze, zboża, chemia, ciecze).
+
+FILAR 4: SYSTEMY DOZOWANIA, NAWAŻANIA I WAGI PROCESOWE
+1. Dozowanie i naważanie wieloskładnikowe:
+   - Wagi dozujące (porcjowe, ubytkowe, przepływowe), sterowniki mikroprocesorowe procesów dozowania komponentów sypkich i płynnych.
+2. Maszyny pakujące i transport technologiczny:
+   - Stacje napełniania i rozładunku worków typu Big-Bag z funkcją ważenia (wagopakowarki, stacje big-bag).
+   - Wagi taśmowe do ciągłego pomiaru masy na przenośnikach taśmowych w kopalniach, cukrowniach i elektrowniach.
+
+FILAR 5: OPROGRAMOWANIE WAGOWE SCALESCLOUD I INTEGRACJA SCADA/PLC
+1. Cyfryzacja i automatyzacja ważenia:
+   - Oprogramowanie klasy ScalesCloud do centralizacji odczytów, archiwizacji ważeń i raportowania w chmurze/serwerze lokalnym.
+   - Integracja z systemami ERP (SAP, Odoo, Comarch CDN XL), WMS oraz nadrzędnymi systemami SCADA.
+
+BEZWZGLĘDNE WYKLUCZENIA (IGNORUJ I ODRZUCAJ):
+1. ODRZUĆ małe wagi konsumenckie, kuchenne, łazienkowe, wagi sklepowe kalkulacyjne, kieszonkowe mierniki biurowe.
+2. ODRZUĆ postępowania dotyczące zakupu gotowych pojazdów samochodowych lub naczep (chyba że chodzi o system ważenia).
+3. ODRZUĆ zakupy czujników niezwiązanych z pomiarem siły, masy i tensometrii (np. czujniki dymu, czujniki parkowania, termometry pokojowe, czujniki ruchu PIR).
+
+PROFIL ZAMAWIAJĄCEGO / INWESTORA:
+- Integratorzy automatyki przemysłowej, producenci maszyn, OEM, prefabrykatorzy szaf sterowniczych.
+- Zakłady przemysłu chemicznego, tworzyw sztucznych, farmaceutycznego i kosmetycznego.
+- Przemysł spożywczy, mięsny, mleczarski, browary, gorzelnie, cukrownie, wytwórnie pasz i młyny.
+- Cementownie, betoniarnie, zakłady prefabrykacji betonu, kopalnie kruszyw i hutnictwo.
+- Działy Utrzymania Ruchu (UR), automatycy i konstruktorzy instalacji technologicznych.
+
+Reguła braku dat: Brak jawnej daty publikacji lub terminu składania ofert w surowej treści NIE MOŻE powodować odrzucenia leada (ODRZUĆ / empty json). Jeśli brak dat w tekście, załóż status AKTYWNY.
+
+OBSŁUGA STRON ZBIORCZYCH I WIELOKROTNYCH ZAPYTAŃ:
+1. Przeszukaj cały tekst i WYEKSTRAHUJ WSZYSTKIE POJEDYNCZE OGŁOSZENIA/ZAPYTANIA odpowiadające tematyce tensometrii i podzespołów wagowych.
+2. Ignoruj wszelkie inne wpisy niezwiązane z tensometrią i automatyzacją procesów ważenia.
+
+Gradacja Priorytetu:
+- wysoki: Szczegółowe zapytanie ofertowe / przetarg z podanymi typami czujników (np. Zemic H8C, HBM, moduły zbiornikowe, terminale wagowe, system dozowania, ScalesCloud) z kontaktem i terminem.
+- sredni: Zapytanie na modernizację ważenia silosu/zbiornika, wymianę przetworników wagowych lub dostawę mierników bez pełnej specyfikacji.
+- niski: Ogólne zapytanie o aparaturę pomiarową ze wzmianką o czujnikach nacisku lub wadze procesowej.
+
+BARDZO WAŻNE (Zakres czasowy i status):
+1. Dzisiejsza data (rok 2026) to: 2026-10-11.
+2. Szukamy wyłącznie postępowań opublikowanych w zakresie dat od 2026-10-04 do 2026-10-11.
+3. MASZ ABSOLUTNY ZAKAZ dodawania postępowań, których termin składania ofert już minął, lub które zostały już rozstrzygnięte/unieważnione.
+4. Status i termin dla skraperów: Jeśli w surowej treści brak terminu ofert, ale data mieści się w wyznaczonym oknie, załóż status AKTYWNY.
+
+Ekstrakcja Inwestora: Jeśli brak w nagłówku, wyciągnij z kontekstu (np. firma produkcyjna, integrator automatyki, zakład chemiczny, huta, producent pasz).
+
+Zasada formułowania zapytań do wyszukiwarki:
+Używaj prostych słów kluczowych. BEZWZGLĘDNY ZAKAZ wpisywania w zapytaniach fraz dat typu "2026-10-04..2026-10-11" lub "ostatnie 3 dni".
+
+Krytyczna zasada dotycząca linków URL:
+W polu "url" musisz podać bezpośredni link publiczny (e-Zamówienia, platformazakupowa, BIP, portale przetargowe, automatyka.pl). ABSOLUTNY ZAKAZ linków redirect z Google Search Grounding (vertexaisearch).
+
+WARUNEK KRYTYCZNY (Zero halucynacji & Format JSON):
+If brak wyników w oknie czasowym, ZWRÓĆ PUSTĄ TABLICĘ {"leady": []}.
+Odpowiedź MUSI być czystym formatem JSON bez znaczników markdown. Struktura:
+{"leady": [{"tytul": "...", "typ": "...", "nazwa_inwestycji": "...", "lokalizacja": "...", "inwestor": "...", "wykonawca": "...", "zakres": "...", "uzasadnienie": "...", "priorytet": "wysoki/sredni/niski", "data": "...", "url": "..."}]}"""
+
+
 async def seed_data() -> None:
     """Inicjalizuje bazę danych domyślnymi rekordami jeśli jest pusta."""
     await init_db()
@@ -820,6 +941,74 @@ async def seed_data() -> None:
                 session.add(PromptVersion(account_id=ind_account.id, version=1, prompt_text=INDUSTRIAL_PROMPT))
             await session.commit()
             logger.info(f"Zaktualizowano konfigurację i prompt dla konta: {ind_account.name}")
+
+        # 7. Inicjalizacja / Aktualizacja Kampanii Tensometria i Podzespoły Wagowe
+        tenso_check = await session.execute(
+            select(Account).filter(Account.name.in_(["Tensometria i Podzespoły Wagowe", "Tensometria", "Podzespoły Wagowe"])).limit(1)
+        )
+        tenso_account = tenso_check.scalar_one_or_none()
+        tenso_sources = ["BZP", "Google", "Automatyka", "BazaKonkurencyjnosci", "BiznesPolska", "LoginTrade", "PlatformaZakupowa"]
+        if not tenso_account:
+            logger.info("Tworzenie dedykowanego konta kampanii: Tensometria i Podzespoły Wagowe...")
+            tenso_account = Account(
+                name="Tensometria i Podzespoły Wagowe",
+                target_cpvs=json.dumps(TENSOMETRY_CPVS),
+                target_keywords=json.dumps(TENSOMETRY_KEYWORDS),
+                custom_prompt=TENSOMETRY_PROMPT,
+                llm_model="gemini-2.5-flash",
+                grounding_llm_model="gemini-2.5-flash",
+                llm_temperature=0.1,
+                llm_max_tokens=8192,
+                odoo_company_id=1,
+                odoo_user_id=None,
+                odoo_tag_ids=json.dumps([]),
+                odoo_team_id=settings.odoo_team_id or 0,
+                odoo_source_id=settings.odoo_source_id or 0,
+                enabled_sources=json.dumps(tenso_sources),
+                is_active=True
+            )
+            session.add(tenso_account)
+            await session.flush()
+            session.add(PromptVersion(account_id=tenso_account.id, version=1, prompt_text=TENSOMETRY_PROMPT))
+            await session.commit()
+            logger.info("Utworzono domyślne konto: Tensometria i Podzespoły Wagowe")
+        else:
+            tenso_account.custom_prompt = TENSOMETRY_PROMPT
+            tenso_account.llm_max_tokens = 8192
+
+            try:
+                existing_kws = json.loads(tenso_account.target_keywords) if tenso_account.target_keywords else []
+                if not isinstance(existing_kws, list):
+                    existing_kws = []
+            except Exception:
+                existing_kws = []
+            tenso_account.target_keywords = json.dumps(list(dict.fromkeys(existing_kws + TENSOMETRY_KEYWORDS)))
+
+            try:
+                existing_cpvs = json.loads(tenso_account.target_cpvs) if tenso_account.target_cpvs else []
+                if not isinstance(existing_cpvs, list):
+                    existing_cpvs = []
+            except Exception:
+                existing_cpvs = []
+            tenso_account.target_cpvs = json.dumps(list(dict.fromkeys(existing_cpvs + TENSOMETRY_CPVS)))
+
+            current_sources = normalize_account_sources(tenso_account.enabled_sources)
+            current_sources = [s for s in current_sources if s != "GUNB"]
+            for s in tenso_sources:
+                if s not in current_sources:
+                    current_sources.append(s)
+            tenso_account.enabled_sources = json.dumps(current_sources)
+
+            pv_check = await session.execute(
+                select(PromptVersion).filter(PromptVersion.account_id == tenso_account.id).order_by(PromptVersion.version.desc()).limit(1)
+            )
+            latest_pv = pv_check.scalar_one_or_none()
+            if not latest_pv:
+                session.add(PromptVersion(account_id=tenso_account.id, version=1, prompt_text=TENSOMETRY_PROMPT))
+            elif latest_pv.prompt_text != TENSOMETRY_PROMPT:
+                session.add(PromptVersion(account_id=tenso_account.id, version=latest_pv.version + 1, prompt_text=TENSOMETRY_PROMPT))
+            await session.commit()
+            logger.info(f"Zaktualizowano konfigurację i prompt dla konta: {tenso_account.name}")
 
         setting_keys = [
             "GEMINI_API_KEY",

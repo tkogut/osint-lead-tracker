@@ -86,10 +86,121 @@ def extract_advertiser_info(html_content: str) -> str:
     return ""
 
 
+def parse_notice_detail(detail_html: str, detail_url: str = "") -> Dict[str, Any]:
+    """
+    Parsuje szczegóły ogłoszenia/zapytania z portalu Automatyka.pl.
+    Obsługuje standardowe ogłoszenia oraz podstrony zbiorcze marek i kategorii (np. -27, ?topId=...).
+    """
+    top_id = None
+    if detail_url:
+        top_id_m = re.search(r'[?&]topId=(\d+)', detail_url)
+        if top_id_m:
+            top_id = top_id_m.group(1)
+
+    # Sprawdzenie czy w treści występują kafelki box-styles
+    box_matches = list(re.finditer(r'<div[^>]*class="[^"]*box-styles[^"]*"[^>]*>', detail_html, flags=re.IGNORECASE))
+
+    # Strona zbiorcza (gdy są kafelki box-styles)
+    if box_matches:
+        boxes = []
+        for i, m in enumerate(box_matches):
+            start = m.start()
+            if i + 1 < len(box_matches):
+                end = box_matches[i + 1].start()
+            else:
+                cutoff_m = re.search(r'(?:<footer|<aside|<div\s+class="[^"]*pagination|<div\s+class="[^"]*footer)', detail_html[start:], re.IGNORECASE)
+                if cutoff_m:
+                    end = start + cutoff_m.start()
+                else:
+                    end = len(detail_html)
+            boxes.append(detail_html[start:end])
+
+        target_box = None
+        # Jeśli mamy top_id, szukamy kafelka z tym numerem
+        if top_id:
+            for b in boxes:
+                if re.search(rf"Zapytanie\s+nr\s+{top_id}\b", b, re.IGNORECASE) or re.search(rf"\b{top_id}\b", b):
+                    target_box = b
+                    break
+
+        # Fallback: kafelek aktywny
+        if not target_box:
+            for b in boxes:
+                if re.search(r'class="[^"]*\bactive\b[^"]*"', b, re.IGNORECASE):
+                    target_box = b
+                    break
+
+        # Fallback: pierwszy kafelek
+        if not target_box and boxes:
+            target_box = boxes[0]
+
+        if target_box:
+            # 1. Tytuł z <h2> wewnątrz tego kafelka, fallback do <h1>
+            title = None
+            h2_m = re.search(r'<h2[^>]*>(.*?)</h2>', target_box, flags=re.DOTALL | re.IGNORECASE)
+            if h2_m:
+                h2_text = re.sub(r'<[^>]+>', '', h2_m.group(1)).strip()
+                if h2_text:
+                    title = h2_text
+
+            if not title:
+                h1_m = re.search(r'<h1[^>]*>(.*?)</h1>', detail_html, flags=re.DOTALL | re.IGNORECASE)
+                if h1_m:
+                    title = re.sub(r'<[^>]+>', '', h1_m.group(1)).strip()
+
+            if not title:
+                title = "Zapytanie ofertowe - Automatyka.pl"
+
+            # 2. Data publikacji z <small>Opublikowano: ...</small> wewnątrz tego kafelka
+            pub_date_str = None
+            small_pub_m = re.search(r'<small[^>]*>Opublikowano:\s*(\d{4}-\d{2}-\d{2})</small>', target_box, re.IGNORECASE)
+            if small_pub_m:
+                pub_date_str = small_pub_m.group(1)
+            else:
+                box_pub_m = re.search(r'Opublikowano:\s*(\d{4}-\d{2}-\d{2})', target_box, re.IGNORECASE)
+                if box_pub_m:
+                    pub_date_str = box_pub_m.group(1)
+                else:
+                    box_date_m = re.search(r'z\s+dnia\s+(\d{4}-\d{2}-\d{2})', target_box, re.IGNORECASE)
+                    if box_date_m:
+                        pub_date_str = box_date_m.group(1)
+
+            # 3. Wyizolowanie tekstu tego konkretnego zapytania
+            clean_text = DOMSanitizer.clean(target_box, max_chars=6000)
+
+            return {
+                "title": title,
+                "pub_date_str": pub_date_str,
+                "clean_text": clean_text
+            }
+
+    # Standardowe ogłoszenie (brak kafelków box-styles)
+    title_m = re.search(r"<h1[^>]*>(.*?)</h1>", detail_html, flags=re.DOTALL | re.IGNORECASE)
+    title = re.sub(r"<[^>]+>", "", title_m.group(1)).strip() if title_m else "Zapytanie ofertowe - Automatyka.pl"
+
+    pub_date_str = None
+    pub_match = re.search(r"Opublikowano:\s*(\d{4}-\d{2}-\d{2})", detail_html, re.IGNORECASE)
+    if pub_match:
+        pub_date_str = pub_match.group(1)
+    else:
+        fallback_match = re.search(r"z\s+dnia\s+(\d{4}-\d{2}-\d{2})", detail_html, re.IGNORECASE)
+        if fallback_match:
+            pub_date_str = fallback_match.group(1)
+
+    clean_text = DOMSanitizer.clean(detail_html, max_chars=6000)
+
+    return {
+        "title": title,
+        "pub_date_str": pub_date_str,
+        "clean_text": clean_text
+    }
+
+
 class AutomatykaScraper(BaseScraper):
     """
     Dedykowany skraper dla portalu automatyka.pl (zapytania ofertowe).
     """
+    parse_notice_detail = staticmethod(parse_notice_detail)
 
     def __init__(self) -> None:
         super().__init__(source_name="Automatyka")
@@ -161,8 +272,8 @@ class AutomatykaScraper(BaseScraper):
                     found_links = set(re.findall(r'href=["\'](/zapytania-ofertowe/[^"\']+)["\']', html))
                     detail_urls = []
                     for link in found_links:
-                        # Match only actual notice links ending with -ID1-ID2 pattern
-                        if re.match(r'^/zapytania-ofertowe/[^/:\?]+-\d+-\d+(?:\?|$)', link):
+                        # Match notice links ending with -ID1-ID2 pattern or brand/category pages like -ID or containing query params
+                        if re.match(r'^/zapytania-ofertowe/[^/:\?]+-(?:\d+-\d+|\d+)(?:\?.*)?$', link):
                             full_url = urllib.parse.urljoin(self.base_url, link)
                             detail_urls.append(full_url)
 
@@ -203,15 +314,10 @@ class AutomatykaScraper(BaseScraper):
 
                             detail_html = detail_resp.text
 
-                            # Wyciągnij datę publikacji za pomocą regex
-                            pub_date_str = None
-                            pub_match = re.search(r"Opublikowano:\s*(\d{4}-\d{2}-\d{2})", detail_html)
-                            if pub_match:
-                                pub_date_str = pub_match.group(1)
-                            else:
-                                fallback_match = re.search(r"z dnia\s+(\d{4}-\d{2}-\d{2})", detail_html)
-                                if fallback_match:
-                                    pub_date_str = fallback_match.group(1)
+                            notice_data = parse_notice_detail(detail_html, detail_url)
+                            pub_date_str = notice_data["pub_date_str"]
+                            clean_text = notice_data["clean_text"]
+                            title = notice_data["title"]
 
                             if pub_date_str:
                                 try:
@@ -222,8 +328,6 @@ class AutomatykaScraper(BaseScraper):
                                         break
                                 except Exception as parse_pub_err:
                                     logger.warning("[Automatyka] Błąd parsowania wyciągniętej daty %s: %s", pub_date_str, parse_pub_err)
-
-                            clean_text = DOMSanitizer.clean(detail_html, max_chars=6000)
 
                             if len(clean_text) < 50:
                                 logger.warning("[Automatyka] Odrzucono zbyt krótki tekst po sanitacji DOM: %s", detail_url)
@@ -240,10 +344,6 @@ class AutomatykaScraper(BaseScraper):
                                 if account and hasattr(account, "id"):
                                     await mark_url_visited(detail_url, account.id, self.source_name, status="SKIPPED")
                                 continue
-
-                            # Próbujemy wyciągnąć prosty tytuł
-                            title_match = re.search(r"<h1[^>]*>(.*?)</h1>", detail_html, flags=re.DOTALL | re.IGNORECASE)
-                            title = re.sub(r"<[^>]+>", "", title_match.group(1)).strip() if title_match else "Zapytanie ofertowe - Automatyka.pl"
 
                             candidate_leads.append({
                                 "url": detail_url,
