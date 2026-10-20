@@ -26,14 +26,80 @@ PLACEHOLDER_REGEXES = [
     re.compile(r"\bdummy\b", re.IGNORECASE),
     re.compile(r"gmina-x\.pl", re.IGNORECASE),
     re.compile(r"example\.com", re.IGNORECASE),
+    # Plan 069: Sequential patterns
+    re.compile(r"\b12345\b"),
+    re.compile(r"/12345(?:\b|/|\?)"),
+    re.compile(r"12345$"),
+    re.compile(r"\b54321\b"),
+    # Plan 069: Fake subdomains of platformazakupowa/ezamowienia/bazakonkurencyjnosci
+    re.compile(r"platformazakupowa\.[a-z0-9\-]+\.pl", re.IGNORECASE),
+    re.compile(r"ezamowienia\.(?!gov\.pl)[a-z0-9\-]+\.pl", re.IGNORECASE),
+    re.compile(r"bazakonkurencyjnosci\.[a-z0-9\-]+\.pl", re.IGNORECASE),
+    # Plan 069: Fake placeholder paths
+    re.compile(r"/zapytani[ea]/1234", re.IGNORECASE),
+    re.compile(r"/przetargi?/1234", re.IGNORECASE),
 ]
+
+# Znane prefiksy IP domen zaparkowanych / dummy (Plan 069)
+PARKED_IP_PREFIXES = (
+    "104.247.81.",
+    "34.102.136.",
+    "199.59.243.",
+    "0.0.0.0",
+    "127.",
+)
+
+# Zaufane domeny i portale publiczne / przetargowe (Plan 069)
+TRUSTED_DOMAINS = (
+    "platformazakupowa.pl",
+    "logintrade.net",
+    "biznes-polska.pl",
+    "automatyka.pl",
+    "bazakonkurencyjnosci.funduszeeuropejskie.gov.pl",
+)
+
+
+def _is_trusted_portal(hostname: str) -> bool:
+    """Sprawdza, czy hostname należy do zaufanych portali publicznych lub rządowych."""
+    if not hostname:
+        return False
+    h = hostname.lower()
+    if h.endswith(".gov.pl") or h == "gov.pl":
+        return True
+    for td in TRUSTED_DOMAINS:
+        if h == td or h.endswith("." + td):
+            return True
+    return False
+
+
+def _handle_connection_failure(hostname: str, url: str, exc: Exception) -> Tuple[bool, str, str]:
+    """
+    Obsługa błędów połączenia HTTP/SSL.
+    Dla zaufanych portali (gov.pl, platformazakupowa itp.) przy przejściowych timeoutach zachowujemy lead.
+    Dla niezweryfikowanych/dowolnych domen link jest odrzucany.
+    """
+    if _is_trusted_portal(hostname):
+        logger.info("Przejściowy problem z połączeniem dla zaufanego portalu %s: %s. Zachowywanie leada.", hostname, exc)
+        return True, url, "OK (Host reachable)"
+    err_msg = f"Nieosiągalny host / Błąd połączenia: {type(exc).__name__}"
+    logger.warning("Odrzucono niezweryfikowany/nieosiągalny URL %s: %s", url, err_msg)
+    return False, url, err_msg
 
 
 async def _resolve_dns(hostname: str) -> bool:
-    """Asynchroniczne sprawdzenie rozwiązywania nazwy hosta w DNS."""
+    """Asynchroniczne sprawdzenie rozwiązywania nazwy hosta w DNS oraz filtr zaparkowanych IP."""
     try:
         loop = asyncio.get_running_loop()
-        await loop.getaddrinfo(hostname, None)
+        addr_info = await loop.getaddrinfo(hostname, None)
+        if not addr_info:
+            return False
+        for item in addr_info:
+            sockaddr = item[4]
+            if sockaddr and isinstance(sockaddr, tuple) and len(sockaddr) > 0:
+                ip_str = str(sockaddr[0])
+                if any(ip_str.startswith(prefix) for prefix in PARKED_IP_PREFIXES):
+                    logger.warning("DNS resolved to parked/dummy IP %s for %s", ip_str, hostname)
+                    return False
         return True
     except (socket.gaierror, socket.error, UnicodeError):
         return False
@@ -82,7 +148,7 @@ async def validate_and_resolve_url(url: str, timeout: float = 5.0) -> Tuple[bool
     # 3. DNS check
     dns_ok = await _resolve_dns(hostname)
     if not dns_ok:
-        return False, url_clean, "Błąd DNS: domena nie istnieje"
+        return False, url_clean, "Błąd DNS: domena nie istnieje lub jest zaparkowana"
 
     resolved_url = url_clean
 
@@ -118,8 +184,7 @@ async def validate_and_resolve_url(url: str, timeout: float = 5.0) -> Tuple[bool
                     resp = await client.get(url_clean, headers=headers)
                 except Exception as get_exc:
                     logger.debug("HTTP GET fallback error for %s: %s", url_clean, get_exc)
-                    # Jeśli DNS przeszedł, ale połączenie zostało odrzucone lub timeout
-                    return True, resolved_url, "OK (Host reachable)"
+                    return _handle_connection_failure(hostname, resolved_url, get_exc)
 
             if resp is not None:
                 final_url = str(resp.url)
@@ -135,12 +200,12 @@ async def validate_and_resolve_url(url: str, timeout: float = 5.0) -> Tuple[bool
                     # Inne kody (np. 500, 502, 503) — serwer istnieje, nie odrzucamy pochopnie
                     return True, resolved_url, f"OK (HTTP {status})"
 
-    except (httpx.TimeoutException, httpx.ConnectError) as exc:
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError) as exc:
         logger.debug("HTTP connection issue for %s: %s", url_clean, exc)
-        return True, resolved_url, "OK (Host reachable)"
+        return _handle_connection_failure(hostname, resolved_url, exc)
     except Exception as exc:
         logger.debug("Unexpected HTTP error for %s: %s", url_clean, exc)
-        return True, resolved_url, "OK (Host reachable)"
+        return _handle_connection_failure(hostname, resolved_url, exc)
 
     return True, resolved_url, "OK"
 

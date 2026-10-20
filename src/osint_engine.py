@@ -152,6 +152,7 @@ BEZWZGLĘDNY ZAKAZ wpisywania w zapytaniach do wyszukiwarki fraz takich jak "dat
 Krytyczna zasada dotycząca linków URL:
 W polu "url" musisz podać bezpośredni, oryginalny link publiczny do ogłoszenia na danej platformie (np. https://ezamowienia.gov.pl/..., https://platformazakupowa.pl/..., bip.xxx.pl).
 ABSOLUTNY ZAKAZ używania linków przekierowujących z Google Search Grounding (np. zaczynających się od vertexaisearch.cloud.google.com/grounding-api-redirect/...). Wyciągaj bezpośrednie domeny i adresy URL stron źródłowych z tekstu lub z linków w wynikach wyszukiwania.
+BEZWZGLĘDNY ZAKAZ generowania fikcyjnych adresów URL, zmyślonych subdomen (np. platformazakupowa.firma.pl) oraz sztucznych identyfikatorów (np. /12345). Każdy podany adres URL MUSI fizycznie istnieć w wynikach wyszukiwania. W przypadku braku bezpośredniego linku, zwróć pustą tablicę leadów.
 
 Cykl 1 (Zarzucenie sieci): Uruchom wyszukiwarkę dla głównych fraz ogólnych.
 Cykl 2 (Precyzowanie): Uruchom narzędzie wyszukiwania ponownie, celując w konkretne platformy i typy zapytań.

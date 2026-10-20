@@ -3,11 +3,12 @@
   "role": "Builder Agent",
   "status": "SUCCESS",
   "files_modified": [
-    "src/scrapers/factory.py",
+    "src/url_validator.py",
+    "src/osint_engine.py",
     "src/main.py",
-    "tests/test_sources_cleanup.py"
+    "tests/test_url_validator_hardening.py"
   ],
   "math_consistency_check": "PASSED",
-  "timestamp": "2026-10-19T11:36:12Z",
-  "notes": "Oczyszczono listę źródeł w /api/sources do 8 unikalnych kanonicznych źródeł, eliminując powielanie aliasów w UI (Plan 068)"
+  "timestamp": "2026-10-20T08:12:15Z",
+  "notes": "Uszczelniono walidator URL przed zmyślonymi subdomenami i placeholderami 12345 oraz dodano DELETE /api/leads/{id} (Plan 069)"
 }

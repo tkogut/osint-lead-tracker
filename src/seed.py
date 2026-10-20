@@ -108,6 +108,7 @@ Używaj prostych słów kluczowych. BEZWZGLĘDNY ZAKAZ wpisywania w zapytaniach 
 
 Krytyczna zasada dotycząca linków URL:
 W polu "url" musisz podać bezpośredni link publiczny (e-Zamówienia, platformazakupowa, BIP, portale przetargowe). ABSOLUTNY ZAKAZ linków redirect z Google Search Grounding (vertexaisearch).
+BEZWZGLĘDNY ZAKAZ generowania fikcyjnych adresów URL, zmyślonych subdomen (np. platformazakupowa.firma.pl) oraz sztucznych identyfikatorów (np. /12345). Każdy podany adres URL MUSI fizycznie istnieć w wynikach wyszukiwania. W przypadku braku bezpośredniego linku, zwróć pustą tablicę leadów.
 
 Cykl 1 (Zarzucenie sieci): Wyszukiwanie ogólne ("waga samochodowa przetarg", "dostawa wagi samochodowej SWZ", "waga najazdowa 60t zapytanie").
 Cykl 2 (Precyzowanie): Wyszukiwanie celowane pod PSZOK i odpady ("budowa PSZOK waga samochodowa", "waga samochodowa odpady BDO", "bezobsługowa waga samochodowa").
@@ -215,6 +216,7 @@ BEZWZGLĘDNY ZAKAZ wpisywania w zapytaniach do wyszukiwarki fraz takich jak "dat
 Krytyczna zasada dotycząca linków URL:
 W polu "url" musisz podać bezpośredni, oryginalny link publiczny do ogłoszenia na danej platformie (np. https://ezamowienia.gov.pl/..., https://platformazakupowa.pl/..., bip.xxx.pl).
 ABSOLUTNY ZAKAZ używania linków przekierowujących z Google Search Grounding (np. zaczynających się od vertexaisearch.cloud.google.com/grounding-api-redirect/...). Wyciągaj bezpośrednie domeny i adresy URL stron źródłowych z tekstu lub z linków w wynikach wyszukiwania.
+BEZWZGLĘDNY ZAKAZ generowania fikcyjnych adresów URL, zmyślonych subdomen (np. platformazakupowa.firma.pl) oraz sztucznych identyfikatorów (np. /12345). Każdy podany adres URL MUSI fizycznie istnieć w wynikach wyszukiwania. W przypadku braku bezpośredniego linku, zwróć pustą tablicę leadów.
 
 Cykl 1 (Zarzucenie sieci): Uruchom wyszukiwarkę dla głównych fraz ogólnych (np. "dostawa analizatora NIR przetarg", "automatyczny próbnik ziarna SWZ", "Rakoraf zapytanie ofertowe").
 Cykl 2 (Precyzowanie): Uruchom narzędzie wyszukiwania ponownie, celując w konkretne platformy i typy zapytań (e-Zamówienia, Baza Konkurencyjności, Platforma Zakupowa).
@@ -310,6 +312,7 @@ BEZWZGLĘDNY ZAKAZ wpisywania w zapytaniach do wyszukiwarki fraz takich jak "dat
 Krytyczna zasada dotycząca linków URL:
 W polu "url" musisz podać bezpośredni, oryginalny link publiczny do ogłoszenia na danej platformie (np. https://ezamowienia.gov.pl/..., https://platformazakupowa.pl/..., bip.xxx.pl).
 ABSOLUTNY ZAKAZ używania linków przekierowujących z Google Search Grounding (np. zaczynających się od vertexaisearch.cloud.google.com/grounding-api-redirect/...). Wyciągaj bezpośrednie domeny i adresy URL stron źródłowych z tekstu lub z linków w wynikach wyszukiwania.
+BEZWZGLĘDNY ZAKAZ generowania fikcyjnych adresów URL, zmyślonych subdomen (np. platformazakupowa.firma.pl) oraz sztucznych identyfikatorów (np. /12345). Każdy podany adres URL MUSI fizycznie istnieć w wynikach wyszukiwania. W przypadku braku bezpośredniego linku, zwróć pustą tablicę leadów.
 
 Cykl 1 (Zarzucenie sieci): Uruchom wyszukiwarkę dla głównych fraz ogólnych (np. "waga kolejowa przetarg", "dostawa wagi wagonowej SWZ", "waga torowa zapytanie ofertowe").
 Cykl 2 (Precyzowanie): Uruchom narzędzie wyszukiwania ponownie, celując w konkretne platformy i typy zapytań ("modernizacja bocznicy waga kolejowa", "waga dynamiczna pociągów", "legalizacja wagi wagonowej").
@@ -412,6 +415,7 @@ Używaj prostych słów kluczowych. BEZWZGLĘDNY ZAKAZ wpisywania w zapytaniach 
 
 Krytyczna zasada dotycząca linków URL:
 W polu "url" musisz podać bezpośredni link publiczny (e-Zamówienia, platformazakupowa, BIP, Baza Konkurencyjności). ABSOLUTNY ZAKAZ linków redirect z Google Search Grounding (vertexaisearch).
+BEZWZGLĘDNY ZAKAZ generowania fikcyjnych adresów URL, zmyślonych subdomen (np. platformazakupowa.firma.pl) oraz sztucznych identyfikatorów (np. /12345). Każdy podany adres URL MUSI fizycznie istnieć w wynikach wyszukiwania. W przypadku braku bezpośredniego linku, zwróć pustą tablicę leadów.
 
 Cykl 1 (Zarzucenie sieci): Wyszukiwanie ogólne ("wzorcowanie wag przetarg", "wzorcowanie wzorców masy SWZ", "wzorcowanie wag PCA zapytanie").
 Cykl 2 (Precyzowanie): Wyszukiwanie celowane ("usługa wzorcowania wag akredytacja", "świadectwo wzorcowania wagi PCA", "kalibracja wag ISO 17025").
@@ -515,6 +519,7 @@ Używaj prostych słów kluczowych. BEZWZGLĘDNY ZAKAZ wpisywania w zapytaniach 
 
 Krytyczna zasada dotycząca linków URL:
 W polu "url" musisz podać bezpośredni link publiczny (e-Zamówienia, platformazakupowa, BIP, Baza Konkurencyjności). ABSOLUTNY ZAKAZ linków redirect z Google Search Grounding (vertexaisearch).
+BEZWZGLĘDNY ZAKAZ generowania fikcyjnych adresów URL, zmyślonych subdomen (np. platformazakupowa.firma.pl) oraz sztucznych identyfikatorów (np. /12345). Każdy podany adres URL MUSI fizycznie istnieć w wynikach wyszukiwania. W przypadku braku bezpośredniego linku, zwróć pustą tablicę leadów.
 
 Cykl 1 (Zarzucenie sieci): Wyszukiwanie ogólne ("dostawa wagi platformowej przetarg", "legalizacja wagi samochodowej przetarg", "waga zbiornikowa zapytanie").
 Cykl 2 (Precyzowanie): Wyszukiwanie celowane ("legalizacja wagi hakowej zapytanie", "legalizacja wagi wózek paletowy", "waga taśmowa przenośnik przetarg").
@@ -640,6 +645,7 @@ Używaj prostych słów kluczowych. BEZWZGLĘDNY ZAKAZ wpisywania w zapytaniach 
 
 Krytyczna zasada dotycząca linków URL:
 W polu "url" musisz podać bezpośredni link publiczny (e-Zamówienia, platformazakupowa, BIP, portale przetargowe, automatyka.pl). ABSOLUTNY ZAKAZ linków redirect z Google Search Grounding (vertexaisearch).
+BEZWZGLĘDNY ZAKAZ generowania fikcyjnych adresów URL, zmyślonych subdomen (np. platformazakupowa.firma.pl) oraz sztucznych identyfikatorów (np. /12345). Każdy podany adres URL MUSI fizycznie istnieć w wynikach wyszukiwania. W przypadku braku bezpośredniego linku, zwróć pustą tablicę leadów.
 
 WARUNEK KRYTYCZNY (Zero halucynacji & Format JSON):
 If brak wyników w oknie czasowym, ZWRÓĆ PUSTĄ TABLICĘ {"leady": []}.

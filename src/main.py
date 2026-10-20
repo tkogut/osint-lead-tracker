@@ -465,7 +465,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="OSINT Lead Tracker",
     description="Mikroserwis wyszukujący wagi samochodowe (e-Zamówienia, GUNB, Google Search) i integrujący je z Odoo CRM.",
-    version="1.7.79",
+    version="1.7.80",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
@@ -488,7 +488,7 @@ async def health() -> dict:
         "status": "ok",
         "system_status": dep_report["status"],
         "service": "osint-lead-tracker",
-        "version": "1.7.79",
+        "version": "1.7.80",
         "scheduler": "running" if scheduler.running else "stopped",
         "next_run": next_run,
         "sanitizer": DOMSanitizer.get_status(),
@@ -611,6 +611,23 @@ async def list_leads_session(
         "limit": limit,
         "pages": pages
     }
+
+
+@app.delete("/api/leads/{id}", tags=["Leads"], summary="Usunięcie leada z bazy")
+async def delete_lead(
+    id: int,
+    _token: Annotated[str, Depends(verify_token_or_session)],
+    db: AsyncSession = Depends(get_db)
+) -> dict:
+    stmt = select(Lead).filter(Lead.id == id).limit(1)
+    res = await db.execute(stmt)
+    lead = res.scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead nie został znaleziony.")
+
+    await db.delete(lead)
+    await db.commit()
+    return {"success": True, "id": id}
 
 
 # ---------------------------------------------------------------------------
