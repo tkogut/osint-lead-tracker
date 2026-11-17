@@ -47,8 +47,8 @@ async def test_calibration_campaign_seed_from_scratch(tmp_path, monkeypatch):
         assert account.custom_prompt == CALIBRATION_PROMPT
         assert json.loads(account.target_keywords) == CALIBRATION_KEYWORDS
         assert json.loads(account.target_cpvs) == CALIBRATION_CPVS
-        assert account.llm_model == "gemini-2.5-flash"
-        assert account.grounding_llm_model == "gemini-2.5-flash"
+        assert account.llm_model == "gemini-3.5-flash"
+        assert account.grounding_llm_model == "gemini-3.5-flash"
         assert account.llm_temperature == 0.1
         assert account.llm_max_tokens == 4096
         assert account.is_active is True

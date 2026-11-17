@@ -119,7 +119,7 @@ async def init_db() -> None:
         _cur.execute("PRAGMA table_info(accounts)")
         _acc_cols = [row[1] for row in _cur.fetchall()]
         if "grounding_llm_model" not in _acc_cols:
-            _cur.execute("ALTER TABLE accounts ADD COLUMN grounding_llm_model VARCHAR(100) DEFAULT 'gemini-2.5-flash'")
+            _cur.execute("ALTER TABLE accounts ADD COLUMN grounding_llm_model VARCHAR(100) DEFAULT 'gemini-3.5-flash'")
             logger.info("Migration OK: added grounding_llm_model to accounts")
         # Seed default SEARCH_WINDOW_DAYS if missing
         _cur.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('SEARCH_WINDOW_DAYS', '7')")
