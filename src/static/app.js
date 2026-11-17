@@ -872,9 +872,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.getElementById("acc-name").value = acc.name;
                 populateModelSelect(accModelSelect, acc.llm_model || "gemini-3.5-flash");
                 const accGroundingSelect = document.getElementById("acc-grounding-model");
-                if (accGroundingSelect) {
-                    accGroundingSelect.value = acc.grounding_llm_model || "gemini-3.5-flash";
-                }
+                populateGroundingSelect(accGroundingSelect, acc.grounding_llm_model || "gemini-3.5-flash");
                 document.getElementById("acc-temperature").value = acc.llm_temperature;
                 document.getElementById("acc-max-tokens").value = acc.llm_max_tokens;
                 document.getElementById("acc-cpvs").value = acc.target_cpvs.join(", ");
@@ -904,9 +902,7 @@ document.addEventListener("DOMContentLoaded", () => {
             modalTitle.textContent = "Dodaj Nową Kampanię";
             populateModelSelect(accModelSelect, "gemini-3.5-flash");
             const accGroundingSelect = document.getElementById("acc-grounding-model");
-            if (accGroundingSelect) {
-                accGroundingSelect.value = "gemini-3.5-flash";
-            }
+            populateGroundingSelect(accGroundingSelect, "gemini-3.5-flash");
             await renderSourcesCheckboxes(null);
             const defaultPromptData = await apiRequest("/api/settings/default-prompt");
             document.getElementById("acc-prompt").value = defaultPromptData ? formatPromptDates(defaultPromptData.default_prompt) : "";
@@ -1868,6 +1864,34 @@ document.addEventListener("DOMContentLoaded", () => {
     const logModalOkBtn = document.getElementById("log-modal-ok-btn");
     if (logModalOkBtn) logModalOkBtn.addEventListener("click", closeLogDetailsModal);
 
+    // Grounding works only with Gemini models: fill from the live list (Gemini only),
+    // keep the static <option>s from index.html as fallback when the list is not loaded.
+    function populateGroundingSelect(selectEl, selectedValue) {
+        if (!selectEl) return;
+        const geminiModels = (availableModelsList || []).filter(
+            m => typeof m === 'object' && m.provider === "Gemini"
+        );
+        if (geminiModels.length > 0) {
+            selectEl.innerHTML = "";
+            geminiModels.forEach(m => {
+                const opt = document.createElement("option");
+                opt.value = m.id;
+                opt.textContent = m.name || prettyModelName(m.id);
+                selectEl.appendChild(opt);
+            });
+        }
+        if (selectedValue) {
+            const exists = Array.from(selectEl.options).some(o => o.value === selectedValue);
+            if (!exists) {
+                const opt = document.createElement("option");
+                opt.value = selectedValue;
+                opt.textContent = `${selectedValue} (nieaktywny/nieobsługiwany)`;
+                selectEl.appendChild(opt);
+            }
+            selectEl.value = selectedValue;
+        }
+    }
+
     function populateModelSelect(selectEl, selectedValue) {
         if (!selectEl) return;
         selectEl.innerHTML = "";
@@ -1993,6 +2017,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Expose for testing environments
     if (typeof window !== "undefined") {
         window.populateModelSelect = populateModelSelect;
+        window.populateGroundingSelect = populateGroundingSelect;
         window.prettyModelName = prettyModelName;
         window.checkCampaignModelsIntegrity = checkCampaignModelsIntegrity;
         window.renderAnalyticsChart = renderAnalyticsChart;
