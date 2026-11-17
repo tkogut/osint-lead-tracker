@@ -37,6 +37,38 @@ CURATED_OPENROUTER_MODELS = [
     {"id": "google/gemini-2.5-flash", "name": "Gemini 2.5 Flash (OpenRouter)", "provider": "OpenRouter"},
 ]
 
+# Models that models.list() may still return but that fail with 404
+# ("no longer available to new users") or are retired.
+RETIRED_GEMINI_MODELS = {
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash-lite",
+    "gemini-2.0-flash",
+}
+# Variants that cannot be used for text generation / Google Search Grounding.
+_NON_TEXT_MARKERS = (
+    "image", "tts", "audio", "live", "embedding", "embed", "vision",
+    "robotics", "computer-use", "learnlm", "aqa", "imagen", "veo",
+)
+_MIN_GEMINI_VERSION = (2, 5)
+
+
+def is_usable_gemini_model(model_id: str) -> bool:
+    """True for current text-capable Gemini models; False for retired/old/non-text ones."""
+    mid = (model_id or "").lower()
+    if not mid.startswith("gemini"):
+        return False
+    if mid in RETIRED_GEMINI_MODELS:
+        return False
+    if any(marker in mid for marker in _NON_TEXT_MARKERS):
+        return False
+    m = re.match(r"gemini-(\d+)(?:\.(\d+))?", mid)
+    if m:
+        version = (int(m.group(1)), int(m.group(2) or 0))
+        if version < _MIN_GEMINI_VERSION:
+            return False
+    return True
+
+
 DEFAULT_GEMINI_MODELS = [
     {"id": "gemini-3.5-flash", "name": "Gemini 3.5 Flash", "provider": "Gemini"},
     {"id": "gemini-3.5-flash-lite", "name": "Gemini 3.5 Flash Lite", "provider": "Gemini"},
@@ -207,6 +239,8 @@ async def fetch_available_models(force_refresh: bool = False) -> List[Dict[str, 
                         clean_name = name
                         if clean_name.startswith("models/"):
                             clean_name = clean_name[len("models/"):]
+                        if not is_usable_gemini_model(clean_name):
+                            continue
                         display_name = getattr(m, "display_name", None) or clean_name
                         gemini_models.append({
                             "id": clean_name,
