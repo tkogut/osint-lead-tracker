@@ -521,11 +521,9 @@ async def get_available_models() -> Any:
     except Exception as e:
         logger.error("Failed to retrieve available models: %s", e, exc_info=True)
         fallback_list = [
-            {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "provider": "Gemini"},
+            {"id": "gemini-3.5-flash", "name": "Gemini 3.5 Flash", "provider": "Gemini"},
+            {"id": "gemini-3.5-flash-lite", "name": "Gemini 3.5 Flash Lite", "provider": "Gemini"},
             {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "provider": "Gemini"},
-            {"id": "gemini-2.0-flash", "name": "Gemini 2.0 Flash", "provider": "Gemini"},
-            {"id": "gemini-1.5-flash", "name": "Gemini 1.5 Flash", "provider": "Gemini"},
-            {"id": "gemini-1.5-pro", "name": "Gemini 1.5 Pro", "provider": "Gemini"},
             {"id": "anthropic/claude-3.7-sonnet", "name": "Claude 3.7 Sonnet", "provider": "OpenRouter"},
             {"id": "openai/gpt-4o", "name": "GPT-4o", "provider": "OpenRouter"},
         ]
@@ -948,7 +946,7 @@ async def get_accounts(
             enabled_sources=_parse_enabled_sources(acc.enabled_sources),
             custom_prompt=formatted_prompt,
             llm_model=acc.llm_model,
-            grounding_llm_model=acc.grounding_llm_model or "gemini-2.5-flash",
+            grounding_llm_model=acc.grounding_llm_model or "gemini-3.5-flash",
             llm_temperature=acc.llm_temperature,
             llm_max_tokens=acc.llm_max_tokens,
             odoo_company_id=acc.odoo_company_id,
@@ -965,7 +963,7 @@ async def expand_keywords_via_ai(keywords: List[str]) -> List[str]:
     if not keywords:
         return []
 
-    llm_model = get_db_setting_sync("GOOGLE_LLM_MODEL", "gemini-2.5-flash")
+    llm_model = get_db_setting_sync("GOOGLE_LLM_MODEL", "gemini-3.5-flash")
     prompt = f"Dla podanych słów kluczowych wygeneruj wszystkie poprawne i powszechnie stosowane w zamówieniach publicznych polskie odmiany gramatyczne (przez przypadki, liczby) oraz formy przyimkowe (np. dla 'waga samochodowa' -> 'wagi samochodowej', 'wagach samochodowych', 'wagi do samochodów'). Zwróć wynik jako płaską tablicę JSON zawierającą oryginalne słowa kluczowe oraz wygenerowane odmiany. Nie dodawaj żadnego formatowania markdown (tylko czysty JSON).\nSłowa kluczowe: {keywords}"
 
     try:
@@ -1040,7 +1038,7 @@ async def create_account(
         enabled_sources=_parse_enabled_sources(new_acc.enabled_sources),
         custom_prompt=formatted_prompt,
         llm_model=new_acc.llm_model,
-        grounding_llm_model=new_acc.grounding_llm_model or "gemini-2.5-flash",
+        grounding_llm_model=new_acc.grounding_llm_model or "gemini-3.5-flash",
         llm_temperature=new_acc.llm_temperature,
         llm_max_tokens=new_acc.llm_max_tokens,
         odoo_company_id=new_acc.odoo_company_id,
@@ -1107,7 +1105,7 @@ async def update_account(
         enabled_sources=_parse_enabled_sources(acc.enabled_sources),
         custom_prompt=formatted_prompt,
         llm_model=acc.llm_model,
-        grounding_llm_model=acc.grounding_llm_model or "gemini-2.5-flash",
+        grounding_llm_model=acc.grounding_llm_model or "gemini-3.5-flash",
         llm_temperature=acc.llm_temperature,
         llm_max_tokens=acc.llm_max_tokens,
         odoo_company_id=acc.odoo_company_id,

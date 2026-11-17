@@ -746,7 +746,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 ? `${acc.llm_model}`
                 : `<span class="text-error" style="color: var(--error); font-weight: bold;"><i class="fa-solid fa-triangle-exclamation"></i> ${acc.llm_model} (Nieobsługiwany!)</span>`;
 
-            const groundingModelVal = acc.grounding_llm_model || 'gemini-2.5-flash';
+            const groundingModelVal = acc.grounding_llm_model || 'gemini-3.5-flash';
             const groundingBadge = `<span class="badge badge-grounding" title="Model Google Search Grounding"><i class="fa-brands fa-google"></i> ${groundingModelVal}</span>`;
 
             return `
@@ -870,10 +870,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 modalTitle.textContent = "Edytuj Kampanię";
                 accountIdInput.value = acc.id;
                 document.getElementById("acc-name").value = acc.name;
-                populateModelSelect(accModelSelect, acc.llm_model || "gemini-2.5-flash");
+                populateModelSelect(accModelSelect, acc.llm_model || "gemini-3.5-flash");
                 const accGroundingSelect = document.getElementById("acc-grounding-model");
                 if (accGroundingSelect) {
-                    accGroundingSelect.value = acc.grounding_llm_model || "gemini-2.5-flash";
+                    accGroundingSelect.value = acc.grounding_llm_model || "gemini-3.5-flash";
                 }
                 document.getElementById("acc-temperature").value = acc.llm_temperature;
                 document.getElementById("acc-max-tokens").value = acc.llm_max_tokens;
@@ -902,10 +902,10 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         } else {
             modalTitle.textContent = "Dodaj Nową Kampanię";
-            populateModelSelect(accModelSelect, "gemini-2.5-flash");
+            populateModelSelect(accModelSelect, "gemini-3.5-flash");
             const accGroundingSelect = document.getElementById("acc-grounding-model");
             if (accGroundingSelect) {
-                accGroundingSelect.value = "gemini-2.5-flash";
+                accGroundingSelect.value = "gemini-3.5-flash";
             }
             await renderSourcesCheckboxes(null);
             const defaultPromptData = await apiRequest("/api/settings/default-prompt");
@@ -998,7 +998,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const teamIdVal = document.getElementById("acc-team-id").value;
         const sourceIdVal = document.getElementById("acc-source-id").value;
         const groundingModelEl = document.getElementById("acc-grounding-model");
-        const groundingModelVal = groundingModelEl ? groundingModelEl.value : "gemini-2.5-flash";
+        const groundingModelVal = groundingModelEl ? groundingModelEl.value : "gemini-3.5-flash";
 
         const payload = {
             name: document.getElementById("acc-name").value,
@@ -1007,7 +1007,7 @@ document.addEventListener("DOMContentLoaded", () => {
             enabled_sources: enabledSources,
             custom_prompt: document.getElementById("acc-prompt").value || null,
             llm_model: document.getElementById("acc-model").value,
-            grounding_llm_model: groundingModelVal || "gemini-2.5-flash",
+            grounding_llm_model: groundingModelVal || "gemini-3.5-flash",
             llm_temperature: parseFloat(document.getElementById("acc-temperature").value),
             llm_max_tokens: parseInt(document.getElementById("acc-max-tokens").value),
             odoo_company_id: companyIdVal ? parseInt(companyIdVal) : null,
@@ -1476,10 +1476,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (key === "GOOGLE_LLM_MODEL") {
                 const fallbackModels = [
-                    { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", provider: "Gemini" },
-                    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", provider: "Gemini" },
-                    { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", provider: "Gemini" },
-                    { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", provider: "Gemini" }
+                    { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", provider: "Gemini" },
+                    { id: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash Lite", provider: "Gemini" },
+                    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", provider: "Gemini" }
                 ];
                 const modelsToUse = (availableModelsList && availableModelsList.length > 0) ? availableModelsList : fallbackModels;
                 
@@ -1974,6 +1973,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function prettyModelName(model) {
         const prettyNames = {
+            "gemini-3.5-flash": "Gemini 3.5 Flash",
+            "gemini-3.5-flash-lite": "Gemini 3.5 Flash Lite",
             "gemini-2.5-flash": "Gemini 2.5 Flash",
             "gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite",
             "gemini-2.5-pro": "Gemini 2.5 Pro",

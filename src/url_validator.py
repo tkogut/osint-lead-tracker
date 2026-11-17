@@ -258,7 +258,7 @@ async def attempt_url_recovery(
 
         search_tool = types.Tool(google_search=types.GoogleSearch())
 
-        model = "gemini-2.5-flash"
+        model = "gemini-3.5-flash"
         if account and hasattr(account, "grounding_llm_model") and account.grounding_llm_model:
             model = account.grounding_llm_model
 

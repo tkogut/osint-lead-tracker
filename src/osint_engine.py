@@ -303,7 +303,7 @@ https://ezamowienia.gov.pl/mo-client-board/bzp/notice-details/{urllib.parse.quot
 
 Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników markdown."""
 
-        llm_model = "gemini-2.5-flash"
+        llm_model = "gemini-3.5-flash"
         llm_temp = 0.1
         if account:
             llm_model = account.llm_model
@@ -394,7 +394,7 @@ Jeśli treść spełnia kryteria, zwróć poprawny obiekt JSON:
 
 Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników markdown."""
 
-        llm_model = "gemini-2.5-flash"
+        llm_model = "gemini-3.5-flash"
         llm_temp = 0.1
         if account:
             llm_model = account.llm_model
@@ -589,7 +589,7 @@ Zwróć wyłącznie słowo ODRZUĆ lub poprawny format JSON bez znaczników mark
         """Przeszukuje publiczny internet za pomocą Google Search Grounding."""
         logger.info("Google Search Grounding: start skanowania…")
         
-        llm_model = getattr(account, "grounding_llm_model", None) or get_db_setting_sync("GOOGLE_LLM_MODEL", "gemini-2.5-flash")
+        llm_model = getattr(account, "grounding_llm_model", None) or get_db_setting_sync("GOOGLE_LLM_MODEL", "gemini-3.5-flash")
         if llm_model and isinstance(llm_model, str):
             llm_model = llm_model.lstrip("~")
         llm_temp = 0.1

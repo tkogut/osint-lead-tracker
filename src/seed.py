@@ -724,8 +724,8 @@ async def seed_data() -> None:
                 target_cpvs=json.dumps(TRUCK_CPVS),
                 target_keywords=json.dumps(TRUCK_KEYWORDS),
                 custom_prompt=TRUCK_PROMPT,
-                llm_model="gemini-2.5-flash",
-                grounding_llm_model="gemini-2.5-flash",
+                llm_model="gemini-3.5-flash",
+                grounding_llm_model="gemini-3.5-flash",
                 llm_temperature=0.1,
                 llm_max_tokens=4096,
                 odoo_company_id=1,      # Multicompany Company ID
@@ -771,8 +771,8 @@ async def seed_data() -> None:
                 target_cpvs=json.dumps(AGRO_CPVS),
                 target_keywords=json.dumps(AGRO_KEYWORDS),
                 custom_prompt=AGRO_PROMPT,
-                llm_model="gemini-2.5-flash",
-                grounding_llm_model="gemini-2.5-flash",
+                llm_model="gemini-3.5-flash",
+                grounding_llm_model="gemini-3.5-flash",
                 llm_temperature=0.1,
                 llm_max_tokens=4096,
                 odoo_company_id=1,
@@ -813,8 +813,8 @@ async def seed_data() -> None:
                 target_cpvs=json.dumps(RAILWAY_CPVS),
                 target_keywords=json.dumps(RAILWAY_KEYWORDS),
                 custom_prompt=RAILWAY_PROMPT,
-                llm_model="gemini-2.5-flash",
-                grounding_llm_model="gemini-2.5-flash",
+                llm_model="gemini-3.5-flash",
+                grounding_llm_model="gemini-3.5-flash",
                 llm_temperature=0.1,
                 llm_max_tokens=4096,
                 odoo_company_id=1,
@@ -862,8 +862,8 @@ async def seed_data() -> None:
                 target_cpvs=json.dumps(CALIBRATION_CPVS),
                 target_keywords=json.dumps(CALIBRATION_KEYWORDS),
                 custom_prompt=CALIBRATION_PROMPT,
-                llm_model="gemini-2.5-flash",
-                grounding_llm_model="gemini-2.5-flash",
+                llm_model="gemini-3.5-flash",
+                grounding_llm_model="gemini-3.5-flash",
                 llm_temperature=0.1,
                 llm_max_tokens=4096,
                 odoo_company_id=1,
@@ -911,8 +911,8 @@ async def seed_data() -> None:
                 target_cpvs=json.dumps(INDUSTRIAL_CPVS),
                 target_keywords=json.dumps(INDUSTRIAL_KEYWORDS),
                 custom_prompt=INDUSTRIAL_PROMPT,
-                llm_model="gemini-2.5-flash",
-                grounding_llm_model="gemini-2.5-flash",
+                llm_model="gemini-3.5-flash",
+                grounding_llm_model="gemini-3.5-flash",
                 llm_temperature=0.1,
                 llm_max_tokens=4096,
                 odoo_company_id=1,
@@ -1046,7 +1046,7 @@ async def seed_data() -> None:
                 val = ""
                 if key == "GEMINI_API_KEY": val = settings.gemini_api_key
                 elif key == "OPENROUTER_API_KEY": val = ""
-                elif key == "GOOGLE_LLM_MODEL": val = "gemini-2.5-flash"
+                elif key == "GOOGLE_LLM_MODEL": val = "gemini-3.5-flash"
                 elif key == "ODOO_URL": val = settings.odoo_url
                 elif key == "ODOO_DB": val = settings.odoo_db
                 elif key == "ODOO_USER": val = settings.odoo_user
